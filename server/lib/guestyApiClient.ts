@@ -12,7 +12,7 @@ export class GuestyAPIClient {
     console.log(`[${new Date().toISOString()}] GuestyAPIClient: Initializing client`);
     this.clientId = process.env.GUESTY_CLIENT_ID || '';
     this.clientSecret = process.env.GUESTY_CLIENT_SECRET || '';
-    this.baseURL = 'https://open-api.guesty.com/api/v2';
+    this.baseURL = 'https://open-api.guesty.com/v1';  // Changed from '/api/v2' to '/v1' to match endpoint paths
 
     this.axios = axios.create({
       baseURL: this.baseURL,
@@ -45,7 +45,8 @@ export class GuestyAPIClient {
     console.log(`[${timestamp}] GuestyClient: _getNewAccessToken called`);
 
     try {
-      const response = await axios.post('https://open-api.guesty.com/api/v2/oauth2/token', {
+      // Changed from '/api/v2/oauth2/token' to '/oauth2/token' to match the correct auth URL
+      const response = await axios.post('https://open-api.guesty.com/oauth2/token', {
         grant_type: 'client_credentials',
         client_id: this.clientId,
         client_secret: this.clientSecret,
@@ -120,7 +121,7 @@ export class GuestyAPIClient {
     console.log(`[${timestamp}] GuestyClient: Performing health check`);
 
     try {
-      await this.makeRequest('GET', '/v1/listings', { params: { limit: 1 } });
+      await this.makeRequest('GET', '/listings', { params: { limit: 1 } });  // Changed from '/v1/listings' to '/listings' since baseURL already includes '/v1'
       console.log(`[${timestamp}] GuestyClient: Health check successful`);
       return { success: true, message: 'Guesty API is healthy' };
     } catch (error) {
