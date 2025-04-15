@@ -1919,9 +1919,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/insights/unit/:unitId", checkAuth, async (req, res) => {
     try {
       const unitId = parseInt(req.params.unitId);
-      const unitInsights = await db.select().from(insights)
-        .where(eq(insights.unitId, unitId))
-        .orderBy(insights.createdAt, 'desc');
+      const unitInsights = await db.select().from(insightsTable)
+        .where(eq(insightsTable.unitId, unitId))
+        .orderBy(insightsTable.createdAt, 'desc');
       res.json(unitInsights);
     } catch (error) {
       console.error("Error fetching unit insights:", error);
@@ -1933,9 +1933,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/insights/type/:type", checkAuth, async (req, res) => {
     try {
       const insightType = req.params.type;
-      const typeInsights = await db.select().from(insights)
-        .where(eq(insights.type, insightType))
-        .orderBy(insights.createdAt, 'desc');
+      const typeInsights = await db.select().from(insightsTable)
+        .where(eq(insightsTable.type, insightType))
+        .orderBy(insightsTable.createdAt, 'desc');
       res.json(typeInsights);
     } catch (error) {
       console.error("Error fetching insights by type:", error);
@@ -1986,7 +1986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: generatedInsights.stats
         }));
         
-        await db.insert(insights).values(insightsToInsert);
+        await db.insert(insightsTable).values(insightsToInsert);
       }
       
       res.json({
