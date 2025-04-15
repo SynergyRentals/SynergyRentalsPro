@@ -1122,6 +1122,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+  
+  // Mobile Cleaning Staff API Routes
+  
+  // Get all cleaning tasks assigned to the current user
+  app.get("/api/cleaning/assigned", checkAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      // Get cleaning tasks assigned to the current user
+      const tasks = await storage.getCleaningTasksByAssignee(req.user.id);
+      
+      // Enrich with unit information
+      const enrichedTasks = await Promise.all(tasks.map(async (task) => {
+        const unit = await storage.getUnit(task.unitId);
+        return {
+          ...task,
+          unitName: unit?.name || null,
+          unitAddress: unit?.address || null,
+          checkoutTime: "11:00 AM", // Default checkout time (would ideally come from booking data)
+        };
+      }));
+      
+      return res.status(200).json(enrichedTasks);
+    } catch (error) {
+      console.error("Error fetching assigned cleaning tasks:", error);
+      return res.status(500).json({ error: "Failed to fetch assigned cleaning tasks" });
+    }
+  });
+  
+  // Get cleaning checklist for a specific property
+  app.get("/api/cleaning/checklist/:unitId", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const unitId = parseInt(req.params.unitId);
+      if (isNaN(unitId)) {
+        return res.status(400).json({ error: "Invalid unit ID" });
+      }
+      
+      // Get active cleaning task for this unit
+      const cleaningTasks = await storage.getCleaningTasksByUnitId(unitId);
+      const activeTask = cleaningTasks.find(task => task.status === "scheduled" || task.status === "in-progress");
+      
+      if (!activeTask) {
+        return res.status(404).json({ error: "No active cleaning task found for this unit" });
+      }
+      
+      // Get checklist template
+      const checklistTemplateId = activeTask.checklistTemplateId || 1; // Default to template ID 1 if none specified
+      const checklistTemplate = await storage.getCleaningChecklist(checklistTemplateId);
+      
+      if (!checklistTemplate) {
+        return res.status(404).json({ error: "Cleaning checklist template not found" });
+      }
+      
+      // Get checklist items
+      const checklistItems = await storage.getCleaningChecklistItems(checklistTemplateId);
+      
+      // Get completed items for this task
+      const completedItems = await storage.getCleaningChecklistCompletionsByTaskId(activeTask.id);
+      
+      // Combine the information
+      const enrichedItems = checklistItems.map(item => ({
+        ...item,
+        completed: completedItems.some(ci => ci.checklistItemId === item.id && ci.completed),
+        photoUrl: completedItems.find(ci => ci.checklistItemId === item.id)?.photoUrl || null,
+      }));
+      
+      return res.status(200).json({
+        taskId: activeTask.id,
+        templateId: checklistTemplateId,
+        templateName: checklistTemplate.name,
+        items: enrichedItems,
+      });
+    } catch (error) {
+      console.error("Error fetching cleaning checklist:", error);
+      return res.status(500).json({ error: "Failed to fetch cleaning checklist" });
+    }
+  });
+  
+  // Mark a checklist item as complete
+  app.post("/api/cleaning/checklist-item/complete", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const { cleaningTaskId, checklistItemId, completed, completedAt, photoUrl } = req.body;
+      
+      if (!cleaningTaskId || !checklistItemId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      // Check if completion record already exists
+      const existingCompletion = await storage.getCleaningChecklistCompletion(cleaningTaskId, checklistItemId);
+      
+      let completion;
+      if (existingCompletion) {
+        // Update existing record
+        completion = await storage.updateCleaningChecklistCompletion(existingCompletion.id, {
+          completed: completed !== undefined ? completed : existingCompletion.completed,
+          completedAt: completedAt || existingCompletion.completedAt,
+          completedBy: req.user?.id || existingCompletion.completedBy,
+          photoUrl: photoUrl || existingCompletion.photoUrl,
+        });
+      } else {
+        // Create new record
+        completion = await storage.createCleaningChecklistCompletion({
+          cleaningTaskId,
+          checklistItemId,
+          completed: completed !== undefined ? completed : true,
+          completedAt: completedAt || new Date(),
+          completedBy: req.user?.id || null,
+          photoUrl: photoUrl || null,
+        });
+      }
+      
+      // Log activity
+      await storage.createActivityLog({
+        action: "complete_checklist_item",
+        userId: req.user?.id || null,
+        targetTable: "cleaning_checklist_completion",
+        targetId: completion.id,
+        timestamp: new Date(),
+        notes: `Completed checklist item #${checklistItemId} for cleaning task #${cleaningTaskId}`,
+      });
+      
+      return res.status(200).json(completion);
+    } catch (error) {
+      console.error("Error completing checklist item:", error);
+      return res.status(500).json({ error: "Failed to complete checklist item" });
+    }
+  });
+  
+  // Mark a cleaning task as complete
+  app.post("/api/cleaning/complete/:taskId", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ error: "Invalid task ID" });
+      }
+      
+      // Get the task
+      const task = await storage.getCleaningTask(taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Cleaning task not found" });
+      }
+      
+      // Update the task
+      const updatedTask = await storage.updateCleaningTask(taskId, {
+        status: "completed",
+        completedAt: req.body.completedAt || new Date(),
+        actualDuration: req.body.actualDuration || task.estimatedDuration,
+      });
+      
+      // Log activity
+      await storage.createActivityLog({
+        action: "complete_cleaning_task",
+        userId: req.user?.id || null,
+        targetTable: "cleaning_tasks",
+        targetId: taskId,
+        timestamp: new Date(),
+        notes: `Completed cleaning task for unit #${task.unitId}`,
+      });
+      
+      return res.status(200).json(updatedTask);
+    } catch (error) {
+      console.error("Error completing cleaning task:", error);
+      return res.status(500).json({ error: "Failed to complete cleaning task" });
+    }
+  });
 
   // Guesty API integration routes
   // These endpoints sync data from Guesty to our database
