@@ -532,7 +532,7 @@ export async function getLatestSyncLog(): Promise<any> {
     const logs = await db
       .select()
       .from(guestySyncLogs)
-      .orderBy(desc(guestySyncLogs.startTime as any))
+      .orderBy(desc(guestySyncLogs.syncDate))
       .limit(5);
     
     if (logs.length === 0) {
