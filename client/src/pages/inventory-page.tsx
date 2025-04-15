@@ -238,9 +238,8 @@ export default function InventoryPage() {
       cost: 550, // $5.50
       supplier: "Synergy Cleaning",
       location: "Garage shelf B1",
-      minOrderQuantity: 6,
-      isConsumable: true,
-      imageUrl: null
+      minOrderQuantity: 6
+      // isConsumable and imageUrl fields removed - they don't exist in DB
     },
     {
       id: 5,
@@ -257,9 +256,8 @@ export default function InventoryPage() {
       cost: 1200, // $12.00
       supplier: "Synergy Supplies",
       location: "Garage shelf A3",
-      minOrderQuantity: 5,
-      isConsumable: true,
-      imageUrl: null
+      minOrderQuantity: 5
+      // isConsumable and imageUrl fields removed - they don't exist in DB
     }
   ];
 
