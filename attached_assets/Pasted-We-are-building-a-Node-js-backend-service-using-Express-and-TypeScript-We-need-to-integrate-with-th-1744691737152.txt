@@ -1,0 +1,260 @@
+We are building a Node.js backend service using Express and TypeScript. We need to integrate with the Guesty Property Management System (PMS) via their Open API (https://open-api.guesty.com). Authentication uses OAuth2 Client Credentials Flow. Our project uses Drizzle ORM, but that's not directly relevant for this API client task.
+
+Goal:
+Create a robust TypeScript module/class (src/server/lib/guestyApiClient.ts or a similar appropriate path) to handle all interactions with the Guesty Open API. This client should manage authentication (token retrieval, caching, proactive refresh) and provide a method for making authenticated API calls with built-in rate limit handling.
+
+Requirements:
+
+Configuration:
+
+Read GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET securely from environment variables (process.env). Throw an error during initialization if they are missing.
+Authentication (OAuth2 Client Credentials):
+
+Implement a private method to fetch an access token from https://open-api.guesty.com/oauth2/token using the client ID, client secret, grant_type: 'client_credentials', and scope: 'open-api'.
+Use the axios library for making HTTP requests.
+Token Caching & Proactive Refresh:
+
+Store the retrieved access_token and its expires_in value internally within the client module/instance. Calculate and store the absolute expiration timestamp (e.g., Date.now() + (expires_in * 1000)).
+Implement a mechanism (e.g., a private _ensureTokenValid method) that is called before every API request.
+This mechanism should check if a token exists and if it's nearing expiration (e.g., within 5 minutes of the calculated expiry time).
+If the token is invalid, missing, or nearing expiration, it should automatically call the method from step 2 to fetch a new token before proceeding with the intended API call.
+Authenticated API Requests (makeRequest):
+
+Create a primary public method, perhaps makeRequest<T = any>(method: string, endpoint: string, options?: { params?: Record<string, any>; data?: Record<string, any>; maxRetries?: number }): Promise<T>, where:
+method is the HTTP method (e.g., 'GET', 'POST').
+endpoint is the API path (e.g., '/v1/listings'). It should expect paths starting with '/'.
+options can contain query parameters (params), request body (data), and retry configuration.
+This method must:
+Call the token validation/refresh mechanism (step 3).
+Construct the full URL using a base URL constant https://open-api.guesty.com.
+Include the Authorization: Bearer <access_token> header.
+Include Accept: application/json header.
+Use axios to make the actual HTTP request.
+Rate Limit Handling (429 Errors):
+
+Integrate retry logic directly within the makeRequest method specifically for 429 Too Many Requests errors received from the Guesty API.
+Use exponential backoff: Start with a base delay (e.g., 1 second) and multiply it (e.g., by 2) for each retry attempt.
+Add jitter: Add a small random amount of time to the backoff delay to prevent thundering herd issues.
+Respect Retry-After Header: If the 429 response includes a Retry-After header (containing seconds), prioritize waiting for that duration.
+Limit the number of retries (e.g., maxRetries = 3). If the request still fails after retries, throw the error.
+Error Handling:
+
+Use try/catch blocks for network requests.
+Check the response status code. Throw appropriate errors for non-2xx status codes (especially after exhausting retries for 429). Axios automatically rejects promises for 4xx/5xx status codes, which simplifies this, but ensure specific handling for 429 retries. Handle potential errors during token retrieval separately.
+TypeScript & Async:
+
+Use TypeScript with appropriate types/interfaces (e.g., for token response, API responses if known).
+Use async/await for all asynchronous operations.
+Code Structure Suggestion:
+A class-based approach is recommended to manage the token state:
+
+TypeScript
+
+// src/server/lib/guestyApiClient.ts
+import axios, { AxiosError, Method } from 'axios';
+import { env } from '~/env'; // Assuming you use t3-env or similar for env validation
+
+const GUESTY_BASE_URL = 'https://open-api.guesty.com';
+const TOKEN_URL = `${GUESTY_BASE_URL}/oauth2/token`;
+const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+interface TokenResponse {
+  access_token: string;
+  expires_in: number; // seconds
+  token_type: string;
+  scope: string;
+}
+
+class GuestyAPIClient {
+  private clientId: string;
+  private clientSecret: string;
+  private accessToken: string | null = null;
+  private tokenExpiresAt: number | null = null; // Store as timestamp (ms)
+
+  constructor() {
+    this.clientId = env.GUESTY_CLIENT_ID;
+    this.clientSecret = env.GUESTY_CLIENT_SECRET;
+
+    if (!this.clientId || !this.clientSecret) {
+      console.error('Guesty Client ID or Secret not found in environment variables.');
+      throw new Error('Guesty credentials are required.');
+    }
+    console.log("GuestyAPIClient initialized.");
+  }
+
+  private async _getNewAccessToken(): Promise<void> {
+    console.log("Attempting to retrieve new Guesty access token...");
+    try {
+        const params = new URLSearchParams();
+        params.append('grant_type', 'client_credentials');
+        params.append('scope', 'open-api');
+        params.append('client_id', this.clientId);
+        params.append('client_secret', this.clientSecret);
+
+        const response = await axios.post<TokenResponse>(TOKEN_URL, params, {
+            headers: {
+                 'Content-Type': 'application/x-www-form-urlencoded',
+                 'Accept': 'application/json'
+             }
+        });
+
+      const tokenData = response.data;
+      if (!tokenData.access_token || typeof tokenData.expires_in !== 'number') {
+          throw new Error('Invalid token data received from Guesty.');
+      }
+
+      this.accessToken = tokenData.access_token;
+      // Calculate expiry timestamp in milliseconds
+      this.tokenExpiresAt = Date.now() + (tokenData.expires_in * 1000);
+      console.log(`Successfully retrieved new Guesty token. Expires in ${tokenData.expires_in}s.`);
+
+    } catch (error) {
+      console.error("Error retrieving Guesty access token:", error instanceof AxiosError ? error.response?.data || error.message : error);
+      // Reset token state on failure
+      this.accessToken = null;
+      this.tokenExpiresAt = null;
+      throw new Error(`Failed to retrieve Guesty access token: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async _ensureTokenValid(): Promise<void> {
+    if (!this.accessToken || !this.tokenExpiresAt || this.tokenExpiresAt < (Date.now() + TOKEN_EXPIRY_BUFFER_MS)) {
+      console.log("Guesty token missing, invalid, or nearing expiration. Refreshing...");
+      await this._getNewAccessToken();
+    } else {
+        console.debug("Existing Guesty token is valid.");
+    }
+  }
+
+  // Implement the makeRequest method here, including retry logic for 429 errors
+  // using axios, exponential backoff, jitter, and Retry-After header check.
+  async makeRequest<T = any>(
+      method: Method,
+      endpoint: string,
+      options?: { params?: Record<string, any>; data?: Record<string, any>; maxRetries?: number }
+  ): Promise<T> {
+     // Ensure endpoint starts with /
+     if (!endpoint.startsWith('/')) {
+          throw new Error("Endpoint must start with '/'");
+     }
+
+     const maxRetries = options?.maxRetries ?? 3;
+     let currentRetry = 0;
+     let baseBackoffTimeMs = 1000; // 1 second
+
+     // eslint-disable-next-line no-constant-condition
+     while (true) { // Loop handles retries
+          try {
+               await this._ensureTokenValid(); // Get/refresh token if needed
+
+               const url = `${GUESTY_BASE_URL}${endpoint}`;
+               console.debug(`Making Guesty API request: ${method} ${url}`);
+
+               const response = await axios.request<T>({
+                    method,
+                    url,
+                    params: options?.params,
+                    data: options?.data,
+                    headers: {
+                         'Authorization': `Bearer ${this.accessToken}`,
+                         'Accept': 'application/json',
+                    },
+                    timeout: 30000, // 30 second timeout
+               });
+
+               console.debug(`Guesty API request successful: ${response.status}`);
+               return response.data; // Success
+
+          } catch (error) {
+               if (error instanceof AxiosError && error.response) {
+                    const status = error.response.status;
+                    // Check for rate limiting (429) and if retries are left
+                    if (status === 429 && currentRetry < maxRetries) {
+                         currentRetry++;
+                         let waitTimeMs = baseBackoffTimeMs;
+
+                         // Check for Retry-After header (value expected in seconds)
+                         const retryAfterHeader = error.response.headers['retry-after'];
+                         if (retryAfterHeader) {
+                              const retryAfterSeconds = parseInt(retryAfterHeader, 10);
+                              if (!isNaN(retryAfterSeconds)) {
+                                   waitTimeMs = retryAfterSeconds * 1000;
+                                   console.warn(`Guesty rate limit (429). Retrying after ${retryAfterSeconds}s (Retry ${currentRetry}/${maxRetries})...`);
+                              } else {
+                                   console.warn(`Guesty rate limit (429). Invalid Retry-After header '${retryAfterHeader}'. Using backoff ${waitTimeMs}ms (Retry ${currentRetry}/${maxRetries})...`);
+                              }
+                         } else {
+                              console.warn(`Guesty rate limit (429). No Retry-After header. Using backoff ${waitTimeMs}ms (Retry ${currentRetry}/${maxRetries})...`);
+                         }
+
+                         // Add jitter (e.g., +/- 10-30% of wait time)
+                         const jitter = waitTimeMs * (Math.random() * 0.4 + 0.1); // 10% to 50%
+                         const finalWaitTime = Math.max(500, waitTimeMs + jitter); // Ensure minimum wait
+
+                         await new Promise(resolve => setTimeout(resolve, finalWaitTime));
+
+                         // Exponential backoff for next potential failure (if Retry-After wasn't used)
+                         if (!retryAfterHeader) {
+                              baseBackoffTimeMs *= 2;
+                         }
+                         continue; // Go to next iteration of the while loop to retry
+                    } else {
+                         // Non-429 error, or retries exhausted
+                         console.error(`Guesty API request failed: ${status} - ${error.response.data || error.message}`);
+                         // Special handling for 401 could force token refresh next time
+                         if (status === 401) {
+                              console.warn("Received 401 Unauthorized from Guesty. Invalidating token.");
+                              this.accessToken = null;
+                              this.tokenExpiresAt = null;
+                         }
+                         throw error; // Re-throw the error after logging
+                    }
+               } else {
+                    // Network error or non-Axios error
+                    console.error(`Guesty API request failed: ${error instanceof Error ? error.message : String(error)}`);
+                    throw error; // Re-throw other errors
+               }
+          }
+     } // End while loop
+  }
+
+  // Example convenience method
+  async getListings(params?: { limit?: number; skip?: number; fields?: string[] }): Promise<any> {
+    const queryParams: Record<string, any> = { ...params };
+    if (params?.fields) {
+      queryParams.fields = params.fields.join(','); // Guesty expects comma-separated string
+    }
+    console.log("Requesting listings with params:", queryParams);
+    return this.makeRequest('GET', '/v1/listings', { params: queryParams });
+  }
+}
+
+// Export a singleton instance (optional, but common)
+export const guestyClient = new GuestyAPIClient();
+
+Example Usage (in an Express route):
+
+TypeScript
+
+// Example: src/server/api/routers/guestyExample.ts
+import { createTRPCRouter, publicProcedure } from "~/server/api/trpc"; // Assuming tRPC setup
+import { guestyClient } from "~/server/lib/guestyApiClient"; // Import the client
+
+export const guestyRouter = createTRPCRouter({
+  fetchListings: publicProcedure
+    .query(async () => {
+      try {
+        console.log("Fetching listings via Guesty client in router...");
+        const listingsData = await guestyClient.getListings({ limit: 10 });
+        console.log("Successfully fetched listings data.");
+        return listingsData; // Return data to the client
+      } catch (error) {
+        console.error("Failed to fetch Guesty listings in router:", error);
+        // Handle error appropriately, maybe throw TRPCError
+        throw new Error("Failed to fetch listings from Guesty.");
+      }
+    }),
+});
+
+Instructions for Agent:
+"Please implement the Guesty API client logic in src/server/lib/guestyApiClient.ts based on the requirements and code structure provided above. Ensure robust error handling, token management, and rate limit retries using exponential backoff and jitter. Use environment variables for credentials and axios for HTTP requests."

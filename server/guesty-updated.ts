@@ -1,160 +1,11 @@
-import fetch from "node-fetch";
 import { db } from "./db";
 import { 
   guestyProperties, guestyReservations, guestySyncLogs,
   InsertGuestyProperty, InsertGuestyReservation, InsertGuestySyncLog
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
+import { guestyClient } from "./lib/guestyApiClient";
 
-// Guesty OAuth2 configuration
-const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
-const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
-const BASE_URL = "https://open-api.guesty.com/v1";
-const OAUTH_URL = "https://login.guesty.com/oauth2/aus1p8qrh53CcQTI95d7/v1/token";
-
-// Token storage - in production this should be stored in a database
-interface TokenData {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number; // timestamp when the token expires
-}
-
-// In-memory token cache
-let tokenCache: TokenData | null = {
-  // Use the provided OAuth2 token from the updated information
-  access_token: "eyJraWQiOiJwNTVFdjZtU1lNLVN3blliNmVZQTZ6elptSkQxSm1KMmNLSEhTejhqMDhNIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULkJKR0xWb0JiX1FrckR6MHZGVi1OQk9IQ2RnMnVUUFdId3VzREliVUh3QmsiLCJpc3MiOiJodHRwczovL2xvZ2luLmd1ZXN0eS5jb20vb2F1dGgyL2F1czFwOHFyaDUzQ2NRVEk5NWQ3IiwiYXVkIjoiaHR0cHM6Ly9vcGVuLWFwaS5ndWVzdHkuY29tIiwiaWF0IjoxNzQ0NjkwMDMzLCJleHAiOjE3NDQ3NzY0MzMsImNpZCI6IjBvYW9hYWxqMmJEMkNhRjRCNWQ3Iiwic2NwIjpbIm9wZW4tYXBpIl0sInJlcXVlc3RlciI6IkVYVEVSTkFMIiwiYWNjb3VudElkIjo3",
-  refresh_token: "", // We weren't provided a refresh token
-  expires_at: Date.now() + (86400 * 1000) // Set expiration based on expires_in (86400 seconds)
-};
-
-/**
- * Get a valid OAuth2 access token, retrieving a new one if necessary
- * @returns A valid access token
- */
-export async function getAccessToken(): Promise<string> {
-  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
-    throw new Error("Guesty OAuth credentials are not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.");
-  }
-
-  // Since we have pre-configured the token and know it's valid,
-  // just return it directly during development
-  if (tokenCache && tokenCache.access_token) {
-    return tokenCache.access_token;
-  }
-
-  // The code below is kept for production use when the token expires
-  
-  // Check if we have a valid cached token
-  const now = Date.now();
-  if (tokenCache && tokenCache.expires_at > now + 60000) { // Add 1 minute buffer
-    return tokenCache.access_token;
-  }
-
-  // If we have a refresh token, try to use it
-  if (tokenCache && tokenCache.refresh_token) {
-    try {
-      const newToken = await refreshAccessToken(tokenCache.refresh_token);
-      return newToken;
-    } catch (error) {
-      console.error('Error refreshing token, will try to get a new one', error);
-      // If refresh fails, continue to get a new token
-    }
-  }
-
-  // Get a new token using client credentials flow
-  return await getNewAccessToken();
-}
-
-/**
- * Get a new OAuth2 access token using client credentials flow
- * @returns A new access token
- */
-async function getNewAccessToken(): Promise<string> {
-  const params = new URLSearchParams();
-  params.append('grant_type', 'client_credentials');
-  params.append('client_id', GUESTY_CLIENT_ID!);
-  params.append('client_secret', GUESTY_CLIENT_SECRET!);
-  params.append('scope', 'users listings reservations');
-
-  try {
-    const response = await fetch(OAUTH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Guesty OAuth error (${response.status}): ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    // Cache the token
-    tokenCache = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token || '', // May not be provided in client credentials flow
-      expires_at: Date.now() + (data.expires_in * 1000)
-    };
-
-    return data.access_token;
-  } catch (error) {
-    console.error('Error getting new access token:', error);
-    throw error;
-  }
-}
-
-/**
- * Refresh an OAuth2 access token using a refresh token
- * @param refreshToken The refresh token
- * @returns A new access token
- */
-async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const params = new URLSearchParams();
-  params.append('grant_type', 'refresh_token');
-  params.append('client_id', GUESTY_CLIENT_ID!);
-  params.append('client_secret', GUESTY_CLIENT_SECRET!);
-  params.append('refresh_token', refreshToken);
-
-  try {
-    const response = await fetch(OAUTH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Guesty OAuth refresh error (${response.status}): ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    // Update the token cache
-    tokenCache = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token || refreshToken, // Use new refresh token if provided
-      expires_at: Date.now() + (data.expires_in * 1000)
-    };
-
-    return data.access_token;
-  } catch (error) {
-    console.error('Error refreshing access token:', error);
-    throw error;
-  }
-}
-
-/**
- * Make a request to the Guesty API
- * @param endpoint - API endpoint path
- * @param method - HTTP method
- * @param data - Optional data for POST/PUT requests
- * @returns API response JSON
- */
 /**
  * Perform a health check to verify that the Guesty API domain is reachable
  * @returns Object with health check status
@@ -166,37 +17,11 @@ export async function healthCheck(): Promise<{
   rateLimit?: boolean;
 }> {
   try {
-    // We're using the base domain without the API path
-    const healthCheckUrl = "https://open-api.guesty.com/health";
-    
-    console.log(`Performing Guesty API health check to ${healthCheckUrl}...`);
-    
-    const response = await fetch(healthCheckUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-    });
-    
-    // Handle rate limiting separately
-    if (response.status === 429) {
-      console.log("Rate limit hit during health check. Need to wait before trying again.");
-      return {
-        success: false,
-        message: "Rate limit exceeded. Please wait a moment before trying again.",
-        timestamp: new Date(),
-        rateLimit: true
-      };
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Health check failed with status ${response.status}: ${errorText}`);
-    }
+    const result = await guestyClient.healthCheck();
     
     return {
-      success: true,
-      message: `Guesty API domain is reachable`,
+      success: result.success,
+      message: result.message,
       timestamp: new Date(),
       rateLimit: false
     };
@@ -215,61 +40,26 @@ export async function healthCheck(): Promise<{
   }
 }
 
+/**
+ * Make a request to the Guesty API
+ * @param endpoint - API endpoint path
+ * @param method - HTTP method
+ * @param data - Optional data for POST/PUT requests
+ * @returns API response JSON
+ */
 export async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
-  // Get a valid access token
-  const accessToken = await getAccessToken();
-  
-  const url = `${BASE_URL}${endpoint}`;
-  const options: any = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${accessToken}`
-    },
-  };
-  
-  if (data && (method === "POST" || method === "PUT")) {
-    options.body = JSON.stringify(data);
+  const options: any = {};
+  if (data) {
+    options.data = data;
   }
   
   try {
-    const response = await fetch(url, options);
-    
-    // Handle rate limiting specially
-    if (response.status === 429) {
-      console.log("Rate limit hit. Need to wait before trying again.");
-      
-      // Try to get retry-after header, default to 60 seconds if not present
-      const retryAfter = response.headers.get('retry-after') || '60';
-      const waitTime = parseInt(retryAfter, 10) * 1000;
-      
-      throw new Error(`Rate limit exceeded. Please wait ${Math.ceil(waitTime/1000)} seconds before trying again.`);
+    // Make sure endpoint starts with /
+    if (!endpoint.startsWith('/')) {
+      endpoint = '/' + endpoint;
     }
     
-    if (!response.ok) {
-      // If unauthorized, try to refresh the token and retry once
-      if (response.status === 401) {
-        // Clear token cache to force a new token request
-        tokenCache = null;
-        const newAccessToken = await getAccessToken();
-        
-        // Retry the request with the new token
-        options.headers.Authorization = `Bearer ${newAccessToken}`;
-        const retryResponse = await fetch(url, options);
-        
-        if (!retryResponse.ok) {
-          const errorText = await retryResponse.text();
-          throw new Error(`Guesty API error after token refresh (${retryResponse.status}): ${errorText}`);
-        }
-        
-        return await retryResponse.json();
-      }
-      
-      const errorText = await response.text();
-      throw new Error(`Guesty API error (${response.status}): ${errorText}`);
-    }
-    
-    return await response.json();
+    return await guestyClient.makeRequest(method as any, endpoint, options);
   } catch (error) {
     console.error(`Guesty API request failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     throw error;
@@ -318,30 +108,13 @@ export async function syncProperties(): Promise<{
   properties_synced?: number;
   errors?: string[];
 }> {
-  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
-    const syncResult: InsertGuestySyncLog = {
-      syncType: "properties",
-      status: "failed",
-      errorMessage: "Guesty OAuth credentials not configured",
-      propertiesCount: 0,
-      reservationsCount: null
-    };
-    
-    await db.insert(guestySyncLogs).values(syncResult);
-    
-    return {
-      success: false,
-      message: "Guesty OAuth credentials not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.",
-    };
-  }
-  
   try {
     // Start sync log
     const startTime = new Date();
     console.log("Starting Guesty properties sync at:", startTime.toISOString());
     
-    // Fetch properties from Guesty API using the new endpoint
-    const response = await makeGuestyRequest("/properties?limit=100");
+    // Fetch properties from Guesty API using the client
+    const response = await guestyClient.getProperties({ limit: 100 });
     const properties = response.data || [];
     
     if (!Array.isArray(properties)) {
@@ -435,23 +208,6 @@ export async function syncReservations(): Promise<{
   reservations_synced?: number;
   errors?: string[];
 }> {
-  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
-    const syncResult: InsertGuestySyncLog = {
-      syncType: "reservations",
-      status: "failed",
-      errorMessage: "Guesty OAuth credentials not configured",
-      propertiesCount: null,
-      reservationsCount: 0
-    };
-    
-    await db.insert(guestySyncLogs).values(syncResult);
-    
-    return {
-      success: false,
-      message: "Guesty OAuth credentials not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.",
-    };
-  }
-  
   try {
     // Start sync log
     const startTime = new Date();
@@ -465,9 +221,13 @@ export async function syncReservations(): Promise<{
     const sixMonthsAhead = new Date(now);
     sixMonthsAhead.setMonth(now.getMonth() + 6);
     
-    // Fetch reservations from Guesty API with date filtering using the new endpoint
-    const queryParams = `?checkIn[$gte]=${oneMonthAgo.toISOString()}&checkOut[$lte]=${sixMonthsAhead.toISOString()}&limit=100`;
-    const response = await makeGuestyRequest(`/reservations${queryParams}`);
+    // Fetch reservations from Guesty API using the client
+    const response = await guestyClient.getReservations({
+      limit: 100,
+      checkIn: { $gte: oneMonthAgo.toISOString() },
+      checkOut: { $lte: sixMonthsAhead.toISOString() }
+    });
+    
     const reservations = response.data || [];
     
     if (!Array.isArray(reservations)) {
