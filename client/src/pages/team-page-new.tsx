@@ -68,23 +68,113 @@ export default function TeamPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch team members (users)
+  // Mock users data
+  const mockUsers = [
+    {
+      id: 1,
+      name: "Admin User",
+      username: "admin",
+      email: "admin@synergy.com",
+      role: "admin",
+      phone: "555-123-4567",
+      active: true,
+    },
+    {
+      id: 2,
+      name: "Operations Manager",
+      username: "manager",
+      email: "manager@synergy.com",
+      role: "ops",
+      phone: "555-987-6543",
+      active: true,
+    },
+    {
+      id: 3,
+      name: "Cleaning Staff A",
+      username: "cleaner1",
+      email: "cleaner1@synergy.com",
+      role: "cleaner",
+      phone: "555-111-2222",
+      active: true,
+    },
+    {
+      id: 4,
+      name: "Maintenance Tech",
+      username: "maintenance",
+      email: "maint@synergy.com",
+      role: "maintenance",
+      phone: "555-333-4444",
+      active: true,
+    }
+  ];
+
+  // Mock tasks data
+  const mockTasks = [
+    {
+      id: 1,
+      title: "Clean Property #103",
+      assignedTo: 3,
+      type: "cleaning",
+      completed: false,
+      priority: "high",
+      dueDate: new Date("2025-04-20"),
+    },
+    {
+      id: 2,
+      title: "Fix broken shower in Unit #205",
+      assignedTo: 4,
+      type: "maintenance",
+      completed: false,
+      priority: "urgent",
+      dueDate: new Date("2025-04-16"),
+    },
+    {
+      id: 3,
+      title: "Restock linens at Property #112",
+      assignedTo: 3,
+      type: "inventory",
+      completed: true,
+      priority: "normal",
+      dueDate: new Date("2025-04-10"),
+    },
+    {
+      id: 4,
+      title: "Update property manual",
+      assignedTo: 2,
+      type: "admin",
+      completed: false,
+      priority: "low",
+      dueDate: new Date("2025-04-25"),
+    }
+  ];
+
+  // Setup React Query for loading users
   const {
-    data: users = [],
+    data: users = mockUsers,
     isLoading: isLoadingUsers,
     error: userError,
   } = useQuery({
     queryKey: ["/api/users"],
-    queryFn: undefined,
+    queryFn: async () => {
+      // When API is actually available
+      // return fetch("/api/users").then(res => res.json());
+      return mockUsers;
+    },
+    initialData: mockUsers,
   });
 
-  // Fetch tasks for workload view
+  // Setup React Query for loading tasks
   const {
-    data: tasks = [],
+    data: tasks = mockTasks,
     isLoading: isLoadingTasks,
   } = useQuery({
     queryKey: ["/api/tasks"],
-    queryFn: undefined,
+    queryFn: async () => {
+      // When API is actually available
+      // return fetch("/api/tasks").then(res => res.json());
+      return mockTasks;
+    },
+    initialData: mockTasks,
   });
 
   // Filter team members based on search and role
