@@ -186,6 +186,39 @@ export default function AiToolsPage() {
     }
   };
 
+  // Generate forecast function
+  const generateForecast = async () => {
+    setIsForecastLoading(true);
+    try {
+      const response = await fetch("/api/ai/forecast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          forecastType, 
+          timeframe
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || "Failed to generate forecast");
+      }
+      
+      const data = await response.json();
+      setForecastResult(data.result);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate forecast",
+        variant: "destructive",
+      });
+    } finally {
+      setIsForecastLoading(false);
+    }
+  };
+
   return (
     <div className="p-4">
       <Container>
@@ -197,6 +230,7 @@ export default function AiToolsPage() {
             <TabsTrigger value="insights">Generate Insights</TabsTrigger>
             <TabsTrigger value="sop">Create SOP</TabsTrigger>
             <TabsTrigger value="sentiment">Sentiment Analysis</TabsTrigger>
+            <TabsTrigger value="forecast">Forecasting</TabsTrigger>
           </TabsList>
           
           {/* AI Assistant Tab */}
@@ -410,6 +444,115 @@ export default function AiToolsPage() {
                               <li key={index}>{point}</li>
                             ))}
                           </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Forecasting Tab */}
+          <TabsContent value="forecast">
+            <Card>
+              <CardHeader>
+                <CardTitle>AI-Powered Forecasting</CardTitle>
+                <CardDescription>Generate predictive forecasts for key business metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="forecastType">Forecast Type</Label>
+                      <Select value={forecastType} onValueChange={setForecastType}>
+                        <SelectTrigger id="forecastType">
+                          <SelectValue placeholder="Select forecast type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="revenue">Revenue</SelectItem>
+                          <SelectItem value="occupancy">Occupancy Rate</SelectItem>
+                          <SelectItem value="maintenance">Maintenance Costs</SelectItem>
+                          <SelectItem value="guest_satisfaction">Guest Satisfaction</SelectItem>
+                          <SelectItem value="operational_efficiency">Operational Efficiency</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="timeframe">Timeframe</Label>
+                      <Select value={timeframe} onValueChange={setTimeframe}>
+                        <SelectTrigger id="timeframe">
+                          <SelectValue placeholder="Select timeframe" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="month">Next Month</SelectItem>
+                          <SelectItem value="quarter">Next Quarter</SelectItem>
+                          <SelectItem value="year">Next Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <Button onClick={generateForecast} disabled={isForecastLoading} className="w-full">
+                    {isForecastLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating Forecast...
+                      </>
+                    ) : (
+                      "Generate Forecast"
+                    )}
+                  </Button>
+                  
+                  {forecastResult && (
+                    <div className="mt-6 space-y-6">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Summary</h3>
+                        <div className="p-4 bg-secondary rounded-md">
+                          {forecastResult.summary}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Forecast Insights</h3>
+                        <div className="space-y-3">
+                          {forecastResult.insights.map((insight, index) => (
+                            <div key={index} className="p-4 border rounded-md hover:bg-slate-50">
+                              <h4 className="font-medium">{insight.title}</h4>
+                              <p className="text-sm text-slate-600 mt-1">{insight.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Forecast Data</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-slate-100">
+                                <th className="border p-2 text-left">Date</th>
+                                <th className="border p-2 text-left">Value</th>
+                                <th className="border p-2 text-left">Type</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {forecastResult.forecast.map((item, index) => (
+                                <tr key={index} className={item.prediction ? "bg-blue-50" : ""}>
+                                  <td className="border p-2">{item.date}</td>
+                                  <td className="border p-2">{item.value}</td>
+                                  <td className="border p-2">
+                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                      item.prediction ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
+                                    }`}>
+                                      {item.prediction ? "Prediction" : "Historical"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     </div>

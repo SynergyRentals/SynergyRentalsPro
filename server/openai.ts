@@ -560,8 +560,145 @@ export async function analyzeUnitHealth(unitId: number, data: any): Promise<{
 }
 
 /**
- * Generate proactive recommendations based on company data
+ * Generate forecast data for business metrics
  */
+export async function generateForecast(forecastType: string, timeframe: string): Promise<{
+  forecast: Array<{
+    date: string;
+    value: number;
+    prediction: boolean;
+  }>;
+  insights: Array<{
+    title: string;
+    description: string;
+  }>;
+  summary: string;
+}> {
+  // Check if API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OpenAI API key is missing");
+    return {
+      forecast: [
+        { date: "2025-05-01", value: 0, prediction: true }
+      ],
+      insights: [
+        {
+          title: "API Key Missing",
+          description: "The OpenAI API key is missing. Please contact your administrator."
+        }
+      ],
+      summary: "Unable to generate forecast due to missing API key"
+    };
+  }
+  
+  try {
+    // Set the timeframe for forecasting
+    let timeframeText = "next month";
+    let dataPoints = 30;
+    
+    if (timeframe === "quarter") {
+      timeframeText = "next quarter";
+      dataPoints = 90;
+    } else if (timeframe === "year") {
+      timeframeText = "next year";
+      dataPoints = 12; // Monthly data points for a year
+    }
+    
+    // Determine the forecast type
+    let metricDescription = "";
+    let valuePrefix = "";
+    
+    switch (forecastType) {
+      case "revenue":
+        metricDescription = "daily revenue";
+        valuePrefix = "$";
+        break;
+      case "occupancy":
+        metricDescription = "occupancy rate (percentage)";
+        valuePrefix = "";
+        break;
+      case "maintenance":
+        metricDescription = "maintenance costs";
+        valuePrefix = "$";
+        break;
+      case "guest_satisfaction":
+        metricDescription = "guest satisfaction score (out of 100)";
+        valuePrefix = "";
+        break;
+      case "operational_efficiency":
+        metricDescription = "operational efficiency score (percentage)";
+        valuePrefix = "";
+        break;
+      default:
+        metricDescription = "business metric";
+        valuePrefix = "";
+    }
+    
+    const currentDate = new Date();
+    const prompt = `As an AI analyst for a property rental management company, generate a forecast for ${metricDescription} for the ${timeframeText}. 
+
+Please provide:
+1. A time series forecast with ${dataPoints} data points, starting from ${currentDate.toISOString().slice(0, 10)}.
+2. 3-5 key insights about the forecast.
+3. A summary of the overall trend and recommendations.
+
+Format your response as JSON with these fields:
+{
+  "forecast": [
+    { "date": "YYYY-MM-DD", "value": number, "prediction": boolean }
+  ],
+  "insights": [
+    { "title": "string", "description": "string" }
+  ],
+  "summary": "string"
+}
+
+For the forecast data:
+- Include both historical data (last 7 days, with "prediction": false) and forecasted data (with "prediction": true)
+- For the values, use realistic ${metricDescription} values
+- For revenue and costs, use dollar values without the $ symbol`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }
+    });
+    
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content returned from OpenAI");
+    }
+    
+    const result = JSON.parse(content);
+    
+    // Format values with prefixes if needed
+    if (valuePrefix) {
+      result.forecast = result.forecast.map((item: any) => ({
+        ...item,
+        value: item.value
+      }));
+    }
+    
+    return result;
+  } catch (error: any) {
+    console.error("Error generating forecast:", error);
+    return {
+      forecast: [
+        { date: "2025-05-01", value: 0, prediction: true }
+      ],
+      insights: [
+        {
+          title: "Forecast Generation Error",
+          description: "There was an error generating the forecast. Please try again later."
+        }
+      ],
+      summary: "An error occurred while generating the forecast. Please try again later."
+    };
+  }
+}
+
 export async function generateProactiveRecommendations(): Promise<Array<{
   title: string;
   description: string;
