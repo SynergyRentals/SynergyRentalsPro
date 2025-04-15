@@ -900,66 +900,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertCleaningTaskSchema.parse(req.body);
       console.log("Validated data:", JSON.stringify(validatedData));
       
-      const cleaningTask = await storage.createCleaningTask(validatedData);
-      console.log("Created cleaning task:", JSON.stringify(cleaningTask));
-      
-      // Send Slack notification for urgent cleaning tasks
-      if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID && cleaningTask.priority === "urgent") {
-        try {
-          const unit = await storage.getUnit(cleaningTask.unitId);
-          const unitName = unit ? unit.name : `Unit #${cleaningTask.unitId}`;
-          const assignee = cleaningTask.assignedTo ? await storage.getUser(cleaningTask.assignedTo) : null;
-          const assigneeName = assignee ? assignee.name : "Unassigned";
-          
-          await sendSlackMessage({
-            channel: process.env.SLACK_CHANNEL_ID,
-            text: `🧹 URGENT CLEANING REQUIRED at ${unitName}!`,
-            blocks: [
-              {
-                type: "header",
-                text: {
-                  type: "plain_text",
-                  text: `🧹 URGENT CLEANING REQUIRED!`,
-                  emoji: true
-                }
-              },
-              {
-                type: "section",
-                fields: [
-                  {
-                    type: "mrkdwn",
-                    text: `*Property:*\n${unitName}`
-                  },
-                  {
-                    type: "mrkdwn",
-                    text: `*Assigned To:*\n${assigneeName}`
-                  },
-                  {
-                    type: "mrkdwn",
-                    text: `*Due:*\n${cleaningTask.scheduledFor ? new Date(cleaningTask.scheduledFor).toLocaleString() : 'ASAP'}`
-                  },
-                  {
-                    type: "mrkdwn",
-                    text: `*Type:*\n${cleaningTask.isInspection ? "Inspection" : "Cleaning"}`
+      try {
+        const cleaningTask = await storage.createCleaningTask(validatedData);
+        console.log("Created cleaning task:", JSON.stringify(cleaningTask));
+        
+        // Send Slack notification for urgent cleaning tasks
+        if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID && cleaningTask.priority === "urgent") {
+          try {
+            const unit = await storage.getUnit(cleaningTask.unitId);
+            const unitName = unit ? unit.name : `Unit #${cleaningTask.unitId}`;
+            const assignee = cleaningTask.assignedTo ? await storage.getUser(cleaningTask.assignedTo) : null;
+            const assigneeName = assignee ? assignee.name : "Unassigned";
+            
+            await sendSlackMessage({
+              channel: process.env.SLACK_CHANNEL_ID,
+              text: `🧹 URGENT CLEANING REQUIRED at ${unitName}!`,
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: `🧹 URGENT CLEANING REQUIRED!`,
+                    emoji: true
                   }
-                ]
-              },
-              {
-                type: "section",
-                text: {
-                  type: "mrkdwn",
-                  text: `*Notes:*\n${cleaningTask.notes || "No additional notes"}`
+                },
+                {
+                  type: "section",
+                  fields: [
+                    {
+                      type: "mrkdwn",
+                      text: `*Property:*\n${unitName}`
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: `*Assigned To:*\n${assigneeName}`
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: `*Due:*\n${cleaningTask.scheduledFor ? new Date(cleaningTask.scheduledFor).toLocaleString() : 'ASAP'}`
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: `*Type:*\n${cleaningTask.isInspection ? "Inspection" : "Cleaning"}`
+                    }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `*Notes:*\n${cleaningTask.notes || "No additional notes"}`
+                  }
                 }
-              }
-            ]
-          });
-        } catch (slackError) {
-          console.error("Failed to send Slack notification:", slackError);
-          // Continue even if Slack notification fails
+              ]
+            });
+          } catch (slackError) {
+            console.error("Failed to send Slack notification:", slackError);
+            // Continue even if Slack notification fails
+          }
         }
+        
+        res.status(201).json(cleaningTask);
+      } catch (storageError) {
+        console.error("Error in storage.createCleaningTask:", storageError);
+        res.status(500).json({ message: "Internal server error", details: storageError.message });
       }
-      
-      res.status(201).json(cleaningTask);
     } catch (error) {
       console.error("Error creating cleaning task:", error);
       if (error instanceof z.ZodError) {
