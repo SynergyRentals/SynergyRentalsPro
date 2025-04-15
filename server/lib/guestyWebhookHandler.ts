@@ -2,9 +2,6 @@ import crypto from 'crypto';
 import { Request } from 'express';
 import { db } from '../db';
 import { 
-  InsertGuestySyncLog,
-  InsertGuestyProperty,
-  InsertGuestyReservation,
   guestySyncLogs,
   guestyProperties,
   guestyReservations
@@ -67,12 +64,13 @@ async function createWebhookSyncLog(
   details: string
 ): Promise<void> {
   try {
-    const syncLog: InsertGuestySyncLog = {
-      syncType: `webhook_${eventType}`,
-      startedAt: new Date(),
-      completedAt: new Date(),
+    const syncLog = {
+      sync_type: `webhook_${eventType}`,
+      sync_date: new Date(),
+      started_at: new Date(),
+      completed_at: new Date(),
       status: status,
-      itemsProcessed: 1,
+      items_processed: 1,
       notes: details
     };
 
@@ -127,7 +125,7 @@ export async function processPropertyWebhook(propertyData: any): Promise<{ succe
     // Check if property already exists
     const existingProperty = await db.select()
       .from(guestyProperties)
-      .where(eq(guestyProperties.guestyId, propertyData.id))
+      .where(eq(guestyProperties.guesty_id, propertyData.id))
       .limit(1);
 
     if (existingProperty.length > 0) {
@@ -135,18 +133,18 @@ export async function processPropertyWebhook(propertyData: any): Promise<{ succe
       await db.update(guestyProperties)
         .set({
           ...cleanProperty,
-          updatedAt: new Date()
+          updated_at: new Date()
         })
-        .where(eq(guestyProperties.guestyId, propertyData.id));
+        .where(eq(guestyProperties.guesty_id, propertyData.id));
 
-      await createWebhookSyncLog('property', 'success', `Updated property: ${cleanProperty.nickname} (ID: ${propertyData.id})`);
-      return { success: true, message: `Property updated: ${cleanProperty.nickname}` };
+      await createWebhookSyncLog('property', 'success', `Updated property: ${cleanProperty.name} (ID: ${propertyData.id})`);
+      return { success: true, message: `Property updated: ${cleanProperty.name}` };
     } else {
       // Insert new property
       await db.insert(guestyProperties).values(cleanProperty);
       
-      await createWebhookSyncLog('property', 'success', `Created new property: ${cleanProperty.nickname} (ID: ${propertyData.id})`);
-      return { success: true, message: `Property created: ${cleanProperty.nickname}` };
+      await createWebhookSyncLog('property', 'success', `Created new property: ${cleanProperty.name} (ID: ${propertyData.id})`);
+      return { success: true, message: `Property created: ${cleanProperty.name}` };
     }
   } catch (error) {
     console.error('Error processing property webhook:', error);
@@ -173,18 +171,23 @@ export async function processReservationWebhook(reservationData: any): Promise<{
 
     console.log(`Processing reservation webhook for ID: ${reservationData.id}`);
 
-    // Clean and transform the reservation data
-    const cleanReservation: InsertGuestyReservation = {
-      guestyId: reservationData.id,
-      guestyPropertyId: reservationData.listing?._id || null,
-      guestId: reservationData.guest?._id || null,
-      guestName: reservationData.guest?.fullName || 'Unknown Guest',
-      guestEmail: reservationData.guest?.email || null,
-      guestPhone: reservationData.guest?.phone || null,
-      checkIn: reservationData.checkIn ? new Date(reservationData.checkIn) : null,
-      checkOut: reservationData.checkOut ? new Date(reservationData.checkOut) : null,
+    // Clean and transform the reservation data based on existing schema
+    const cleanReservation = {
+      guesty_id: reservationData.id,
+      reservation_id: reservationData.id,
+      property_id: reservationData.listing?._id || null,
+      guest_name: reservationData.guest?.fullName || 'Unknown Guest',
+      guest_email: reservationData.guest?.email || null,
+      check_in: reservationData.checkIn ? new Date(reservationData.checkIn) : new Date(),
+      check_out: reservationData.checkOut ? new Date(reservationData.checkOut) : new Date(),
       status: reservationData.status || 'unknown',
-      confirmationCode: reservationData.confirmationCode || null,
+      channel: reservationData.source || 'direct',
+      total_price: reservationData.money?.total || 0,
+      
+      // Additional fields we've added to the schema
+      guest_id: reservationData.guest?._id || null,
+      guest_phone: reservationData.guest?.phone || null,
+      confirmation_code: reservationData.confirmationCode || null,
       money: {
         total: reservationData.money?.total || 0,
         currency: reservationData.money?.currency || 'USD'
@@ -194,14 +197,14 @@ export async function processReservationWebhook(reservationData: any): Promise<{
       children: reservationData.guests?.children || 0,
       infants: reservationData.guests?.infants || 0,
       pets: reservationData.guests?.pets || 0,
-      totalGuests: reservationData.guests?.total || 0,
-      reservationData: reservationData
+      total_guests: reservationData.guests?.total || 0,
+      reservation_data: reservationData
     };
 
     // Check if reservation already exists
     const existingReservation = await db.select()
       .from(guestyReservations)
-      .where(eq(guestyReservations.guestyId, reservationData.id))
+      .where(eq(guestyReservations.guesty_id, reservationData.id))
       .limit(1);
 
     if (existingReservation.length > 0) {
@@ -209,18 +212,18 @@ export async function processReservationWebhook(reservationData: any): Promise<{
       await db.update(guestyReservations)
         .set({
           ...cleanReservation,
-          updatedAt: new Date()
+          updated_at: new Date()
         })
-        .where(eq(guestyReservations.guestyId, reservationData.id));
+        .where(eq(guestyReservations.guesty_id, reservationData.id));
 
-      await createWebhookSyncLog('reservation', 'success', `Updated reservation: ${cleanReservation.guestyId} for guest ${cleanReservation.guestName}`);
-      return { success: true, message: `Reservation updated: ${cleanReservation.guestyId}` };
+      await createWebhookSyncLog('reservation', 'success', `Updated reservation: ${cleanReservation.reservation_id} for guest ${cleanReservation.guest_name}`);
+      return { success: true, message: `Reservation updated: ${cleanReservation.reservation_id}` };
     } else {
       // Insert new reservation
       await db.insert(guestyReservations).values(cleanReservation);
       
-      await createWebhookSyncLog('reservation', 'success', `Created new reservation: ${cleanReservation.guestyId} for guest ${cleanReservation.guestName}`);
-      return { success: true, message: `Reservation created: ${cleanReservation.guestyId}` };
+      await createWebhookSyncLog('reservation', 'success', `Created new reservation: ${cleanReservation.reservation_id} for guest ${cleanReservation.guest_name}`);
+      return { success: true, message: `Reservation created: ${cleanReservation.reservation_id}` };
     }
   } catch (error) {
     console.error('Error processing reservation webhook:', error);
@@ -250,14 +253,14 @@ export async function processPropertyDeletionWebhook(propertyId: string): Promis
     // Get the property name before deletion for the log
     const existingProperty = await db.select()
       .from(guestyProperties)
-      .where(eq(guestyProperties.guestyId, propertyId))
+      .where(eq(guestyProperties.guesty_id, propertyId))
       .limit(1);
 
-    const propertyName = existingProperty[0]?.nickname || 'Unknown Property';
+    const propertyName = existingProperty[0]?.name || 'Unknown Property';
 
     // Delete the property
     await db.delete(guestyProperties)
-      .where(eq(guestyProperties.guestyId, propertyId));
+      .where(eq(guestyProperties.guesty_id, propertyId));
 
     await createWebhookSyncLog('property', 'success', `Deleted property: ${propertyName} (ID: ${propertyId})`);
     return { success: true, message: `Property deleted: ${propertyName} (ID: ${propertyId})` };
@@ -289,14 +292,14 @@ export async function processReservationDeletionWebhook(reservationId: string): 
     // Get the reservation details before deletion for the log
     const existingReservation = await db.select()
       .from(guestyReservations)
-      .where(eq(guestyReservations.guestyId, reservationId))
+      .where(eq(guestyReservations.guesty_id, reservationId))
       .limit(1);
 
-    const guestName = existingReservation[0]?.guestName || 'Unknown Guest';
+    const guestName = existingReservation[0]?.guest_name || 'Unknown Guest';
 
     // Delete the reservation
     await db.delete(guestyReservations)
-      .where(eq(guestyReservations.guestyId, reservationId));
+      .where(eq(guestyReservations.guesty_id, reservationId));
 
     await createWebhookSyncLog('reservation', 'success', `Deleted reservation: ${reservationId} for guest ${guestName}`);
     return { success: true, message: `Reservation deleted: ${reservationId} for guest ${guestName}` };

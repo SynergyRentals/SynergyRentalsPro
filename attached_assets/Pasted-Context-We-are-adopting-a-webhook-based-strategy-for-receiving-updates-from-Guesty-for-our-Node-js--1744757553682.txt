@@ -1,0 +1,50 @@
+Context:
+We are adopting a webhook-based strategy for receiving updates from Guesty for our Node.js/Express/TypeScript application. Guesty documentation confirms they send POST requests with Content-Type: application/json, use the X-Guesty-Signature-V2 header for signature verification via HMAC-SHA256, and require a shared Signing Key (secret) stored in the environment variable GUESTY_WEBHOOK_SECRET. Guesty expects a fast 200 OK response and will retry if it times out, so processing should be asynchronous/idempotent.
+
+Goal:
+Create a secure Express POST endpoint at /api/webhooks/guesty that:
+
+Verifies incoming webhook signatures using the X-Guesty-Signature-V2 header, HMAC-SHA256, and GUESTY_WEBHOOK_SECRET.
+Immediately responds 200 OK upon successful verification to prevent Guesty retries.
+Asynchronously logs the verified webhook payload (event type, event ID, data) for later processing.
+Rejects requests with invalid signatures (403 Forbidden) or other errors (400 Bad Request).
+Instructions:
+
+Install Dependency: Ensure the crypto module (built-in to Node.js) is available.
+Add Route: Create a new POST route in your Express application for /api/webhooks/guesty.
+Enable Raw Body Parsing: Configure Express to provide the raw request body for this specific route using express.raw({ type: 'application/json' }) middleware before any standard express.json() middleware might run on this path.
+TypeScript
+
+// Example Middleware application for the specific route
+app.post('/api/webhooks/guesty', express.raw({ type: 'application/json' }), async (req, res) => { // Make handler async
+  // Access raw body via req.body (should be a Buffer)
+  // ... rest of handler logic
+});
+Implement Signature Verification:
+Retrieve the signature from the X-Guesty-Signature-V2 header. Return 400 if missing.
+Retrieve the GUESTY_WEBHOOK_SECRET from process.env. Return 500 or log error if missing server-side.
+Get the raw request body (req.body Buffer). Handle cases where it might be empty.
+Calculate the expected signature: const expectedSignature = crypto.createHmac('sha256', webhookSecret).update(req.body).digest('hex');.
+Compare signatures using crypto.timingSafeEqual(Buffer.from(receivedSignature), Buffer.from(expectedSignature));.
+If signatures don't match, log the attempt and return res.status(403).send('Invalid signature');.
+Acknowledge & Log Asynchronously:
+If the signature is valid, immediately send res.status(200).send('OK');.
+After sending the response, start asynchronous processing:
+TypeScript
+
+// Example async processing after sending response
+(async () => {
+  try {
+    const payload = JSON.parse(req.body.toString('utf-8'));
+    console.log(`[<span class="math-inline">\{new Date\(\)\.toISOString\(\)\}\] Valid Guesty Webhook Received\: EventID\=</span>{payload.eventId}, Event=${payload.event}`);
+    console.debug(`[${new Date().toISOString()}] Webhook Payload:`, payload); // Log full payload for debugging
+    // TODO: Add actual processing logic here or push to a queue
+  } catch (parseError) {
+    console.error(`[${new Date().toISOString()}] Error parsing verified Guesty webhook payload:`, parseError);
+  }
+})().catch(processingError => {
+    // Catch errors from the async processing itself
+     console.error(`[${new Date().toISOString()}] Error processing verified Guesty webhook:`, processingError);
+});
+Error Handling: Wrap main logic in try/catch for robustness.
+Instructions for Agent: "Please create an Express POST endpoint at /api/webhooks/guesty. Configure express.raw({ type: 'application/json' }) middleware for it. Implement webhook signature verification using HMAC-SHA256, comparing the X-Guesty-Signature-V2 header against a calculation using the raw body and the GUESTY_WEBHOOK_SECRET environment variable. If valid, respond immediately with 200 OK, then asynchronously parse and log the event details (like eventId, event, and the full payload) from the JSON body. If invalid, respond 403 Forbidden. Include basic error handling."
