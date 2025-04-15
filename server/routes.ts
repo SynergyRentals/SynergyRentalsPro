@@ -16,8 +16,8 @@ import { z } from "zod";
 import { askAI, generateAiInsights, trainAI, generateMaintenanceTicket } from "./openai";
 import { 
   syncProperties, syncReservations, syncAll, getLatestSyncLog,
-  getAccessToken, makeGuestyRequest, healthCheck
-} from "./guesty";
+  makeGuestyRequest, healthCheck
+} from "./guesty-updated";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user

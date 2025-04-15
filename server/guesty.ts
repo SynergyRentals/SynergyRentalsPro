@@ -1,31 +1,10 @@
-import fetch from "node-fetch";
 import { db } from "./db";
 import { 
   guestyProperties, guestyReservations, guestySyncLogs,
   InsertGuestyProperty, InsertGuestyReservation, InsertGuestySyncLog
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
-
-// Guesty OAuth2 configuration
-const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
-const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
-const BASE_URL = "https://open-api.guesty.com/v1";
-const OAUTH_URL = "https://login.guesty.com/oauth2/aus1p8qrh53CcQTI95d7/v1/token";
-
-// Token storage - in production this should be stored in a database
-interface TokenData {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number; // timestamp when the token expires
-}
-
-// In-memory token cache
-let tokenCache: TokenData | null = {
-  // Use the provided OAuth2 token from the updated information
-  access_token: "eyJraWQiOiJwNTVFdjZtU1lNLVN3blliNmVZQTZ6elptSkQxSm1KMmNLSEhTejhqMDhNIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULkJKR0xWb0JiX1FrckR6MHZGVi1OQk9IQ2RnMnVUUFdId3VzREliVUh3QmsiLCJpc3MiOiJodHRwczovL2xvZ2luLmd1ZXN0eS5jb20vb2F1dGgyL2F1czFwOHFyaDUzQ2NRVEk5NWQ3IiwiYXVkIjoiaHR0cHM6Ly9vcGVuLWFwaS5ndWVzdHkuY29tIiwiaWF0IjoxNzQ0NjkwMDMzLCJleHAiOjE3NDQ3NzY0MzMsImNpZCI6IjBvYW9hYWxqMmJEMkNhRjRCNWQ3Iiwic2NwIjpbIm9wZW4tYXBpIl0sInJlcXVlc3RlciI6IkVYVEVSTkFMIiwiYWNjb3VudElkIjo3",
-  refresh_token: "", // We weren't provided a refresh token
-  expires_at: Date.now() + (86400 * 1000) // Set expiration based on expires_in (86400 seconds)
-};
+import { guestyClient } from "./lib/guestyApiClient";
 
 /**
  * Get a valid OAuth2 access token, retrieving a new one if necessary
