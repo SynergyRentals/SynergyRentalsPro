@@ -373,12 +373,14 @@ export default function UnitDetailPage() {
                         <p>{unit.address}</p>
                       </div>
                       
+                      {/* Property Type field is not in the schema, so it's commented out 
                       {unit.source === 'guesty' && unit.propertyType && (
                         <div>
                           <p className="text-sm text-muted-foreground">Property Type</p>
                           <p>{unit.propertyType}</p>
                         </div>
                       )}
+                      */}
                       
                       {unit.source === 'guesty' && unit.bedrooms && (
                         <div>
@@ -419,18 +421,18 @@ export default function UnitDetailPage() {
                         </div>
                       )}
                       
-                      {unit.source === 'guesty' && unit.guestyId && (
+                      {unit.source === 'guesty' && unit.propertyId && (
                         <div>
                           <p className="text-sm text-muted-foreground">Guesty ID</p>
-                          <p className="text-xs font-mono text-muted-foreground">{unit.guestyId}</p>
+                          <p className="text-xs font-mono text-muted-foreground">{unit.propertyId}</p>
                         </div>
                       )}
                       
-                      {unit.source === 'guesty' && unit.lastSync && (
+                      {unit.source === 'guesty' && unit.updatedAt && (
                         <div>
                           <p className="text-sm text-muted-foreground">Last Synced</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(unit.lastSync).toLocaleString()}
+                            {new Date(unit.updatedAt).toLocaleString()}
                           </p>
                         </div>
                       )}
