@@ -218,6 +218,12 @@ export class MemStorage implements IStorage {
     this.cleaningChecklists = new Map();
     this.cleaningChecklistItems = new Map();
     this.cleaningChecklistCompletions = new Map();
+    // Initialize Project Task module maps
+    this.projectMilestones = new Map();
+    this.projectTasks = new Map();
+    this.taskComments = new Map();
+    this.projectFiles = new Map();
+    this.aiGeneratedPlans = new Map();
     
     this.userIdCounter = 1;
     this.unitIdCounter = 1;
@@ -233,6 +239,12 @@ export class MemStorage implements IStorage {
     this.cleaningChecklistIdCounter = 1;
     this.cleaningChecklistItemIdCounter = 1;
     this.cleaningChecklistCompletionIdCounter = 1;
+    // Initialize Project Task module counters
+    this.projectMilestoneIdCounter = 1;
+    this.projectTaskIdCounter = 1;
+    this.taskCommentIdCounter = 1;
+    this.projectFileIdCounter = 1;
+    this.aiGeneratedPlanIdCounter = 1;
     
     const MemoryStore = createMemoryStore(session);
     this.sessionStore = new MemoryStore({
@@ -541,6 +553,167 @@ export class MemStorage implements IStorage {
     return Array.from(this.projects.values()).filter(project => project.unitId === unitId);
   }
   
+  // Project Milestone Methods
+  async getProjectMilestone(id: number): Promise<ProjectMilestone | undefined> {
+    return this.projectMilestones.get(id);
+  }
+  
+  async createProjectMilestone(insertMilestone: InsertProjectMilestone): Promise<ProjectMilestone> {
+    const id = this.projectMilestoneIdCounter++;
+    const createdAt = new Date();
+    const milestone: ProjectMilestone = { 
+      ...insertMilestone, 
+      id, 
+      createdAt,
+      completedAt: null
+    };
+    this.projectMilestones.set(id, milestone);
+    return milestone;
+  }
+  
+  async updateProjectMilestone(id: number, milestoneData: Partial<ProjectMilestone>): Promise<ProjectMilestone | undefined> {
+    const milestone = this.projectMilestones.get(id);
+    if (!milestone) return undefined;
+    
+    // If milestone is being marked as completed, set completedAt
+    if (milestoneData.completed === true && !milestone.completed) {
+      milestoneData.completedAt = new Date();
+    }
+    
+    const updatedMilestone = { ...milestone, ...milestoneData };
+    this.projectMilestones.set(id, updatedMilestone);
+    return updatedMilestone;
+  }
+  
+  async getProjectMilestonesByProject(projectId: number): Promise<ProjectMilestone[]> {
+    return Array.from(this.projectMilestones.values()).filter(milestone => milestone.projectId === projectId);
+  }
+  
+  // Project Task Methods
+  async getProjectTask(id: number): Promise<ProjectTask | undefined> {
+    return this.projectTasks.get(id);
+  }
+  
+  async createProjectTask(insertTask: InsertProjectTask): Promise<ProjectTask> {
+    const id = this.projectTaskIdCounter++;
+    const createdAt = new Date();
+    const task: ProjectTask = { 
+      ...insertTask, 
+      id, 
+      status: "pending", 
+      createdAt,
+      completedAt: null
+    };
+    this.projectTasks.set(id, task);
+    return task;
+  }
+  
+  async updateProjectTask(id: number, taskData: Partial<ProjectTask>): Promise<ProjectTask | undefined> {
+    const task = this.projectTasks.get(id);
+    if (!task) return undefined;
+    
+    // If task is being marked as completed, set completedAt
+    if (taskData.status === 'completed' && task.status !== 'completed') {
+      taskData.completedAt = new Date();
+    }
+    
+    const updatedTask = { ...task, ...taskData };
+    this.projectTasks.set(id, updatedTask);
+    return updatedTask;
+  }
+  
+  async getAllProjectTasks(): Promise<ProjectTask[]> {
+    return Array.from(this.projectTasks.values());
+  }
+  
+  async getProjectTasksByProject(projectId: number): Promise<ProjectTask[]> {
+    return Array.from(this.projectTasks.values()).filter(task => task.projectId === projectId);
+  }
+  
+  async getProjectTasksByUnit(unitId: number): Promise<ProjectTask[]> {
+    return Array.from(this.projectTasks.values()).filter(task => task.unitId === unitId);
+  }
+  
+  async getProjectTasksByAssignee(userId: number): Promise<ProjectTask[]> {
+    return Array.from(this.projectTasks.values()).filter(task => task.assignedTo === userId);
+  }
+  
+  async getProjectTasksByStatus(status: string): Promise<ProjectTask[]> {
+    return Array.from(this.projectTasks.values()).filter(task => task.status === status);
+  }
+  
+  // Task Comment Methods
+  async getTaskComment(id: number): Promise<TaskComment | undefined> {
+    return this.taskComments.get(id);
+  }
+  
+  async createTaskComment(insertComment: InsertTaskComment): Promise<TaskComment> {
+    const id = this.taskCommentIdCounter++;
+    const createdAt = new Date();
+    const comment: TaskComment = { 
+      ...insertComment, 
+      id, 
+      createdAt
+    };
+    this.taskComments.set(id, comment);
+    return comment;
+  }
+  
+  async getTaskCommentsByTask(taskId: number): Promise<TaskComment[]> {
+    return Array.from(this.taskComments.values()).filter(comment => comment.taskId === taskId);
+  }
+  
+  // Project File Methods
+  async getProjectFile(id: number): Promise<ProjectFile | undefined> {
+    return this.projectFiles.get(id);
+  }
+  
+  async createProjectFile(insertFile: InsertProjectFile): Promise<ProjectFile> {
+    const id = this.projectFileIdCounter++;
+    const uploadedAt = new Date();
+    const file: ProjectFile = { 
+      ...insertFile, 
+      id, 
+      uploadedAt
+    };
+    this.projectFiles.set(id, file);
+    return file;
+  }
+  
+  async getProjectFilesByProject(projectId: number): Promise<ProjectFile[]> {
+    return Array.from(this.projectFiles.values()).filter(file => file.projectId === projectId);
+  }
+  
+  // AI Generated Plan Methods
+  async getAiGeneratedPlan(id: number): Promise<AiGeneratedPlan | undefined> {
+    return this.aiGeneratedPlans.get(id);
+  }
+  
+  async createAiGeneratedPlan(insertPlan: InsertAiGeneratedPlan): Promise<AiGeneratedPlan> {
+    const id = this.aiGeneratedPlanIdCounter++;
+    const createdAt = new Date();
+    const plan: AiGeneratedPlan = { 
+      ...insertPlan, 
+      id, 
+      createdAt
+    };
+    this.aiGeneratedPlans.set(id, plan);
+    return plan;
+  }
+  
+  async updateAiGeneratedPlan(id: number, planData: Partial<AiGeneratedPlan>): Promise<AiGeneratedPlan | undefined> {
+    const plan = this.aiGeneratedPlans.get(id);
+    if (!plan) return undefined;
+    
+    const updatedPlan = { ...plan, ...planData };
+    this.aiGeneratedPlans.set(id, updatedPlan);
+    return updatedPlan;
+  }
+  
+  async getAiGeneratedPlansByProject(projectId: number): Promise<AiGeneratedPlan[]> {
+    return Array.from(this.aiGeneratedPlans.values()).filter(plan => plan.projectId === projectId);
+  }
+  
   // Document Methods
   async getDocument(id: number): Promise<Document | undefined> {
     return this.documents.get(id);
@@ -776,6 +949,164 @@ export class DatabaseStorage implements IStorage {
       pool, 
       createTableIfMissing: true
     });
+  }
+  
+  // Project Milestone Methods
+  async getProjectMilestone(id: number): Promise<ProjectMilestone | undefined> {
+    const [milestone] = await db.select().from(schema.projectMilestones).where(eq(schema.projectMilestones.id, id));
+    return milestone;
+  }
+  
+  async createProjectMilestone(insertMilestone: InsertProjectMilestone): Promise<ProjectMilestone> {
+    const [milestone] = await db.insert(schema.projectMilestones).values({
+      ...insertMilestone,
+      complete: false,
+      completedAt: null,
+      createdAt: new Date()
+    }).returning();
+    return milestone;
+  }
+  
+  async updateProjectMilestone(id: number, milestoneData: Partial<ProjectMilestone>): Promise<ProjectMilestone | undefined> {
+    // If milestone is being marked as completed, set completedAt
+    if (milestoneData.complete === true) {
+      const [milestone] = await db.select().from(schema.projectMilestones).where(eq(schema.projectMilestones.id, id));
+      if (milestone && !milestone.complete) {
+        milestoneData.completedAt = new Date();
+      }
+    }
+    
+    const [updatedMilestone] = await db.update(schema.projectMilestones)
+      .set(milestoneData)
+      .where(eq(schema.projectMilestones.id, id))
+      .returning();
+    return updatedMilestone;
+  }
+  
+  async getProjectMilestonesByProject(projectId: number): Promise<ProjectMilestone[]> {
+    return await db.select().from(schema.projectMilestones)
+      .where(eq(schema.projectMilestones.projectId, projectId));
+  }
+  
+  // Project Task Methods
+  async getProjectTask(id: number): Promise<ProjectTask | undefined> {
+    const [task] = await db.select().from(schema.projectTasks).where(eq(schema.projectTasks.id, id));
+    return task;
+  }
+  
+  async createProjectTask(insertTask: InsertProjectTask): Promise<ProjectTask> {
+    const [task] = await db.insert(schema.projectTasks).values({
+      ...insertTask,
+      status: "pending",
+      createdAt: new Date(),
+      completedAt: null
+    }).returning();
+    return task;
+  }
+  
+  async updateProjectTask(id: number, taskData: Partial<ProjectTask>): Promise<ProjectTask | undefined> {
+    // If task is being marked as completed, set completedAt
+    if (taskData.status === 'completed') {
+      const [task] = await db.select().from(schema.projectTasks).where(eq(schema.projectTasks.id, id));
+      if (task && task.status !== 'completed') {
+        taskData.completedAt = new Date();
+      }
+    }
+    
+    const [updatedTask] = await db.update(schema.projectTasks)
+      .set(taskData)
+      .where(eq(schema.projectTasks.id, id))
+      .returning();
+    return updatedTask;
+  }
+  
+  async getAllProjectTasks(): Promise<ProjectTask[]> {
+    return await db.select().from(schema.projectTasks);
+  }
+  
+  async getProjectTasksByProject(projectId: number): Promise<ProjectTask[]> {
+    return await db.select().from(schema.projectTasks)
+      .where(eq(schema.projectTasks.projectId, projectId));
+  }
+  
+  async getProjectTasksByUnit(unitId: number): Promise<ProjectTask[]> {
+    return await db.select().from(schema.projectTasks)
+      .where(eq(schema.projectTasks.unitId, unitId));
+  }
+  
+  async getProjectTasksByAssignee(userId: number): Promise<ProjectTask[]> {
+    return await db.select().from(schema.projectTasks)
+      .where(eq(schema.projectTasks.assignedTo, userId));
+  }
+  
+  async getProjectTasksByStatus(status: string): Promise<ProjectTask[]> {
+    return await db.select().from(schema.projectTasks)
+      .where(eq(schema.projectTasks.status, status));
+  }
+  
+  // Task Comment Methods
+  async getTaskComment(id: number): Promise<TaskComment | undefined> {
+    const [comment] = await db.select().from(schema.taskComments).where(eq(schema.taskComments.id, id));
+    return comment;
+  }
+  
+  async createTaskComment(insertComment: InsertTaskComment): Promise<TaskComment> {
+    const [comment] = await db.insert(schema.taskComments).values({
+      ...insertComment,
+      timestamp: new Date()
+    }).returning();
+    return comment;
+  }
+  
+  async getTaskCommentsByTask(taskId: number): Promise<TaskComment[]> {
+    return await db.select().from(schema.taskComments)
+      .where(eq(schema.taskComments.taskId, taskId));
+  }
+  
+  // Project File Methods
+  async getProjectFile(id: number): Promise<ProjectFile | undefined> {
+    const [file] = await db.select().from(schema.projectFiles).where(eq(schema.projectFiles.id, id));
+    return file;
+  }
+  
+  async createProjectFile(insertFile: InsertProjectFile): Promise<ProjectFile> {
+    const [file] = await db.insert(schema.projectFiles).values({
+      ...insertFile,
+      uploadedAt: new Date()
+    }).returning();
+    return file;
+  }
+  
+  async getProjectFilesByProject(projectId: number): Promise<ProjectFile[]> {
+    return await db.select().from(schema.projectFiles)
+      .where(eq(schema.projectFiles.projectId, projectId));
+  }
+  
+  // AI Generated Plan Methods
+  async getAiGeneratedPlan(id: number): Promise<AiGeneratedPlan | undefined> {
+    const [plan] = await db.select().from(schema.aiGeneratedPlans).where(eq(schema.aiGeneratedPlans.id, id));
+    return plan;
+  }
+  
+  async createAiGeneratedPlan(insertPlan: InsertAiGeneratedPlan): Promise<AiGeneratedPlan> {
+    const [plan] = await db.insert(schema.aiGeneratedPlans).values({
+      ...insertPlan,
+      createdAt: new Date()
+    }).returning();
+    return plan;
+  }
+  
+  async updateAiGeneratedPlan(id: number, planData: Partial<AiGeneratedPlan>): Promise<AiGeneratedPlan | undefined> {
+    const [updatedPlan] = await db.update(schema.aiGeneratedPlans)
+      .set(planData)
+      .where(eq(schema.aiGeneratedPlans.id, id))
+      .returning();
+    return updatedPlan;
+  }
+  
+  async getAiGeneratedPlansByProject(projectId: number): Promise<AiGeneratedPlan[]> {
+    return await db.select().from(schema.aiGeneratedPlans)
+      .where(eq(schema.aiGeneratedPlans.projectId, projectId));
   }
 
   // User Methods
