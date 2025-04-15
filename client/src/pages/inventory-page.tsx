@@ -49,6 +49,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Inventory, InsertInventory, insertInventorySchema } from "@shared/schema";
 import { z } from "zod";
+import UnitQrRequestCard from "@/components/inventory/UnitQrRequestCard";
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -512,10 +513,11 @@ export default function InventoryPage() {
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="unit-inventory">Unit Inventory</TabsTrigger>
             <TabsTrigger value="garage-inventory">Garage Inventory</TabsTrigger>
             <TabsTrigger value="order-queue">Order Queue</TabsTrigger>
+            <TabsTrigger value="qr-requests">QR Code Requests</TabsTrigger>
           </TabsList>
 
           {/* Unit Inventory Tab */}
@@ -685,6 +687,11 @@ export default function InventoryPage() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* QR Code Requests Tab */}
+          <TabsContent value="qr-requests" className="mt-4">
+            <UnitQrRequestCard units={units || mockUnits} />
           </TabsContent>
 
           {/* Order Queue Tab */}
