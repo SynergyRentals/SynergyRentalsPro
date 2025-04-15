@@ -119,7 +119,7 @@ export const inventory = pgTable("inventory", {
   notes: text("notes"),
   // sku: text("sku"), // Stock Keeping Unit - removed due to missing column in DB
   // upc: text("upc"), // Universal Product Code - removed due to missing column in DB
-  cost: integer("cost"), // in cents
+  // cost: integer("cost"), // in cents - removed due to missing column in DB
   supplier: text("supplier"),
   location: text("location"), // specific location within unit or garage
   minOrderQuantity: integer("min_order_quantity"),
