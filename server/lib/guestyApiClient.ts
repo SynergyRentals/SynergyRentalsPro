@@ -45,21 +45,26 @@ export class GuestyAPIClient {
     console.log(`[${timestamp}] GuestyClient: _getNewAccessToken called`);
 
     try {
-      // Changed from '/api/v2/oauth2/token' to '/oauth2/token' to match the correct auth URL
-      // Added proper headers as required by the Guesty API
-      const response = await axios.post('https://open-api.guesty.com/oauth2/token', 
-        {
-          grant_type: 'client_credentials',
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          scope: 'read write'
-        },
-        {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        }
+      // Try using application/x-www-form-urlencoded content type instead of JSON
+      // This is a common content type for OAuth token requests
+      const params = new URLSearchParams();
+      params.append('grant_type', 'client_credentials');
+      params.append('client_id', this.clientId);
+      params.append('client_secret', this.clientSecret);
+      params.append('scope', 'read write');
+
+      const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+      
+      console.log(`[${timestamp}] GuestyClient: Sending token request with headers:`, JSON.stringify(headers));
+      console.log(`[${timestamp}] GuestyClient: Sending token request with params:`, params.toString());
+      
+      const response = await axios.post(
+        'https://open-api.guesty.com/oauth2/token', 
+        params,
+        { headers }
       );
 
       this.accessToken = response.data.access_token;
@@ -94,16 +99,26 @@ export class GuestyAPIClient {
       try {
         await this._ensureTokenValid();
 
+        // Prepare headers object for logging
+        const requestHeaders = {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        };
+
+        console.log(`[${timestamp}] GuestyClient: Preparing request ${method} ${endpoint}`);
+        console.log(`[${timestamp}] GuestyClient: Sending Headers ->`, JSON.stringify(requestHeaders));
+        
+        if (data) {
+          console.log(`[${timestamp}] GuestyClient: Sending Data ->`, typeof data === 'object' ? JSON.stringify(data) : data);
+        }
+
         console.log(`[${timestamp}] GuestyClient: Attempting API call to ${endpoint}`);
         const response = await this.axios.request({
           method,
           url: endpoint,
           data,
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+          headers: requestHeaders
         });
 
         console.log(`[${timestamp}] GuestyClient: Request successful for ${method} ${endpoint}`);

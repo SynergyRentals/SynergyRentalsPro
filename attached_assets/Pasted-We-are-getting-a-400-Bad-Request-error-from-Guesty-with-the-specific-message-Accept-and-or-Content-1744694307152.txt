@@ -1,0 +1,54 @@
+We are getting a 400 Bad Request error from Guesty with the specific message: "Accept and/or Content-Type headers likely do not match supported values." This occurred after fixing the endpoint path to /v1/listings. We need to verify the exact headers being sent by axios in our GuestyAPIClient.makeRequest function.
+
+Goal:
+Add logging within the GuestyAPIClient.makeRequest method to print the complete headers object immediately before the axios.request call is made.
+
+Instructions:
+
+Locate makeRequest: Open the file src/server/lib/guestyApiClient.ts and find the makeRequest method.
+
+Add Header Logging: Just before the line const response = await axios.request<T>({ ... });, add the following lines to prepare and log the headers object:
+
+TypeScript
+
+// Inside makeRequest, BEFORE the axios.request call:
+
+const requestHeaders: Record<string, string> = {
+    'Authorization': `Bearer ${this.accessToken}`,
+    'Accept': 'application/json',
+    // Explicitly DO NOT set Content-Type for GET requests initially
+};
+
+// If the method is NOT GET, PUT, POST, PATCH (methods that might have a body),
+// it might be safer to ensure Content-Type isn't set.
+// Or, more simply, rely on axios defaults for GET/DELETE etc.
+// Let's just log what we intend to send for now.
+
+// If options?.headers exist, merge them carefully (optional, check if needed)
+// if (options?.headers) {
+//   Object.assign(requestHeaders, options.headers);
+// }
+
+console.log(`[${new Date().toISOString()}] GuestyClient: Preparing request ${method} ${url}`);
+console.log(`[${new Date().toISOString()}] GuestyClient: Sending Headers ->`, JSON.stringify(requestHeaders)); // Log intended headers
+if (options?.params) {
+    console.log(`[${new Date().toISOString()}] GuestyClient: Sending Params ->`, options.params);
+}
+ if (options?.data) {
+    console.log(`[${new Date().toISOString()}] GuestyClient: Sending Data ->`, options.data);
+}
+
+// Now make the call using the defined headers
+const response = await axios.request<T>({
+    method,
+    url,
+    params: options?.params,
+    data: options?.data,
+    headers: requestHeaders, // Use the headers object we defined and logged
+    timeout: 30000,
+});
+Run and Capture Logs: Run the application, trigger the Health Check or Connection Test that fails, and monitor the console.
+
+Display Logs: Find and display the console logs showing the Sending Headers -> line immediately preceding the 400 Bad Request error.
+
+Instructions for Agent: "Please modify the GuestyAPIClient.makeRequest method in src/server/lib/guestyApiClient.ts to add console.log statements that show the exact headers object being prepared and sent with the axios request, as shown in the example code block above. Then, run the application, trigger the failing check, and display the logs showing the headers just before the 400 error occurs."
