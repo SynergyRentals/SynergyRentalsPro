@@ -675,7 +675,46 @@ export class MemStorage implements IStorage {
   
   async getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]> {
     return Array.from(this.cleaningChecklistCompletions.values())
-      .filter(completion => completion.taskId === taskId);
+      .filter(completion => completion.cleaningTaskId === taskId);
+  }
+  
+  // Get checklist items for a specific template
+  async getCleaningChecklistItems(checklistId: number): Promise<CleaningChecklistItem[]> {
+    return Array.from(this.cleaningChecklistItems.values())
+      .filter(item => item.checklistId === checklistId);
+  }
+  
+  // Get cleaning tasks for a specific unit
+  async getCleaningTasksByUnitId(unitId: number): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values())
+      .filter(task => task.unitId === unitId);
+  }
+  
+  // Get completions for a specific cleaning task
+  async getCleaningChecklistCompletionsByTaskId(taskId: number): Promise<CleaningChecklistCompletion[]> {
+    return Array.from(this.cleaningChecklistCompletions.values())
+      .filter(completion => completion.cleaningTaskId === taskId);
+  }
+  
+  // Get checklist completion by task and item
+  async getCleaningChecklistCompletion(taskId: number, itemId: number): Promise<CleaningChecklistCompletion | undefined> {
+    return Array.from(this.cleaningChecklistCompletions.values())
+      .find(completion => completion.cleaningTaskId === taskId && completion.checklistItemId === itemId);
+  }
+  
+  // Create activity log for user actions
+  async createActivityLog(insertLog: { 
+    action: string; 
+    userId: number | null; 
+    targetTable: string; 
+    targetId?: number; 
+    timestamp: Date;
+    notes: string;
+  }): Promise<any> {
+    const id = this.logIdCounter++;
+    const log = { ...insertLog, id };
+    this.logs.set(id, log);
+    return log;
   }
 }
 

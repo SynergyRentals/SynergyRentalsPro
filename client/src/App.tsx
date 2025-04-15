@@ -7,6 +7,7 @@ import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
 import GuestsPage from "@/pages/guests-page";
 import CleaningPage from "@/pages/cleaning-page";
+import MobileCleaningPage from "@/pages/mobile-cleaning-page";
 import MaintenancePage from "@/pages/maintenance-page";
 import InventoryPage from "@/pages/inventory-page";
 // Using the new Team page implementation
@@ -27,6 +28,7 @@ function Router() {
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/guests" component={GuestsPage} />
       <ProtectedRoute path="/cleaning" component={CleaningPage} />
+      <ProtectedRoute path="/mobile-cleaning" component={MobileCleaningPage} />
       <ProtectedRoute path="/maintenance" component={MaintenancePage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />
       <ProtectedRoute path="/team" component={TeamPage} />
