@@ -449,3 +449,135 @@ export type InsertGuestyReservation = z.infer<typeof insertGuestyReservationSche
 
 export type GuestySyncLog = typeof guestySyncLogs.$inferSelect;
 export type InsertGuestySyncLog = z.infer<typeof insertGuestySyncLogSchema>;
+
+// Company Insights module - AI powered analytics
+export const insights = pgTable("insights", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // revenue, sentiment, operational, unit_health, recommendation
+  unitId: integer("unit_id"), // null for company-wide insights
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  insightType: text("insight_type").notNull(), // info, warning, alert, suggestion
+  severity: text("severity").notNull().default("info"), // info, low, medium, high, critical
+  createdAt: timestamp("created_at").defaultNow(),
+  actionable: boolean("actionable").default(true),
+  data: jsonb("data"), // additional structured data for the insight
+});
+
+export const insertInsightSchema = createInsertSchema(insights).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const unitHealthScores = pgTable("unit_health_scores", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").notNull(),
+  score: integer("score").notNull(), // 0-100 rating
+  revenueScore: integer("revenue_score"), // component scores (0-100)
+  maintenanceScore: integer("maintenance_score"),
+  guestSatisfactionScore: integer("guest_satisfaction_score"),
+  inventoryScore: integer("inventory_score"),
+  cleaningScore: integer("cleaning_score"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  notes: text("notes"),
+  trendDirection: text("trend_direction"), // up, down, stable
+  trendValue: integer("trend_value"), // change value
+});
+
+export const insertUnitHealthScoreSchema = createInsertSchema(unitHealthScores).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const reviewSentiment = pgTable("review_sentiment", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").notNull(),
+  sentimentScore: real("sentiment_score").notNull(), // -1.0 to 1.0 scale
+  trendingKeywords: text("trending_keywords").array(),
+  reviewCount: integer("review_count").notNull().default(0),
+  aiSummary: text("ai_summary"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  positiveAspects: text("positive_aspects").array(),
+  negativeAspects: text("negative_aspects").array(),
+  messageSentiment: real("message_sentiment"), // sentiment from guest messages
+});
+
+export const insertReviewSentimentSchema = createInsertSchema(reviewSentiment).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const revenueSnapshots = pgTable("revenue_snapshots", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  revenue: integer("revenue").notNull(), // in cents
+  occupancyRate: real("occupancy_rate"), // percentage (0-100)
+  averageDailyRate: integer("average_daily_rate"), // in cents
+  bookingCount: integer("booking_count").notNull().default(0),
+  cancellationCount: integer("cancellation_count").default(0),
+  forecastRevenue: integer("forecast_revenue"), // predicted revenue in cents
+  period: text("period").notNull(), // daily, weekly, monthly, quarterly, yearly
+  channelBreakdown: jsonb("channel_breakdown"), // revenue by booking source
+});
+
+export const insertRevenueSnapshotSchema = createInsertSchema(revenueSnapshots).omit({
+  id: true,
+});
+
+export const efficiencyMetrics = pgTable("efficiency_metrics", {
+  id: serial("id").primaryKey(),
+  teamId: integer("team_id"), // null for company-wide
+  taskType: text("task_type").notNull(), // cleaning, maintenance, inventory, etc.
+  onTimePercent: real("on_time_percent"),
+  averageCompletionTime: integer("average_completion_time"), // in minutes
+  tasksCompleted: integer("tasks_completed").default(0),
+  tasksDelayed: integer("tasks_delayed").default(0),
+  period: text("period").notNull(), // daily, weekly, monthly
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  teamSize: integer("team_size"), 
+  costPerTask: integer("cost_per_task"), // in cents
+});
+
+export const insertEfficiencyMetricSchema = createInsertSchema(efficiencyMetrics).omit({
+  id: true,
+});
+
+export const insightLogs = pgTable("insight_logs", {
+  id: serial("id").primaryKey(),
+  analysisType: text("analysis_type").notNull(), // revenue, sentiment, operational, etc.
+  unitId: integer("unit_id"), // null for company-wide
+  timestamp: timestamp("timestamp").defaultNow(),
+  inputData: jsonb("input_data"), // what was analyzed
+  resultData: jsonb("result_data"), // what insights were generated
+  actionabilityScore: real("actionability_score"), // how actionable the insights are (0-1)
+  processingTime: integer("processing_time"), // in milliseconds
+  promptTokens: integer("prompt_tokens"), // number of tokens in prompt
+  completionTokens: integer("completion_tokens"), // number of tokens in completion
+});
+
+export const insertInsightLogSchema = createInsertSchema(insightLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+// Type exports for Company Insights module
+export type Insight = typeof insights.$inferSelect;
+export type InsertInsight = z.infer<typeof insertInsightSchema>;
+
+export type UnitHealthScore = typeof unitHealthScores.$inferSelect;
+export type InsertUnitHealthScore = z.infer<typeof insertUnitHealthScoreSchema>;
+
+export type ReviewSentiment = typeof reviewSentiment.$inferSelect;
+export type InsertReviewSentiment = z.infer<typeof insertReviewSentimentSchema>;
+
+export type RevenueSnapshot = typeof revenueSnapshots.$inferSelect;
+export type InsertRevenueSnapshot = z.infer<typeof insertRevenueSnapshotSchema>;
+
+export type EfficiencyMetric = typeof efficiencyMetrics.$inferSelect;
+export type InsertEfficiencyMetric = z.infer<typeof insertEfficiencyMetricSchema>;
+
+export type InsightLog = typeof insightLogs.$inferSelect;
+export type InsertInsightLog = z.infer<typeof insertInsightLogSchema>;

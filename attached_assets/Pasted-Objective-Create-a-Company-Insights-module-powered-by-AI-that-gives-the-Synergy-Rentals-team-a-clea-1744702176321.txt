@@ -1,0 +1,149 @@
+Objective:
+Create a Company Insights module powered by AI that gives the Synergy Rentals team a clear, proactive view into the business’s health across revenue performance, guest reviews, operational metrics, and unit-level insights. The module should surface trends, detect risks, and suggest actions that lead to measurable improvement.
+
+1. Module Name:
+Company Insights
+
+2. Core Sections
+Create a sidebar entry called Insights that loads a dashboard with the following sections:
+
+a. Revenue Insights
+b. Guest Sentiment & Reviews
+c. Operational Efficiency
+d. Unit Health Scores
+e. Proactive Recommendations (AI-Powered)
+3. Section Details & Features
+a. Revenue Insights
+Purpose: Visualize income trends and spot revenue leaks.
+
+Features:
+
+Weekly, monthly, and quarterly revenue reports by unit, property, and co-host/arbitrage split
+
+Occupancy rate vs. revenue performance
+
+Average nightly rate trends
+
+Underperforming units compared to comps (based on historical performance)
+
+Cancellation trends
+
+Seasonality mapping (automated trend detection)
+
+Exportable charts for owner/client reporting
+
+b. Guest Sentiment & Reviews
+Purpose: Understand guest satisfaction and areas for improvement.
+
+Features:
+
+AI sentiment analysis of recent guest reviews and messages
+
+Sentiment over time (graph)
+
+Unit-level happiness score
+
+Review keyword frequency (e.g., “dirty,” “friendly,” “check-in”)
+
+Guest issue tagging (late check-in, supplies missing, cleanliness, etc.)
+
+Alerts for review drops or clusters of complaints
+
+Option to link flagged reviews to team task (QA, cleaner retrain, etc.)
+
+c. Operational Efficiency
+Purpose: Measure how well the team is performing on day-to-day execution.
+
+Features:
+
+Task completion rates by team (cleaning, maintenance, VA)
+
+On-time vs. delayed tasks
+
+Number of escalated guest issues
+
+Average time to complete cleaning/maintenance
+
+Inventory restock response times
+
+Cost per clean per unit (vs. average)
+
+d. Unit Health Scores
+Purpose: Evaluate which units are operating most efficiently, and which may need intervention.
+
+AI-Powered Scoring Logic (0–100):
+
+Revenue growth/stability
+
+Maintenance frequency
+
+Guest satisfaction
+
+Inventory cost/overuse
+
+Cleaning QC results
+
+Review frequency and rating
+
+Features:
+
+Visual unit cards sorted by score
+
+Auto-flag units with score below threshold
+
+Suggestions to improve score (linked to task system)
+
+e. Proactive Recommendations (AI-Powered)
+Purpose: Use AI to provide actions you can take to improve key metrics before issues arise.
+
+Features:
+
+If reviews drop: “Consider retraining cleaners for Unit 53A based on past guest feedback.”
+
+If occupancy is low: “Increase Wheelhouse minimum for weekdays in Unit 7B; you’re below comp rate.”
+
+If maintenance spikes: “3 repeated issues in Unit 12 suggest plumbing inspection needed.”
+
+If revenue falls: “Consider running a 3-night stay promo during shoulder season in September.”
+
+AI-generated summaries: “This week, Synergy Rentals saw a 12% drop in weekend bookings across 2BR units. Consider adjusting pricing or running promos.”
+
+4. AI Integration Requirements
+Use OpenAI or other LLM API to analyze:
+
+Booking data (revenue, dates, sources)
+
+Guest message and review text
+
+Task history
+
+Maintenance logs
+
+Pricing history (optional if integrated with Wheelhouse)
+
+Create POST /insights/analyze endpoint to process summaries
+
+Store results in insight_logs with timestamp, type, unit_id (if applicable), and actionability score
+
+5. Backend & Tables (PostgreSQL)
+insights: id, type, unit_id, title, description, created_at, insight_type, severity
+
+unit_health_scores: unit_id, score, last_updated, notes
+
+review_sentiment: unit_id, sentiment_score, trending_keywords, AI_summary
+
+revenue_snapshots: unit_id, date_range, revenue, occupancy, ADR
+
+efficiency_metrics: team_id, task_type, on_time_percent, avg_completion_time, period
+
+6. Frontend Features (React + Tailwind)
+Insight Cards (filterable by type, property, severity)
+
+Insight Feed (like a timeline of AI-generated business intelligence)
+
+Charts and Graphs (unit-level and company-wide)
+
+Button to “Create Task from Insight” (assign follow-up action to a team member)
+
+Admin-only filters for deeper analysis
+

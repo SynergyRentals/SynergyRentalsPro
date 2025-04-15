@@ -314,3 +314,321 @@ export async function generateMaintenanceTicket(prompt: string): Promise<{
     };
   }
 }
+
+/**
+ * Generate company insights by analyzing various data
+ */
+export async function generateCompanyInsights(analysisType: string, data: any): Promise<{
+  insights: Array<{
+    title: string;
+    description: string;
+    type: string;
+    insightType: string;
+    severity: string;
+    actionable: boolean;
+  }>;
+  summary: string;
+  stats: Record<string, any>;
+  processingTime?: number;
+}> {
+  // Check if API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OpenAI API key is missing");
+    return {
+      insights: [
+        {
+          title: "API Key Missing",
+          description: "The OpenAI API key is missing. Please contact your administrator.",
+          type: analysisType,
+          insightType: "warning",
+          severity: "high",
+          actionable: true
+        }
+      ],
+      summary: "Unable to generate insights due to missing API key",
+      stats: {}
+    };
+  }
+  
+  const startTime = Date.now();
+  
+  try {
+    const prompts: Record<string, string> = {
+      revenue: `Analyze the following revenue and booking data to identify trends, issues, and opportunities:
+        ${JSON.stringify(data)}
+        
+        Generate insights focused on:
+        1. Revenue trends and anomalies
+        2. Occupancy rate optimization
+        3. Pricing strategy recommendations
+        4. Booking source efficiency
+        5. Seasonal patterns and forecasting`,
+      
+      sentiment: `Analyze the following guest review and sentiment data to identify patterns and improvement areas:
+        ${JSON.stringify(data)}
+        
+        Generate insights focused on:
+        1. Overall sentiment trends
+        2. Common praise points (to reinforce)
+        3. Common complaint areas (to address)
+        4. Unit-specific issues
+        5. Team performance indicators in guest satisfaction`,
+      
+      operations: `Analyze the following operational metrics to identify efficiency improvements and bottlenecks:
+        ${JSON.stringify(data)}
+        
+        Generate insights focused on:
+        1. Team performance metrics
+        2. Task completion rates and delays
+        3. Cost efficiency opportunities
+        4. Process bottlenecks
+        5. Staffing optimization suggestions`,
+      
+      unit_health: `Analyze the following unit health data to identify properties requiring attention:
+        ${JSON.stringify(data)}
+        
+        Generate insights focused on:
+        1. Units with degrading health scores
+        2. Recurring maintenance issues
+        3. Guest satisfaction correlation
+        4. Revenue impact of maintenance issues
+        5. Preventative maintenance opportunities`
+    };
+    
+    const prompt = prompts[analysisType] || `Analyze the following data for insights: ${JSON.stringify(data)}`;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { 
+          role: "system", 
+          content: `You are an AI business analyst for Synergy Rentals, a short-term rental management company. Your task is to analyze data and generate actionable insights.
+          
+          Provide a JSON response with the following structure:
+          {
+            "insights": [
+              {
+                "title": "Brief, actionable insight title",
+                "description": "Detailed explanation with context and reasoning",
+                "type": "${analysisType}", 
+                "insightType": "One of: info, warning, alert, suggestion",
+                "severity": "One of: info, low, medium, high, critical",
+                "actionable": true or false
+              }
+            ],
+            "summary": "A brief 2-3 sentence executive summary of all insights",
+            "stats": {
+              // Key metrics and statistics extracted from the data
+              // Include at least 3-5 relevant statistics, normalized to appropriate units
+            }
+          }
+          
+          Generate 3-5 high-quality, actionable insights. Focus on concrete recommendations.
+          The severity should reflect the business impact of addressing or ignoring the insight.`
+        },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1500,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content returned from OpenAI");
+    }
+    
+    const result = JSON.parse(content);
+    const processingTime = Date.now() - startTime;
+    
+    return {
+      ...result,
+      processingTime
+    };
+  } catch (error: any) {
+    console.error("OpenAI API error:", error);
+    
+    // Check for common error types
+    let errorMessage = "Error generating insights. Please try again later.";
+    if (error?.status === 401) {
+      errorMessage = "Authentication error: The OpenAI API key may be invalid.";
+    } else if (error?.status === 429) {
+      errorMessage = "The AI service is currently experiencing high demand or has reached its rate limit.";
+    }
+    
+    return {
+      insights: [
+        {
+          title: "Error Generating Insights",
+          description: errorMessage,
+          type: analysisType,
+          insightType: "warning",
+          severity: "medium",
+          actionable: false
+        }
+      ],
+      summary: "Unable to generate complete insights at this time due to technical issues.",
+      stats: {},
+      processingTime: Date.now() - startTime
+    };
+  }
+}
+
+/**
+ * Analyze a unit's health by reviewing various metrics
+ */
+export async function analyzeUnitHealth(unitId: number, data: any): Promise<{
+  score: number;
+  revenueScore: number;
+  maintenanceScore: number;
+  guestSatisfactionScore: number;
+  inventoryScore: number;
+  cleaningScore: number;
+  notes: string;
+  trendDirection: 'up' | 'down' | 'stable';
+  trendValue: number;
+}> {
+  // Check if API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OpenAI API key is missing");
+    return {
+      score: 50,
+      revenueScore: 50,
+      maintenanceScore: 50,
+      guestSatisfactionScore: 50,
+      inventoryScore: 50,
+      cleaningScore: 50,
+      notes: "The OpenAI API key is missing. Please contact your administrator.",
+      trendDirection: 'stable',
+      trendValue: 0
+    };
+  }
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { 
+          role: "system", 
+          content: `You are an AI property analyst for Synergy Rentals. Analyze the following unit data and generate a health score.
+          
+          Provide a JSON response with the following structure:
+          {
+            "score": Integer from 0-100 representing overall health,
+            "revenueScore": Integer from 0-100 for revenue performance,
+            "maintenanceScore": Integer from 0-100 for maintenance health,
+            "guestSatisfactionScore": Integer from 0-100 for guest satisfaction,
+            "inventoryScore": Integer from 0-100 for inventory management,
+            "cleaningScore": Integer from 0-100 for cleaning performance,
+            "notes": "Brief analysis of why scores are what they are",
+            "trendDirection": "up", "down", or "stable",
+            "trendValue": Integer representing percent change
+          }
+          
+          Base the scores on the data provided. The overall score should be a weighted average that prioritizes guest satisfaction and maintenance.`
+        },
+        { 
+          role: "user", 
+          content: `Analyze unit #${unitId} with the following data:\n${JSON.stringify(data)}`
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 800,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content returned from OpenAI");
+    }
+    
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("OpenAI API error:", error);
+    
+    // Default values
+    return {
+      score: 50,
+      revenueScore: 50,
+      maintenanceScore: 50,
+      guestSatisfactionScore: 50,
+      inventoryScore: 50,
+      cleaningScore: 50,
+      notes: "Error generating health score. Please try again later.",
+      trendDirection: 'stable',
+      trendValue: 0
+    };
+  }
+}
+
+/**
+ * Generate proactive recommendations based on company data
+ */
+export async function generateProactiveRecommendations(): Promise<Array<{
+  title: string;
+  description: string;
+  type: string;
+  severity: string;
+  actionType: string;
+}>> {
+  // Check if API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OpenAI API key is missing");
+    return [{
+      title: "API Key Missing",
+      description: "The OpenAI API key is missing. Please contact your administrator.",
+      type: "system",
+      severity: "high",
+      actionType: "contact_admin"
+    }];
+  }
+  
+  try {
+    // In a real implementation, we would collect actual company data
+    // For this MVP, we'll generate realistic recommendations with minimal context
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { 
+          role: "system", 
+          content: `You are an AI business analyst for Synergy Rentals, a short-term rental property management company.
+          Generate 5 proactive, actionable recommendations that would be realistic for a vacation rental business.
+          
+          Each recommendation should include:
+          1. A brief, actionable title
+          2. A detailed explanation with context and reasoning
+          3. The business area it relates to (operations, revenue, guest_experience, maintenance, cleaning, inventory)
+          4. A severity level (low, medium, high)
+          5. An action type (create_task, review_data, update_policy, schedule_training, adjust_pricing)
+          
+          Focus on realistic, high-impact recommendations that would actually help a rental management business.
+          Include specific examples and numbers to make recommendations concrete.`
+        },
+        { 
+          role: "user", 
+          content: "Generate proactive recommendations for our short-term rental business."
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1000,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content returned from OpenAI");
+    }
+    
+    const result = JSON.parse(content);
+    return result.recommendations || [];
+  } catch (error: any) {
+    console.error("OpenAI API error:", error);
+    
+    // Default recommendation on error
+    return [{
+      title: "Error Generating Recommendations",
+      description: "We encountered an error while generating recommendations. Please try again later.",
+      type: "system",
+      severity: "medium",
+      actionType: "try_again"
+    }];
+  }
+}
