@@ -87,8 +87,8 @@ export default function InventoryPage() {
       cost: 0,
       supplier: "",
       location: "",
-      minOrderQuantity: 1,
-      isConsumable: true,
+      // minOrderQuantity: 1, // Removed - field doesn't exist in DB
+      // isConsumable: true, // Removed - field doesn't exist in DB
     },
   });
   
@@ -184,9 +184,8 @@ export default function InventoryPage() {
       cost: 1500, // $15.00
       supplier: "Synergy Linen Supply",
       location: "Bathroom closet",
-      minOrderQuantity: 4,
-      isConsumable: false,
-      imageUrl: null
+      minOrderQuantity: 4
+      // isConsumable and imageUrl commented out since they don't exist in DB
     },
     {
       id: 2,
@@ -203,9 +202,8 @@ export default function InventoryPage() {
       cost: 250, // $2.50
       supplier: "Synergy Amenities",
       location: "Bathroom cabinet",
-      minOrderQuantity: 20,
-      isConsumable: true,
-      imageUrl: null
+      minOrderQuantity: 20
+      // isConsumable and imageUrl removed - they don't exist in DB
     },
     {
       id: 3,
@@ -222,9 +220,8 @@ export default function InventoryPage() {
       cost: 120, // $1.20
       supplier: "Synergy Foods",
       location: "Kitchen drawer",
-      minOrderQuantity: 30,
-      isConsumable: true,
-      imageUrl: null
+      minOrderQuantity: 30
+      // isConsumable and imageUrl fields removed - they don't exist in DB
     },
     {
       id: 4,

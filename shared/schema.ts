@@ -124,7 +124,7 @@ export const inventory = pgTable("inventory", {
   // location: text("location"), // specific location within unit or garage - removed due to missing column in DB
   // minOrderQuantity: integer("min_order_quantity"), // removed due to missing column in DB
   // isConsumable: boolean("is_consumable").default(true), // removed due to missing column in DB
-  imageUrl: text("image_url"),
+  // imageUrl: text("image_url"), // removed due to missing column in DB
 });
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({
