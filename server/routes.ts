@@ -9,7 +9,7 @@ import {
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
-import { askAI, generateAiInsights, trainAI } from "./openai";
+import { askAI, generateAiInsights, trainAI, generateMaintenanceTicket } from "./openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
@@ -287,6 +287,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(maintenance);
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // AI-generated maintenance ticket
+  app.post("/api/maintenance/generate", checkAuth, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+      
+      const generatedTicket = await generateMaintenanceTicket(prompt);
+      res.json(generatedTicket);
+    } catch (error) {
+      console.error("Error generating maintenance ticket:", error);
+      res.status(500).json({ message: "Error generating maintenance ticket" });
     }
   });
 
