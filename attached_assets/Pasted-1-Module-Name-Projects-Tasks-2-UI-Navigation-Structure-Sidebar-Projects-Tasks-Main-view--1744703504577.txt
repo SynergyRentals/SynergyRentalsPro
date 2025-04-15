@@ -1,0 +1,184 @@
+1. Module Name:
+Projects & Tasks
+
+2. UI Navigation Structure (Sidebar)
+Projects & Tasks (Main view)
+
+Dashboard
+
+All Tasks
+
+All Projects
+
+AI Project Planner
+
+Calendar View
+
+3. Unified Dashboard
+Display key real-time indicators:
+
+Open Tasks (by type)
+
+Overdue Tasks
+
+Active Projects (by phase)
+
+Units with Most Tasks
+
+Estimated vs. Actual Project Spend
+
+Tasks per Team Member
+
+AI-Powered Suggested Action Cards (e.g. “Consider closing Phase 2 for Project ‘Soulard Upgrade’ — all tasks complete”)
+
+4. All Tasks View
+Features:
+
+Task Table (sortable, filterable by type, due date, status, assignee, project)
+
+Inline task status update and assignment
+
+Create Task button with modal input:
+
+Task Type (Cleaning, Maintenance, Inventory, VA, Admin)
+
+Description
+
+Assigned To
+
+Linked Project (optional)
+
+Unit (optional)
+
+Priority, Due Date
+
+Attach files/photos
+
+Bulk Assign / Bulk Edit options
+
+Quick-link buttons:
+
+Go to Project, View Unit, Open Chat, Reassign
+
+5. All Projects View
+Features:
+
+Visual cards or table layout for all projects
+
+Filters: Status, Unit, Category, Assigned User
+
+Display:
+
+Project Title
+
+Linked Units
+
+Task Completion %
+
+Budget vs. Spend
+
+Assigned Team
+
+Clicking into a project opens full Project Detail View
+
+6. Project Detail View
+Sections:
+
+Overview: Title, Category, Status, Budget, Timeline, Units involved
+
+Milestones: Add/Edit milestones with progress bar
+
+Linked Tasks: List all tasks created under this project
+
+Add New Task (auto-link to project)
+
+File uploads: Contracts, designs, quotes, reports
+
+Notes + Commenting feed
+
+Project Spend Tracker (based on linked tasks + manual entries)
+
+7. AI Project Planner (Smart Wizard)
+Page: /projects/ai-planner
+
+Input Fields:
+
+Project Name
+
+Summary of Scope
+
+Key Objectives
+
+Deadline
+
+Unit(s)
+
+Budget Estimate
+
+AI Output:
+
+Suggested phases (Planning, Setup, Execution, Review)
+
+Auto-generated tasks per phase
+
+Assigned roles (Maintenance, Cleaner, Admin, etc.)
+
+Suggested timeline (start/end dates)
+
+Risk flags or dependency notes
+
+Actions:
+
+Accept → Creates project + tasks
+
+Edit plan before accepting
+
+Regenerate option
+
+8. Calendar View
+A full visual calendar displaying:
+
+Task due dates
+
+Project milestones
+
+Filters: task type, assignee, project, status
+
+Click to edit task or milestone
+
+View by day, week, or month
+
+9. Backend Requirements (PostgreSQL)
+Tables:
+projects: id, title, description, start_date, due_date, status, budget_estimate, actual_spend, category, created_by
+
+tasks: id, project_id (nullable), unit_id (nullable), task_type, description, assigned_to, due_date, status, priority, notes, images
+
+project_milestones: id, project_id, title, due_date, complete
+
+task_comments: task_id, user_id, message, timestamp
+
+project_files: project_id, file_url, uploaded_by
+
+10. Permissions Logic
+Admin: full access to all tasks and projects
+
+Ops Manager: create/edit all projects and assign tasks
+
+Cleaner / Maintenance / VA: view tasks assigned to them only
+
+Designers (optional): access to project files and task list
+
+11. AI Integration Requirements
+Use OpenAI API to generate:
+
+Project plans based on user input
+
+Task descriptions
+
+Phase breakdowns
+
+Timeline estimates
+
+Store AI output in ai_generated_plans for future retraining
+
