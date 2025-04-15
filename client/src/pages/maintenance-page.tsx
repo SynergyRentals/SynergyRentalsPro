@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +21,9 @@ import {
   Engineering,
   Business,
   AssignmentInd,
+  Delete,
+  Edit,
+  PhotoLibrary,
 } from "@mui/icons-material";
 import {
   Dialog,
@@ -28,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -36,34 +40,188 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue, 
+} from "@/components/ui/select";
+import { insertMaintenanceSchema } from "@shared/schema";
+import { Maintenance } from "@shared/schema";
+
+// Extended maintenance schema with validation rules for form
+const createMaintenanceSchema = insertMaintenanceSchema.extend({
+  description: z.string().min(5, "Description must be at least 5 characters"),
+  unitId: z.number({
+    required_error: "Please select a property",
+    invalid_type_error: "Please select a property",
+  }),
+  priority: z.enum(["low", "normal", "high", "urgent"], {
+    required_error: "Please select a priority level",
+  }),
+  cost: z.number().optional(),
+});
+
+// Type for the form values
+type CreateMaintenanceFormValues = z.infer<typeof createMaintenanceSchema>;
 
 export default function MaintenancePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("tickets");
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [filterPriority, setFilterPriority] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingMaintenance, setEditingMaintenance] = useState<Maintenance | null>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch maintenance items
   const {
     data: maintenance,
     isLoading,
     error,
-  } = useQuery({
+    refetch: refetchMaintenance,
+  } = useQuery<Maintenance[]>({
     queryKey: ["/api/maintenance"],
-    queryFn: undefined,
   });
 
   // Fetch units for reference
   const { data: units } = useQuery({
     queryKey: ["/api/units"],
-    queryFn: undefined,
   });
 
   // Fetch vendors for reference
   const { data: vendors } = useQuery({
     queryKey: ["/api/vendors"],
-    queryFn: undefined,
+  });
+
+  // Create maintenance mutation
+  const createMaintenanceMutation = useMutation({
+    mutationFn: async (data: CreateMaintenanceFormValues) => {
+      return apiRequest("POST", "/api/maintenance", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Maintenance ticket created",
+        description: "The maintenance ticket has been created successfully",
+        variant: "default",
+      });
+      setIsCreateDialogOpen(false);
+      createForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create maintenance ticket",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update maintenance mutation
+  const updateMaintenanceMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Maintenance> }) => {
+      return apiRequest("PATCH", `/api/maintenance/${id}`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Maintenance ticket updated",
+        description: "The maintenance ticket has been updated successfully",
+        variant: "default",
+      });
+      setIsEditDialogOpen(false);
+      setEditingMaintenance(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update maintenance ticket",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Complete maintenance mutation
+  const completeMaintenanceMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("PATCH", `/api/maintenance/${id}`, {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Maintenance completed",
+        description: "The maintenance ticket has been marked as completed",
+        variant: "default",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to complete maintenance",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Assign vendor mutation
+  const assignVendorMutation = useMutation({
+    mutationFn: async ({ id, vendorId }: { id: number; vendorId: number }) => {
+      return apiRequest("PATCH", `/api/maintenance/${id}`, {
+        vendorId,
+        status: "in-progress",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Vendor assigned",
+        description: "The vendor has been assigned to the maintenance ticket",
+        variant: "default",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to assign vendor",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create form
+  const createForm = useForm<CreateMaintenanceFormValues>({
+    resolver: zodResolver(createMaintenanceSchema),
+    defaultValues: {
+      description: "",
+      unitId: undefined,
+      priority: "normal",
+      notes: "",
+      vendorId: undefined,
+      cost: undefined,
+    },
+  });
+
+  // Edit form
+  const editForm = useForm<Partial<Maintenance>>({
+    resolver: zodResolver(createMaintenanceSchema.partial()),
   });
 
   // Helper function to get unit name
@@ -87,7 +245,9 @@ export default function MaintenancePage() {
   };
 
   // Get priority label and styling
-  const getPriorityBadge = (priority: string) => {
+  const getPriorityBadge = (priority: string | null) => {
+    if (!priority) return <Badge className="bg-green-100 text-green-800 border-0">Normal</Badge>;
+    
     const styleMap: Record<string, { bg: string; text: string }> = {
       low: { bg: "bg-blue-100", text: "text-blue-800" },
       normal: { bg: "bg-green-100", text: "text-green-800" },
@@ -132,17 +292,69 @@ export default function MaintenancePage() {
     }
   };
 
-  // Filter maintenance based on search and active tab
+  // Handle submitting the create form
+  const onSubmitCreate = (data: CreateMaintenanceFormValues) => {
+    // Convert dollar amount to cents for storage
+    if (data.cost) {
+      data.cost = Math.round(data.cost * 100);
+    }
+    createMaintenanceMutation.mutate(data);
+  };
+
+  // Handle submitting the edit form
+  const onSubmitEdit = (data: Partial<Maintenance>) => {
+    if (!editingMaintenance) return;
+    
+    // Convert dollar amount to cents for storage
+    if (data.cost) {
+      data.cost = Math.round(data.cost * 100);
+    }
+    
+    updateMaintenanceMutation.mutate({
+      id: editingMaintenance.id,
+      data,
+    });
+  };
+
+  // Handle clicking edit on a maintenance item
+  const handleEditClick = (item: Maintenance) => {
+    setEditingMaintenance(item);
+    setIsEditDialogOpen(true);
+    
+    // Convert cents to dollars for display
+    const costInDollars = item.cost ? item.cost / 100 : undefined;
+    
+    editForm.reset({
+      description: item.description,
+      unitId: item.unitId,
+      priority: item.priority,
+      notes: item.notes,
+      vendorId: item.vendorId,
+      cost: costInDollars,
+    });
+  };
+
+  // Filter maintenance based on search, status, and priority
   const filteredMaintenance = maintenance
     ? maintenance.filter(
-        (item) =>
-          item.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (item) => {
+          const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesStatus = filterStatus ? item.status === filterStatus : true;
+          const matchesPriority = filterPriority ? item.priority === filterPriority : true;
+          return matchesSearch && matchesStatus && matchesPriority;
+        }
       )
     : [];
   
   // Open tickets and completed tickets for the tickets tab
   const openTickets = filteredMaintenance.filter(item => item.status !== "completed");
   const completedTickets = filteredMaintenance.filter(item => item.status === "completed");
+
+  // Calculate stats for dashboard
+  const totalTickets = maintenance ? maintenance.length : 0;
+  const openTicketsCount = maintenance ? maintenance.filter(item => item.status !== "completed").length : 0;
+  const urgentTicketsCount = maintenance ? maintenance.filter(item => item.priority === "urgent" && item.status !== "completed").length : 0;
+  const percentComplete = totalTickets ? Math.round(((totalTickets - openTicketsCount) / totalTickets) * 100) : 0;
 
   if (isLoading) {
     return (
@@ -159,6 +371,13 @@ export default function MaintenancePage() {
       <Layout>
         <div className="text-center py-10">
           <p className="text-red-500">Error loading maintenance data</p>
+          <Button 
+            onClick={() => refetchMaintenance()} 
+            className="mt-4"
+            variant="outline"
+          >
+            Try Again
+          </Button>
         </div>
       </Layout>
     );
@@ -194,14 +413,25 @@ export default function MaintenancePage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>All Tickets</DropdownMenuItem>
-                <DropdownMenuItem>Urgent Priority</DropdownMenuItem>
-                <DropdownMenuItem>Assigned to Me</DropdownMenuItem>
-                <DropdownMenuItem>By Property</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setFilterStatus(null);
+                  setFilterPriority(null);
+                }}>
+                  All Tickets
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterPriority("urgent")}>
+                  Urgent Priority
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("open")}>
+                  Open Tickets
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("in-progress")}>
+                  In Progress Tickets
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Dialog>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Add className="h-4 w-4 mr-2" />
@@ -212,82 +442,230 @@ export default function MaintenancePage() {
                 <DialogHeader>
                   <DialogTitle>Create Maintenance Ticket</DialogTitle>
                 </DialogHeader>
-                <div className="py-4">
-                  <p className="text-[#9EA2B1] mb-4">
-                    Enter the maintenance issue details below
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Property
-                        </label>
-                        <select className="w-full p-2 border border-gray-300 rounded">
-                          <option value="">Select a property</option>
-                          {units &&
-                            units.map((unit) => (
-                              <option key={unit.id} value={unit.id}>
-                                {unit.name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Description
-                        </label>
-                        <textarea
-                          className="w-full p-2 border border-gray-300 rounded"
-                          rows={3}
-                          placeholder="Describe the maintenance issue..."
-                        ></textarea>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Priority
-                        </label>
-                        <select className="w-full p-2 border border-gray-300 rounded">
-                          <option value="low">Low</option>
-                          <option value="normal" selected>
-                            Normal
-                          </option>
-                          <option value="high">High</option>
-                          <option value="urgent">Urgent</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Assign to Vendor
-                        </label>
-                        <select className="w-full p-2 border border-gray-300 rounded">
-                          <option value="">Unassigned</option>
-                          {vendors &&
-                            vendors.map((vendor) => (
-                              <option key={vendor.id} value={vendor.id}>
-                                {vendor.name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Estimated Cost
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-                          <Input className="pl-6" placeholder="0.00" />
-                        </div>
-                      </div>
-                    </div>
+                <Form {...createForm}>
+                  <form onSubmit={createForm.handleSubmit(onSubmitCreate)} className="space-y-6">
+                    <FormField
+                      control={createForm.control}
+                      name="unitId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Property</FormLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(Number(value))}
+                            defaultValue={field.value?.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a property" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {units?.map((unit) => (
+                                <SelectItem key={unit.id} value={unit.id.toString()}>
+                                  {unit.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={createForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Describe the maintenance issue"
+                              rows={3}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={createForm.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="normal">Normal</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="urgent">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={createForm.control}
+                      name="vendorId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assign to Vendor (Optional)</FormLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                            defaultValue={field.value?.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select vendor" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">Unassigned</SelectItem>
+                              {vendors?.map((vendor) => (
+                                <SelectItem key={vendor.id} value={vendor.id.toString()}>
+                                  {vendor.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={createForm.control}
+                      name="cost"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Estimated Cost (Optional)</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                className="pl-6"
+                                placeholder="0.00"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={createForm.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Additional Notes (Optional)</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Enter any additional notes or details"
+                              rows={2}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div className="flex justify-end space-x-2">
-                      <Button variant="outline">Cancel</Button>
-                      <Button>Create Ticket</Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setIsCreateDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit"
+                        disabled={createMaintenanceMutation.isPending}
+                      >
+                        {createMaintenanceMutation.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Create Ticket
+                      </Button>
                     </div>
-                  </div>
-                </div>
+                  </form>
+                </Form>
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+        
+        {/* Maintenance Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#9EA2B1] text-sm">Total Tickets</p>
+                  <h3 className="text-2xl font-bold">{totalTickets}</h3>
+                </div>
+                <div className="bg-blue-50 p-3 rounded-full">
+                  <Build className="text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#9EA2B1] text-sm">Open Tickets</p>
+                  <h3 className="text-2xl font-bold">{openTicketsCount}</h3>
+                </div>
+                <div className="bg-yellow-50 p-3 rounded-full">
+                  <Engineering className="text-yellow-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#9EA2B1] text-sm">Urgent Issues</p>
+                  <h3 className="text-2xl font-bold">{urgentTicketsCount}</h3>
+                </div>
+                <div className="bg-red-50 p-3 rounded-full">
+                  <PriorityHigh className="text-red-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col">
+                <p className="text-[#9EA2B1] text-sm">Completion Rate</p>
+                <h3 className="text-2xl font-bold mb-2">{percentComplete}%</h3>
+                <Progress value={percentComplete} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Tabs for different views */}
