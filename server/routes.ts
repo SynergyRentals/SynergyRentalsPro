@@ -483,6 +483,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(sanitizedUsers);
   });
 
+  // Slack Routes
+  app.post("/api/slack/send", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      // Check if Slack token is available
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.status(503).json({ 
+          message: "Slack service unavailable", 
+          details: "Slack Bot Token is not configured. Please contact your administrator." 
+        });
+      }
+      
+      const { channel, message, blocks } = req.body;
+      
+      if (!message && !blocks) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      
+      const slackMessage: any = {
+        text: message
+      };
+      
+      if (channel) {
+        slackMessage.channel = channel;
+      }
+      
+      if (blocks) {
+        slackMessage.blocks = blocks;
+      }
+      
+      const timestamp = await sendSlackMessage(slackMessage);
+      
+      await storage.createLog({
+        userId: req.user.id,
+        action: "SEND_SLACK_MESSAGE",
+        targetTable: null,
+        targetId: null,
+        details: JSON.stringify({ channel, message: message?.substring(0, 100) }),
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, timestamp });
+    } catch (error) {
+      console.error("Slack send error:", error);
+      res.status(500).json({ message: "Failed to send Slack message" });
+    }
+  });
+  
+  app.post("/api/slack/maintenance-notification", checkAuth, async (req, res) => {
+    try {
+      // Check if Slack token is available
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.status(503).json({ 
+          message: "Slack service unavailable", 
+          details: "Slack Bot Token is not configured. Please contact your administrator." 
+        });
+      }
+      
+      const { maintenanceId } = req.body;
+      
+      if (!maintenanceId) {
+        return res.status(400).json({ message: "Maintenance ID is required" });
+      }
+      
+      const maintenance = await storage.getMaintenance(parseInt(maintenanceId));
+      
+      if (!maintenance) {
+        return res.status(404).json({ message: "Maintenance request not found" });
+      }
+      
+      // Get user who reported
+      const reporter = await storage.getUser(maintenance.reportedBy);
+      const reporterName = reporter ? reporter.name : "Unknown";
+      
+      const timestamp = await sendMaintenanceNotification({
+        ...maintenance,
+        reportedBy: reporterName
+      });
+      
+      await storage.createLog({
+        userId: req.user.id,
+        action: "SEND_MAINTENANCE_NOTIFICATION",
+        targetTable: "maintenance",
+        targetId: maintenance.id,
+        details: JSON.stringify({ maintenanceId, title: maintenance.title }),
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, timestamp });
+    } catch (error) {
+      console.error("Maintenance notification error:", error);
+      res.status(500).json({ message: "Failed to send maintenance notification" });
+    }
+  });
+  
+  app.post("/api/slack/inventory-alert", checkAuth, async (req, res) => {
+    try {
+      // Check if Slack token is available
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.status(503).json({ 
+          message: "Slack service unavailable", 
+          details: "Slack Bot Token is not configured. Please contact your administrator." 
+        });
+      }
+      
+      const { inventoryId } = req.body;
+      
+      if (!inventoryId) {
+        return res.status(400).json({ message: "Inventory ID is required" });
+      }
+      
+      const inventory = await storage.getInventory(parseInt(inventoryId));
+      
+      if (!inventory) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+      
+      const timestamp = await sendInventoryAlert(inventory);
+      
+      await storage.createLog({
+        userId: req.user.id,
+        action: "SEND_INVENTORY_ALERT",
+        targetTable: "inventory",
+        targetId: inventory.id,
+        details: JSON.stringify({ 
+          inventoryId, 
+          name: inventory.name,
+          quantity: inventory.currentQuantity
+        }),
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, timestamp });
+    } catch (error) {
+      console.error("Inventory alert error:", error);
+      res.status(500).json({ message: "Failed to send inventory alert" });
+    }
+  });
+  
+  app.post("/api/slack/guest-checkin", checkAuth, async (req, res) => {
+    try {
+      // Check if Slack token is available
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.status(503).json({ 
+          message: "Slack service unavailable", 
+          details: "Slack Bot Token is not configured. Please contact your administrator." 
+        });
+      }
+      
+      const { guestId } = req.body;
+      
+      if (!guestId) {
+        return res.status(400).json({ message: "Guest ID is required" });
+      }
+      
+      const guest = await storage.getGuest(parseInt(guestId));
+      
+      if (!guest) {
+        return res.status(404).json({ message: "Guest not found" });
+      }
+      
+      const timestamp = await sendGuestCheckInNotification(guest);
+      
+      await storage.createLog({
+        userId: req.user.id,
+        action: "SEND_GUEST_CHECKIN_NOTIFICATION",
+        targetTable: "guests",
+        targetId: guest.id,
+        details: JSON.stringify({ 
+          guestId, 
+          name: guest.name,
+          unitId: guest.unitId
+        }),
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, timestamp });
+    } catch (error) {
+      console.error("Guest check-in notification error:", error);
+      res.status(500).json({ message: "Failed to send guest check-in notification" });
+    }
+  });
+  
+  app.get("/api/slack/history", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      // Check if Slack token is available
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.status(503).json({ 
+          message: "Slack service unavailable", 
+          details: "Slack Bot Token is not configured. Please contact your administrator." 
+        });
+      }
+      
+      if (!process.env.SLACK_CHANNEL_ID) {
+        return res.status(503).json({ 
+          message: "Slack service misconfigured", 
+          details: "Slack Channel ID is not configured. Please contact your administrator." 
+        });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const channel = req.query.channel || process.env.SLACK_CHANNEL_ID;
+      
+      const history = await readSlackHistory(channel as string, limit);
+      
+      await storage.createLog({
+        userId: req.user.id,
+        action: "READ_SLACK_HISTORY",
+        targetTable: null,
+        targetId: null,
+        details: JSON.stringify({ channel, limit }),
+        ipAddress: req.ip
+      });
+      
+      res.json({ messages: history.messages || [] });
+    } catch (error) {
+      console.error("Error reading Slack history:", error);
+      res.status(500).json({ message: "Failed to read Slack message history" });
+    }
+  });
+
   // AI Routes
   app.post("/api/ai/ask", checkAuth, async (req, res) => {
     try {
