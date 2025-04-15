@@ -9,7 +9,7 @@ import { eq, desc } from "drizzle-orm";
 // Guesty OAuth2 configuration
 const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
 const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
-const BASE_URL = "https://api.guesty.com/api/v2";
+const BASE_URL = "https://open-api.guesty.com/api/v2";
 const OAUTH_URL = "https://login.guesty.com/oauth2/aus1p8qrh53CcQTI95d7/v1/token";
 
 // Token storage - in production this should be stored in a database
@@ -155,6 +155,49 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
  * @param data - Optional data for POST/PUT requests
  * @returns API response JSON
  */
+/**
+ * Perform a health check to verify that the Guesty API domain is reachable
+ * @returns Object with health check status
+ */
+export async function healthCheck(): Promise<{
+  success: boolean;
+  message: string;
+  timestamp: Date;
+}> {
+  try {
+    // We're using the base domain without the API path
+    const healthCheckUrl = "https://open-api.guesty.com/health";
+    
+    console.log(`Performing Guesty API health check to ${healthCheckUrl}...`);
+    
+    const response = await fetch(healthCheckUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Health check failed with status ${response.status}: ${errorText}`);
+    }
+    
+    return {
+      success: true,
+      message: `Guesty API domain is reachable`,
+      timestamp: new Date()
+    };
+  } catch (error) {
+    console.error(`Guesty API health check failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred during health check",
+      timestamp: new Date()
+    };
+  }
+}
+
 export async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
   // Get a valid access token
   const accessToken = await getAccessToken();
