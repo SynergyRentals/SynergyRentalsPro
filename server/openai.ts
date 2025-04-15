@@ -233,3 +233,84 @@ export async function analyzeGuestSentiment(text: string): Promise<{
     };
   }
 }
+
+/**
+ * Generate maintenance ticket details from a prompt
+ */
+export async function generateMaintenanceTicket(prompt: string): Promise<{
+  description: string;
+  unitId?: number;
+  priority: string;
+  notes?: string;
+  vendorId?: number | null;
+  status: string;
+  cost?: number | null;
+}> {
+  // Check if API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OpenAI API key is missing");
+    return {
+      description: "Maintenance issue",
+      priority: "normal",
+      status: "open",
+      notes: "OpenAI API key is missing. Please contact your administrator."
+    };
+  }
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { 
+          role: "system", 
+          content: `You are a property maintenance expert for Synergy Rentals. Parse the user's description of a maintenance issue and create a structured maintenance ticket with the following fields:
+          
+          1. description: A clear, concise title for the maintenance ticket
+          2. priority: One of 'low', 'normal', 'high', or 'urgent' based on severity
+          3. notes: Detailed information about the issue, including suspected causes and potential solutions
+          4. status: Always set to 'open'
+          5. cost: An estimated cost for repairs if possible (numeric value only, no currency symbol)
+          
+          Respond with JSON only.`
+        },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 800,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content returned from OpenAI");
+    }
+    
+    const result = JSON.parse(content);
+    
+    // Ensure the response has the correct format
+    return {
+      description: result.description || "Maintenance issue",
+      priority: ['low', 'normal', 'high', 'urgent'].includes(result.priority) ? result.priority : 'normal',
+      notes: result.notes || "",
+      status: "open",
+      cost: result.cost ? Number(result.cost) : null,
+      vendorId: null
+    };
+  } catch (error: any) {
+    console.error("OpenAI API error:", error);
+    
+    // Check for common error types
+    let errorMessage = "Error generating ticket details. Please enter manually.";
+    if (error?.status === 401) {
+      errorMessage = "Authentication error: The OpenAI API key may be invalid. Please contact your administrator.";
+    } else if (error?.status === 429) {
+      errorMessage = "The AI service is currently experiencing high demand or has reached its rate limit. Please try again later.";
+    }
+    
+    return {
+      description: "Maintenance issue",
+      priority: "normal",
+      status: "open",
+      notes: errorMessage
+    };
+  }
+}
