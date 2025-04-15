@@ -1080,10 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/cleaning-checklist-completions", checkAuth, async (req, res) => {
     try {
       const validatedData = insertCleaningChecklistCompletionSchema.parse(req.body);
-      const completion = await storage.createCleaningChecklistCompletion({
-        ...validatedData,
-        completed: true
-      });
+      const completion = await storage.createCleaningChecklistCompletion(validatedData);
       res.status(201).json(completion);
     } catch (error) {
       if (error instanceof z.ZodError) {

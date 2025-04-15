@@ -260,14 +260,19 @@ export const cleaningTasks = pgTable("cleaning_tasks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertCleaningTaskSchema = createInsertSchema(cleaningTasks).omit({
-  id: true,
-  status: true,
-  completedAt: true,
-  verifiedAt: true,
-  actualDuration: true,
-  createdAt: true,
-});
+export const insertCleaningTaskSchema = createInsertSchema(cleaningTasks)
+  .omit({
+    id: true,
+    status: true,
+    completedAt: true,
+    verifiedAt: true,
+    actualDuration: true,
+    createdAt: true,
+  })
+  .extend({
+    // Allow string date format which will be parsed to Date object
+    scheduledFor: z.union([z.string().datetime(), z.date()]),
+  });
 
 // Cleaning Checklists (templates)
 export const cleaningChecklists = pgTable("cleaning_checklists", {
