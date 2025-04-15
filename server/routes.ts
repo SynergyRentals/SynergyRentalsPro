@@ -14,7 +14,10 @@ import {
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
 import { askAI, generateAiInsights, trainAI, generateMaintenanceTicket } from "./openai";
-import { syncProperties, syncReservations, syncAll, getLatestSyncLog } from "./guesty";
+import { 
+  syncProperties, syncReservations, syncAll, getLatestSyncLog,
+  getAccessToken, makeGuestyRequest 
+} from "./guesty";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
@@ -1191,7 +1194,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get latest sync log
+  // Get latest sync log and test Guesty API OAuth2 connection
+  app.get("/api/guesty/test-connection", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      console.log("Testing Guesty API OAuth connection...");
+      
+      // First test token retrieval
+      const token = await getAccessToken();
+      
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to retrieve OAuth token',
+          tokenReceived: false
+        });
+      }
+      
+      console.log("Successfully retrieved Guesty OAuth token, now testing API access...");
+      
+      // Then test a simple API call
+      try {
+        const testResponse = await makeGuestyRequest('/me');
+        
+        console.log("Successfully made test API call to Guesty API");
+        
+        // Log the successful connection test
+        await storage.createLog({
+          action: "GUESTY_CONNECTION_TEST",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: "OAuth2 connection test successful",
+          ipAddress: req.ip
+        });
+        
+        return res.json({
+          success: true,
+          message: 'Successfully connected to Guesty API',
+          tokenReceived: true,
+          apiCallSuccess: true,
+          userData: testResponse
+        });
+      } catch (apiError) {
+        console.error("API call failed despite successful token retrieval:", apiError);
+        
+        // Log the failed API call
+        await storage.createLog({
+          action: "GUESTY_CONNECTION_TEST",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: `Token obtained but API call failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`,
+          ipAddress: req.ip
+        });
+        
+        // If we got a token but API call failed
+        return res.status(500).json({
+          success: false,
+          message: `Token obtained but API call failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`,
+          tokenReceived: true,
+          apiCallSuccess: false
+        });
+      }
+    } catch (error) {
+      console.error("Guesty connection test failed:", error);
+      
+      // Log the connection test failure
+      try {
+        await storage.createLog({
+          action: "GUESTY_CONNECTION_TEST",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ipAddress: req.ip
+        });
+      } catch (logError) {
+        console.error("Failed to log connection test failure:", logError);
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        tokenReceived: false,
+        apiCallSuccess: false
+      });
+    }
+  });
+
   app.get("/api/guesty/sync-status", checkAuth, async (req: Request, res: Response) => {
     try {
       const latestLog = await getLatestSyncLog();
