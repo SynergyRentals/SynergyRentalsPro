@@ -397,8 +397,9 @@ export default function PropertyDetailPage() {
                                 ? "default" 
                                 : item.status === "in-progress" 
                                   ? "secondary"
-                                  : "success"
+                                  : "outline"
                             }
+                            className={item.status === "completed" ? "bg-green-100 text-green-800" : ""}
                           >
                             {item.status}
                           </Badge>
@@ -464,7 +465,10 @@ export default function PropertyDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={task.completed ? "success" : "default"}>
+                          <Badge 
+                            variant={task.completed ? "outline" : "default"}
+                            className={task.completed ? "bg-green-100 text-green-800" : ""}
+                          >
                             {task.completed ? "Completed" : "Pending"}
                           </Badge>
                         </TableCell>
