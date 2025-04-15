@@ -14,6 +14,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -147,6 +148,10 @@ export class MemStorage implements IStorage {
   private projectIdCounter: number;
   private documentIdCounter: number;
   private logIdCounter: number;
+  private cleaningTaskIdCounter: number;
+  private cleaningChecklistIdCounter: number;
+  private cleaningChecklistItemIdCounter: number;
+  private cleaningChecklistCompletionIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -159,6 +164,10 @@ export class MemStorage implements IStorage {
     this.projects = new Map();
     this.documents = new Map();
     this.logs = new Map();
+    this.cleaningTasks = new Map();
+    this.cleaningChecklists = new Map();
+    this.cleaningChecklistItems = new Map();
+    this.cleaningChecklistCompletions = new Map();
     
     this.userIdCounter = 1;
     this.unitIdCounter = 1;
@@ -170,7 +179,12 @@ export class MemStorage implements IStorage {
     this.projectIdCounter = 1;
     this.documentIdCounter = 1;
     this.logIdCounter = 1;
+    this.cleaningTaskIdCounter = 1;
+    this.cleaningChecklistIdCounter = 1;
+    this.cleaningChecklistItemIdCounter = 1;
+    this.cleaningChecklistCompletionIdCounter = 1;
     
+    const MemoryStore = createMemoryStore(session);
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000 // Clear expired sessions every 24h
     });
@@ -523,6 +537,146 @@ export class MemStorage implements IStorage {
   async getAllLogs(): Promise<Log[]> {
     return Array.from(this.logs.values());
   }
+  
+  // Cleaning Task Methods
+  async getCleaningTask(id: number): Promise<CleaningTask | undefined> {
+    return this.cleaningTasks.get(id);
+  }
+  
+  async createCleaningTask(insertCleaningTask: InsertCleaningTask): Promise<CleaningTask> {
+    const id = this.cleaningTaskIdCounter++;
+    const createdAt = new Date();
+    const cleaningTask: CleaningTask = { 
+      ...insertCleaningTask, 
+      id, 
+      status: "scheduled", 
+      createdAt,
+      completedAt: null 
+    };
+    this.cleaningTasks.set(id, cleaningTask);
+    return cleaningTask;
+  }
+  
+  async updateCleaningTask(id: number, cleaningTaskData: Partial<CleaningTask>): Promise<CleaningTask | undefined> {
+    const cleaningTask = this.cleaningTasks.get(id);
+    if (!cleaningTask) return undefined;
+    
+    // If task is being marked as completed, set completedAt
+    if (cleaningTaskData.status === 'completed' && cleaningTask.status !== 'completed') {
+      cleaningTaskData.completedAt = new Date();
+    }
+    
+    const updatedCleaningTask = { ...cleaningTask, ...cleaningTaskData };
+    this.cleaningTasks.set(id, updatedCleaningTask);
+    return updatedCleaningTask;
+  }
+  
+  async getAllCleaningTasks(): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values());
+  }
+  
+  async getCleaningTasksByUnit(unitId: number): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values()).filter(task => task.unitId === unitId);
+  }
+  
+  async getCleaningTasksByAssignee(userId: number): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values()).filter(task => task.assignedTo === userId);
+  }
+  
+  async getCleaningTasksByStatus(status: string): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values()).filter(task => task.status === status);
+  }
+  
+  // Cleaning Checklist Methods
+  async getCleaningChecklist(id: number): Promise<CleaningChecklist | undefined> {
+    return this.cleaningChecklists.get(id);
+  }
+  
+  async createCleaningChecklist(insertCleaningChecklist: InsertCleaningChecklist): Promise<CleaningChecklist> {
+    const id = this.cleaningChecklistIdCounter++;
+    const createdAt = new Date();
+    const cleaningChecklist: CleaningChecklist = { 
+      ...insertCleaningChecklist, 
+      id, 
+      active: true,
+      createdAt
+    };
+    this.cleaningChecklists.set(id, cleaningChecklist);
+    return cleaningChecklist;
+  }
+  
+  async updateCleaningChecklist(id: number, checklistData: Partial<CleaningChecklist>): Promise<CleaningChecklist | undefined> {
+    const checklist = this.cleaningChecklists.get(id);
+    if (!checklist) return undefined;
+    
+    const updatedChecklist = { ...checklist, ...checklistData };
+    this.cleaningChecklists.set(id, updatedChecklist);
+    return updatedChecklist;
+  }
+  
+  async getAllCleaningChecklists(): Promise<CleaningChecklist[]> {
+    return Array.from(this.cleaningChecklists.values());
+  }
+  
+  // Cleaning Checklist Items Methods
+  async getCleaningChecklistItem(id: number): Promise<CleaningChecklistItem | undefined> {
+    return this.cleaningChecklistItems.get(id);
+  }
+  
+  async createCleaningChecklistItem(insertCleaningChecklistItem: InsertCleaningChecklistItem): Promise<CleaningChecklistItem> {
+    const id = this.cleaningChecklistItemIdCounter++;
+    const cleaningChecklistItem: CleaningChecklistItem = { 
+      ...insertCleaningChecklistItem, 
+      id 
+    };
+    this.cleaningChecklistItems.set(id, cleaningChecklistItem);
+    return cleaningChecklistItem;
+  }
+  
+  async updateCleaningChecklistItem(id: number, itemData: Partial<CleaningChecklistItem>): Promise<CleaningChecklistItem | undefined> {
+    const item = this.cleaningChecklistItems.get(id);
+    if (!item) return undefined;
+    
+    const updatedItem = { ...item, ...itemData };
+    this.cleaningChecklistItems.set(id, updatedItem);
+    return updatedItem;
+  }
+  
+  async getCleaningChecklistItemsByChecklist(checklistId: number): Promise<CleaningChecklistItem[]> {
+    return Array.from(this.cleaningChecklistItems.values())
+      .filter(item => item.checklistId === checklistId);
+  }
+  
+  // Cleaning Checklist Completions Methods
+  async getCleaningChecklistCompletion(id: number): Promise<CleaningChecklistCompletion | undefined> {
+    return this.cleaningChecklistCompletions.get(id);
+  }
+  
+  async createCleaningChecklistCompletion(insertCompletion: InsertCleaningChecklistCompletion): Promise<CleaningChecklistCompletion> {
+    const id = this.cleaningChecklistCompletionIdCounter++;
+    const completedAt = new Date();
+    const completion: CleaningChecklistCompletion = { 
+      ...insertCompletion, 
+      id,
+      completedAt
+    };
+    this.cleaningChecklistCompletions.set(id, completion);
+    return completion;
+  }
+  
+  async updateCleaningChecklistCompletion(id: number, completionData: Partial<CleaningChecklistCompletion>): Promise<CleaningChecklistCompletion | undefined> {
+    const completion = this.cleaningChecklistCompletions.get(id);
+    if (!completion) return undefined;
+    
+    const updatedCompletion = { ...completion, ...completionData };
+    this.cleaningChecklistCompletions.set(id, updatedCompletion);
+    return updatedCompletion;
+  }
+  
+  async getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]> {
+    return Array.from(this.cleaningChecklistCompletions.values())
+      .filter(completion => completion.taskId === taskId);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -829,6 +983,130 @@ export class DatabaseStorage implements IStorage {
 
   async getAllLogs(): Promise<Log[]> {
     return await db.select().from(schema.logs);
+  }
+  
+  // Cleaning Task Methods
+  async getCleaningTask(id: number): Promise<CleaningTask | undefined> {
+    const [cleaningTask] = await db.select().from(schema.cleaningTasks).where(eq(schema.cleaningTasks.id, id));
+    return cleaningTask;
+  }
+  
+  async createCleaningTask(insertCleaningTask: InsertCleaningTask): Promise<CleaningTask> {
+    const [cleaningTask] = await db.insert(schema.cleaningTasks).values({
+      ...insertCleaningTask,
+      status: "scheduled",
+      verifiedAt: null,
+      actualDuration: null,
+    }).returning();
+    return cleaningTask;
+  }
+  
+  async updateCleaningTask(id: number, cleaningTaskData: Partial<CleaningTask>): Promise<CleaningTask | undefined> {
+    // If task is being marked as completed, set completedAt
+    if (cleaningTaskData.status === 'completed') {
+      const task = await this.getCleaningTask(id);
+      if (task && task.status !== 'completed') {
+        cleaningTaskData.completedAt = new Date();
+      }
+    }
+
+    const [updatedCleaningTask] = await db.update(schema.cleaningTasks)
+      .set(cleaningTaskData)
+      .where(eq(schema.cleaningTasks.id, id))
+      .returning();
+    return updatedCleaningTask;
+  }
+  
+  async getAllCleaningTasks(): Promise<CleaningTask[]> {
+    return await db.select().from(schema.cleaningTasks);
+  }
+  
+  async getCleaningTasksByUnit(unitId: number): Promise<CleaningTask[]> {
+    return await db.select().from(schema.cleaningTasks).where(eq(schema.cleaningTasks.unitId, unitId));
+  }
+  
+  async getCleaningTasksByAssignee(userId: number): Promise<CleaningTask[]> {
+    return await db.select().from(schema.cleaningTasks).where(eq(schema.cleaningTasks.assignedTo, userId));
+  }
+  
+  async getCleaningTasksByStatus(status: string): Promise<CleaningTask[]> {
+    return await db.select().from(schema.cleaningTasks).where(eq(schema.cleaningTasks.status, status));
+  }
+  
+  // Cleaning Checklist Methods
+  async getCleaningChecklist(id: number): Promise<CleaningChecklist | undefined> {
+    const [cleaningChecklist] = await db.select().from(schema.cleaningChecklists).where(eq(schema.cleaningChecklists.id, id));
+    return cleaningChecklist;
+  }
+  
+  async createCleaningChecklist(insertCleaningChecklist: InsertCleaningChecklist): Promise<CleaningChecklist> {
+    const [cleaningChecklist] = await db.insert(schema.cleaningChecklists).values({
+      ...insertCleaningChecklist,
+      isActive: true,
+    }).returning();
+    return cleaningChecklist;
+  }
+  
+  async updateCleaningChecklist(id: number, checklistData: Partial<CleaningChecklist>): Promise<CleaningChecklist | undefined> {
+    const [updatedChecklist] = await db.update(schema.cleaningChecklists)
+      .set(checklistData)
+      .where(eq(schema.cleaningChecklists.id, id))
+      .returning();
+    return updatedChecklist;
+  }
+  
+  async getAllCleaningChecklists(): Promise<CleaningChecklist[]> {
+    return await db.select().from(schema.cleaningChecklists);
+  }
+  
+  // Cleaning Checklist Items Methods
+  async getCleaningChecklistItem(id: number): Promise<CleaningChecklistItem | undefined> {
+    const [cleaningChecklistItem] = await db.select().from(schema.cleaningChecklistItems).where(eq(schema.cleaningChecklistItems.id, id));
+    return cleaningChecklistItem;
+  }
+  
+  async createCleaningChecklistItem(insertCleaningChecklistItem: InsertCleaningChecklistItem): Promise<CleaningChecklistItem> {
+    const [cleaningChecklistItem] = await db.insert(schema.cleaningChecklistItems).values(insertCleaningChecklistItem).returning();
+    return cleaningChecklistItem;
+  }
+  
+  async updateCleaningChecklistItem(id: number, itemData: Partial<CleaningChecklistItem>): Promise<CleaningChecklistItem | undefined> {
+    const [updatedItem] = await db.update(schema.cleaningChecklistItems)
+      .set(itemData)
+      .where(eq(schema.cleaningChecklistItems.id, id))
+      .returning();
+    return updatedItem;
+  }
+  
+  async getCleaningChecklistItemsByChecklist(checklistId: number): Promise<CleaningChecklistItem[]> {
+    return await db.select().from(schema.cleaningChecklistItems).where(eq(schema.cleaningChecklistItems.checklistId, checklistId));
+  }
+  
+  // Cleaning Checklist Completions Methods
+  async getCleaningChecklistCompletion(id: number): Promise<CleaningChecklistCompletion | undefined> {
+    const [completion] = await db.select().from(schema.cleaningChecklistCompletions).where(eq(schema.cleaningChecklistCompletions.id, id));
+    return completion;
+  }
+  
+  async createCleaningChecklistCompletion(insertCompletion: InsertCleaningChecklistCompletion): Promise<CleaningChecklistCompletion> {
+    const [completion] = await db.insert(schema.cleaningChecklistCompletions).values({
+      ...insertCompletion,
+      completedAt: new Date(),
+      completed: true,
+    }).returning();
+    return completion;
+  }
+  
+  async updateCleaningChecklistCompletion(id: number, completionData: Partial<CleaningChecklistCompletion>): Promise<CleaningChecklistCompletion | undefined> {
+    const [updatedCompletion] = await db.update(schema.cleaningChecklistCompletions)
+      .set(completionData)
+      .where(eq(schema.cleaningChecklistCompletions.id, id))
+      .returning();
+    return updatedCompletion;
+  }
+  
+  async getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]> {
+    return await db.select().from(schema.cleaningChecklistCompletions).where(eq(schema.cleaningChecklistCompletions.cleaningTaskId, taskId));
   }
 }
 
