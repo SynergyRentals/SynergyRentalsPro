@@ -117,8 +117,8 @@ export const inventory = pgTable("inventory", {
   category: text("category"), // linens, toiletries, kitchen, etc.
   reorderThreshold: integer("reorder_threshold"),
   notes: text("notes"),
-  sku: text("sku"), // Stock Keeping Unit
-  upc: text("upc"), // Universal Product Code
+  // sku: text("sku"), // Stock Keeping Unit - removed due to missing column in DB
+  // upc: text("upc"), // Universal Product Code - removed due to missing column in DB
   cost: integer("cost"), // in cents
   supplier: text("supplier"),
   location: text("location"), // specific location within unit or garage
