@@ -1,0 +1,29 @@
+Context:
+Our Health Check and Connection Test endpoints are now consistently failing with 404 Not Found errors when interacting with the Guesty API via our guestyClient. This indicates they are calling the correct base domain (open-api.guesty.com) but are requesting an invalid or non-existent API endpoint path. We need to correct the path used in these checks.
+
+Goal:
+Modify the Health Check and Connection Test endpoint logic to use a known valid and lightweight Guesty Open API endpoint path for their checks, such as /v1/listings.
+
+Instructions:
+
+Locate Check Endpoints: Find the route handlers or functions for the Health Check and Connection Test again.
+Identify API Call: Find the specific line(s) within these handlers where guestyClient.makeRequest (or a convenience method like guestyClient.getListings) is being called.
+Determine Current Path: Examine the code (or use the detailed logs previously added, specifically looking for GuestyClient: makeRequest called for...) to confirm the exact invalid endpoint path currently being used (e.g., /v1/status, /health, /v1/property, etc.).
+Replace with Valid Path: Modify the code to replace the invalid endpoint path with a valid one. A good default choice is /v1/listings.
+Ensure the HTTP method is GET.
+Strongly recommend adding a limit=1 parameter to the request to minimize data transfer.
+Example modification if makeRequest is used directly:
+TypeScript
+
+// Before (Example):
+// const result = await guestyClient.makeRequest('GET', '/v1/invalid-path');
+
+// After (Recommended):
+const result = await guestyClient.makeRequest('GET', '/v1/listings', { params: { limit: 1 } });
+If a convenience method like getListings is used, ensure it's called appropriately:
+TypeScript
+
+// Example:
+const result = await guestyClient.getListings({ limit: 1 });
+Preserve Optimization: Ensure any previous logic for reducing call frequency (like internal caching or using isTokenPotentiallyValid before making the call) remains in place. The goal is to fix the endpoint path within the existing optimized structure.
+Instructions for Agent: "Please locate the Health Check and Connection Test endpoint handlers. Find where they call the guestyClient to interact with the Guesty API. Identify the incorrect endpoint path currently being used, which is causing 404 Not Found errors. Replace this incorrect path with the valid endpoint path /v1/listings, ensuring the request uses the GET method and includes a limit=1 query parameter to keep it lightweight. Preserve any existing call frequency reduction logic."
