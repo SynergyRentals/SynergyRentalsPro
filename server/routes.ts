@@ -12,11 +12,15 @@ import {
   insertProjectSchema, insertDocumentSchema, insertLogSchema,
   insertCleaningTaskSchema, insertCleaningChecklistSchema, 
   insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema,
-  guestyProperties, guestyReservations, guestySyncLogs
+  guestyProperties, guestyReservations, guestySyncLogs,
+  insights as insightsTable, unitHealthScores, insightLogs
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
-import { askAI, generateAiInsights, trainAI, generateMaintenanceTicket } from "./openai";
+import { 
+  askAI, generateAiInsights, trainAI, generateMaintenanceTicket,
+  generateCompanyInsights, analyzeUnitHealth, generateProactiveRecommendations 
+} from "./openai";
 import { 
   syncProperties, syncReservations, syncAll, getLatestSyncLog,
   makeGuestyRequest, healthCheck
@@ -1894,6 +1898,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         message: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date()
+      });
+    }
+  });
+
+  // Company Insights Module
+  
+  // Get all insights
+  app.get("/api/insights", checkAuth, async (req, res) => {
+    try {
+      const insightsData = await db.select().from(insightsTable).orderBy(insightsTable.createdAt, 'desc');
+      res.json(insightsData);
+    } catch (error) {
+      console.error("Error fetching insights:", error);
+      res.status(500).json({ message: "Error fetching insights" });
+    }
+  });
+
+  // Get insights by unit
+  app.get("/api/insights/unit/:unitId", checkAuth, async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.unitId);
+      const unitInsights = await db.select().from(insights)
+        .where(eq(insights.unitId, unitId))
+        .orderBy(insights.createdAt, 'desc');
+      res.json(unitInsights);
+    } catch (error) {
+      console.error("Error fetching unit insights:", error);
+      res.status(500).json({ message: "Error fetching unit insights" });
+    }
+  });
+  
+  // Get insights by type
+  app.get("/api/insights/type/:type", checkAuth, async (req, res) => {
+    try {
+      const insightType = req.params.type;
+      const typeInsights = await db.select().from(insights)
+        .where(eq(insights.type, insightType))
+        .orderBy(insights.createdAt, 'desc');
+      res.json(typeInsights);
+    } catch (error) {
+      console.error("Error fetching insights by type:", error);
+      res.status(500).json({ message: "Error fetching insights by type" });
+    }
+  });
+
+  // Generate insights via AI
+  app.post("/api/insights/generate", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const { analysisType, data } = req.body;
+      
+      if (!analysisType) {
+        return res.status(400).json({ message: "Analysis type is required" });
+      }
+      
+      // Check if OpenAI API key is available
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({ 
+          message: "AI service unavailable", 
+          details: "API key not configured"
+        });
+      }
+      
+      // Generate insights using AI
+      const generatedInsights = await generateCompanyInsights(analysisType, data);
+      
+      // Log the analysis
+      await db.insert(insightLogs).values({
+        analysisType,
+        inputData: data,
+        resultData: generatedInsights,
+        processingTime: generatedInsights.processingTime || 0,
+        actionabilityScore: 0.8, // Default score, we would calculate this in a real implementation
+      });
+      
+      // Store the generated insights
+      if (generatedInsights.insights && generatedInsights.insights.length > 0) {
+        // Insert all insights into the database
+        const insightsToInsert = generatedInsights.insights.map(insight => ({
+          type: analysisType,
+          unitId: data.unitId || null,
+          title: insight.title,
+          description: insight.description,
+          insightType: insight.insightType,
+          severity: insight.severity,
+          actionable: insight.actionable,
+          data: generatedInsights.stats
+        }));
+        
+        await db.insert(insights).values(insightsToInsert);
+      }
+      
+      res.json({
+        success: true,
+        insights: generatedInsights,
+        message: "Insights generated successfully"
+      });
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      res.status(500).json({ 
+        message: "Error generating insights", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Get unit health scores
+  app.get("/api/unit-health", checkAuth, async (req, res) => {
+    try {
+      const healthScores = await db.select().from(unitHealthScores)
+        .orderBy(unitHealthScores.lastUpdated, 'desc');
+      res.json(healthScores);
+    } catch (error) {
+      console.error("Error fetching unit health scores:", error);
+      res.status(500).json({ message: "Error fetching unit health scores" });
+    }
+  });
+
+  // Get unit health for specific unit
+  app.get("/api/unit-health/:unitId", checkAuth, async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.unitId);
+      const [unitHealth] = await db.select().from(unitHealthScores)
+        .where(eq(unitHealthScores.unitId, unitId))
+        .orderBy(unitHealthScores.lastUpdated, 'desc')
+        .limit(1);
+      
+      if (!unitHealth) {
+        return res.status(404).json({ message: "Unit health data not found" });
+      }
+      
+      res.json(unitHealth);
+    } catch (error) {
+      console.error("Error fetching unit health:", error);
+      res.status(500).json({ message: "Error fetching unit health" });
+    }
+  });
+
+  // Generate unit health score via AI
+  app.post("/api/unit-health/analyze/:unitId", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.unitId);
+      const { data } = req.body;
+      
+      // Check if OpenAI API key is available
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({ 
+          message: "AI service unavailable", 
+          details: "API key not configured"
+        });
+      }
+      
+      // Get relevant data from the database if not provided
+      let analysisData = data || {};
+      if (!data || Object.keys(data).length === 0) {
+        // Get unit information
+        const unit = await storage.getUnit(unitId);
+        if (!unit) {
+          return res.status(404).json({ message: "Unit not found" });
+        }
+        
+        // Get maintenance and tasks data
+        const maintenance = await storage.getMaintenanceByUnit(unitId);
+        const tasks = await storage.getTasksByUnit(unitId);
+        const inventory = await storage.getInventoryByUnit(unitId);
+        
+        // Get reservation data if available
+        const guestyReservationsData = await db.select()
+          .from(guestyReservations)
+          .where(eq(guestyReservations.unitId, unitId))
+          .orderBy(guestyReservations.checkInDateLocale, 'desc')
+          .limit(10);
+          
+        analysisData = {
+          unit,
+          maintenance,
+          tasks,
+          inventory,
+          reservations: guestyReservationsData
+        };
+      }
+      
+      // Generate unit health score using AI
+      const healthScore = await analyzeUnitHealth(unitId, analysisData);
+      
+      // Store the health score
+      const [insertedScore] = await db.insert(unitHealthScores).values({
+        unitId,
+        score: healthScore.score,
+        revenueScore: healthScore.revenueScore,
+        maintenanceScore: healthScore.maintenanceScore,
+        guestSatisfactionScore: healthScore.guestSatisfactionScore,
+        inventoryScore: healthScore.inventoryScore,
+        cleaningScore: healthScore.cleaningScore,
+        notes: healthScore.notes,
+        trendDirection: healthScore.trendDirection,
+        trendValue: healthScore.trendValue
+      }).returning();
+      
+      res.json({
+        success: true,
+        healthScore: insertedScore,
+        message: "Unit health score generated successfully"
+      });
+    } catch (error) {
+      console.error("Error analyzing unit health:", error);
+      res.status(500).json({ 
+        message: "Error analyzing unit health", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Get proactive recommendations
+  app.get("/api/insights/recommendations", checkAuth, async (req, res) => {
+    try {
+      // Check if OpenAI API key is available
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({ 
+          message: "AI service unavailable", 
+          details: "API key not configured"
+        });
+      }
+      
+      // Generate recommendations
+      const recommendations = await generateProactiveRecommendations();
+      
+      res.json({
+        success: true,
+        recommendations,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      res.status(500).json({ 
+        message: "Error generating recommendations", 
+        error: error instanceof Error ? error.message : "Unknown error" 
       });
     }
   });
