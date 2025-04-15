@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import fs from 'fs';
 import fileUpload from 'express-fileupload';
@@ -28,8 +28,8 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
-import { verifyGuestySignature } from "./lib/guestyWebhookHandler";
-import { processWebhook, processWebhookAsync } from "./lib/webhookProcessor";
+import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
+import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
@@ -2422,23 +2422,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // No authentication required as they're called by Guesty's servers
   
   // Main webhook endpoint for Guesty events
-  app.post("/api/webhooks/guesty", async (req: Request, res: Response) => {
+  // Use raw body middleware just for this route to verify signature against raw body
+  app.post("/api/webhooks/guesty", express.raw({ type: 'application/json' }), verifyGuestyWebhookMiddleware, async (req: Request, res: Response) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] Guesty webhook received`);
     
     try {
-      // Verify the Guesty signature
-      if (!verifyGuestySignature(req)) {
-        console.error('Invalid webhook signature');
-        return res.status(403).json({
+      // Since we used express.raw, we need to parse the body
+      const rawBody = req.body.toString('utf-8');
+      let webhook;
+      
+      try {
+        webhook = JSON.parse(rawBody);
+      } catch (parseError) {
+        console.error('Error parsing webhook payload:', parseError);
+        return res.status(400).json({
           success: false,
-          message: 'Invalid signature'
+          message: 'Error parsing webhook payload'
         });
       }
       
-      // Get the event type from the payload
-      const webhook = req.body;
-      if (!webhook || !webhook.event || !webhook.data || !webhook.id) {
+      if (!webhook || !webhook.event) {
         console.error('Invalid webhook payload structure');
         return res.status(400).json({
           success: false,
@@ -2446,26 +2450,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Extract important fields
-      const eventType = webhook.event;      // e.g., 'property.created', 'reservation.updated'
-      const entityType = eventType.split('.')[0]; // e.g., 'property', 'reservation'
-      const action = eventType.split('.')[1];     // e.g., 'created', 'updated', 'deleted'
-      const entityId = webhook.data.id || webhook.id;
-      
-      // Log the webhook event in the database
-      const webhookEvent: InsertGuestyWebhookEvent = {
-        eventType: eventType,
-        entityType: entityType,
-        entityId: entityId,
-        eventData: webhook,
-        signature: req.header('X-Guesty-Signature-V2') || '',
-        ipAddress: req.ip
-      };
-      
-      // Insert the webhook event
-      const [insertedEvent] = await db.insert(guestyWebhookEvents)
-        .values(webhookEvent)
-        .returning();
+      // Extract the webhook details
+      const { eventType, entityType, entityId, data } = extractWebhookDetails(webhook);
       
       // Log the webhook receipt
       await storage.createLog({
@@ -2475,14 +2461,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ipAddress: req.ip
       });
       
-      // Process the webhook asynchronously (don't wait for completion)
-      processWebhookAsync(insertedEvent.id, entityType, action, webhook.data);
+      // Store the webhook event in database
+      const eventId = await logWebhookEvent(
+        eventType, 
+        entityType, 
+        entityId, 
+        webhook, 
+        req.headers['x-guesty-signature-v2']?.toString() || '', 
+        req.ip
+      );
       
-      // Respond to Guesty immediately to acknowledge receipt
-      res.status(202).json({
+      // Process the webhook asynchronously in the background
+      // We don't await this, but we do handle errors
+      processWebhookEvent(eventId).catch(error => {
+        console.error(`Error in async webhook processing for event ${eventId}:`, error);
+      });
+      
+      // Respond to Guesty with success
+      return res.status(202).json({
         success: true,
         message: 'Webhook received and queued for processing',
-        webhookId: insertedEvent.id
+        webhookId: eventId
       });
       
     } catch (error) {
@@ -2523,8 +2522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       // Process the webhook synchronously for testing
-      const action = eventType.split('.')[1] || 'unknown';
-      const result = await processWebhook(insertedEvent.id, entityType, action, eventData);
+      const result = await processWebhookEvent(insertedEvent.id);
       
       res.json({
         success: true,
@@ -2584,8 +2582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Process the webhook
-      const action = event.eventType.split('.')[1] || 'unknown';
-      const result = await processWebhook(event.id, event.entityType, action, event.eventData);
+      const result = await processWebhookEvent(webhookId);
       
       res.json({
         success: true,

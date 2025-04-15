@@ -1,100 +1,174 @@
+/**
+ * Process webhook events from Guesty
+ */
 import { db } from '../db';
-import { 
-  guestyWebhookEvents, 
-  InsertGuestyWebhookEvent 
-} from '@shared/schema';
+import { guestyWebhookEvents } from '../../shared/schema';
 import { 
   processPropertyWebhook, 
   processReservationWebhook,
   processPropertyDeletionWebhook,
-  processReservationDeletionWebhook
+  processReservationDeletionWebhook 
 } from './guestyWebhookHandler';
-import { eq } from 'drizzle-orm';
 
 /**
- * Process a webhook event based on entity type and action
- * @param webhookId - ID of the webhook event
+ * Log a webhook event to the database
+ * @param eventType - Type of event (created, updated, deleted)
  * @param entityType - Type of entity (property, reservation)
- * @param action - Action (created, updated, deleted)
- * @param data - Entity data payload
- * @returns Processing result
+ * @param entityId - ID of the entity
+ * @param eventData - The full event data payload
+ * @param signature - The signature from the request
+ * @param ipAddress - IP address of the sender
+ * @returns The ID of the created event log
  */
-export async function processWebhook(
-  webhookId: number,
+export async function logWebhookEvent(
+  eventType: string,
   entityType: string,
-  action: string,
-  data: any
-): Promise<{ success: boolean; message: string }> {
+  entityId: string,
+  eventData: any,
+  signature: string,
+  ipAddress: string
+): Promise<number> {
   try {
-    let result: { success: boolean; message: string };
-    
-    // Process based on entity type and action
+    // Insert the webhook event into the database
+    const result = await db.insert(guestyWebhookEvents).values({
+      event_type: eventType,
+      entity_type: entityType,
+      entity_id: entityId,
+      event_data: eventData,
+      signature: signature,
+      ip_address: ipAddress,
+      created_at: new Date(),
+      processed: false
+    }).returning({ id: guestyWebhookEvents.id });
+
+    return result[0].id;
+  } catch (error) {
+    console.error('Error logging webhook event:', error);
+    throw error;
+  }
+}
+
+/**
+ * Process a webhook event
+ * @param eventId - ID of the event to process
+ * @returns Result of processing
+ */
+export async function processWebhookEvent(eventId: number): Promise<{ success: boolean; message: string }> {
+  try {
+    // Get the event from the database
+    const events = await db.select()
+      .from(guestyWebhookEvents)
+      .where(event => event.id.equals(eventId))
+      .limit(1);
+
+    if (events.length === 0) {
+      return { success: false, message: `Event ID ${eventId} not found` };
+    }
+
+    const event = events[0];
+    const entityType = event.entity_type;
+    const eventType = event.event_type;
+    const entityId = event.entity_id;
+    const eventData = event.event_data;
+
+    let processingResult: { success: boolean; message: string };
+
+    // Process based on entity type and event type
     if (entityType === 'property') {
-      if (action === 'deleted') {
-        result = await processPropertyDeletionWebhook(data.id);
+      if (eventType === 'deleted') {
+        processingResult = await processPropertyDeletionWebhook(entityId);
       } else {
-        // created, updated
-        result = await processPropertyWebhook(data);
+        // created or updated
+        processingResult = await processPropertyWebhook(eventData);
       }
     } else if (entityType === 'reservation') {
-      if (action === 'deleted') {
-        result = await processReservationDeletionWebhook(data.id);
+      if (eventType === 'deleted') {
+        processingResult = await processReservationDeletionWebhook(entityId);
       } else {
-        // created, updated
-        result = await processReservationWebhook(data);
+        // created or updated
+        processingResult = await processReservationWebhook(eventData);
       }
     } else {
-      result = {
-        success: false,
-        message: `Unsupported entity type: ${entityType}`
+      processingResult = { 
+        success: false, 
+        message: `Unknown entity type: ${entityType}` 
       };
     }
-    
-    // Update the webhook event with processing result
+
+    // Update the event with processing results
     await db.update(guestyWebhookEvents)
       .set({
         processed: true,
-        processedAt: new Date(),
-        processingErrors: !result.success ? result.message : null
+        processed_at: new Date(),
+        processing_errors: !processingResult.success ? processingResult.message : null
       })
-      .where(eq(guestyWebhookEvents.id, webhookId));
-    
-    return result;
+      .where(event => event.id.equals(eventId));
+
+    return processingResult;
   } catch (error) {
-    console.error(`Error processing webhook event ${webhookId}:`, error);
+    console.error(`Error processing webhook event ${eventId}:`, error);
     
-    // Update the webhook event with error information
+    // Update the event with processing error
     await db.update(guestyWebhookEvents)
       .set({
         processed: true,
-        processedAt: new Date(),
-        processingErrors: error instanceof Error ? error.message : 'Unknown error'
+        processed_at: new Date(),
+        processing_errors: error instanceof Error ? error.message : 'Unknown error'
       })
-      .where(eq(guestyWebhookEvents.id, webhookId));
-    
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error during webhook processing'
+      .where(event => event.id.equals(eventId));
+
+    return { 
+      success: false, 
+      message: `Error processing webhook event: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
 
 /**
- * Process a webhook event asynchronously (fire and forget)
- * @param webhookId - ID of the webhook event
- * @param entityType - Type of entity (property, reservation)
- * @param action - Action (created, updated, deleted)
- * @param data - Entity data payload
+ * Extract Guesty entity details from webhook payload
+ * @param payload - The webhook payload
+ * @returns Object with event type, entity type, entity ID, and data
  */
-export function processWebhookAsync(
-  webhookId: number,
-  entityType: string,
-  action: string,
-  data: any
-): void {
-  // Launch processing in the background without awaiting completion
-  processWebhook(webhookId, entityType, action, data)
-    .catch(error => {
-      console.error(`Asynchronous webhook processing error for event ${webhookId}:`, error);
-    });
+export function extractWebhookDetails(payload: any): { 
+  eventType: string;
+  entityType: string;
+  entityId: string;
+  data: any;
+} {
+  // Default values
+  let eventType = 'unknown';
+  let entityType = 'unknown';
+  let entityId = '';
+  let data = null;
+
+  try {
+    // Extract event type (created, updated, deleted)
+    if (payload.event) {
+      // Convert event string like "reservation.created" to "created"
+      const eventParts = payload.event.split('.');
+      eventType = eventParts[eventParts.length - 1];
+    }
+
+    // Extract entity type (property, reservation)
+    if (payload.event && payload.event.includes('.')) {
+      // Convert event string like "reservation.created" to "reservation"
+      entityType = payload.event.split('.')[0];
+    }
+
+    // Extract entity ID and data
+    if (payload.data) {
+      if (payload.data.id) {
+        entityId = payload.data.id;
+      } else if (payload.data._id) {
+        entityId = payload.data._id;
+      }
+      
+      data = payload.data;
+    }
+
+    return { eventType, entityType, entityId, data };
+  } catch (error) {
+    console.error('Error extracting webhook details:', error);
+    return { eventType, entityType, entityId, data };
+  }
 }
