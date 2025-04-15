@@ -524,8 +524,8 @@ export default function MaintenancePage() {
                         <FormItem>
                           <FormLabel>Assign to Vendor (Optional)</FormLabel>
                           <Select
-                            onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
-                            defaultValue={field.value?.toString()}
+                            onValueChange={(value) => field.onChange(value === "unassigned" ? null : Number(value))}
+                            defaultValue={field.value?.toString() || "unassigned"}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -533,7 +533,7 @@ export default function MaintenancePage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Unassigned</SelectItem>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
                               {vendors?.map((vendor) => (
                                 <SelectItem key={vendor.id} value={vendor.id.toString()}>
                                   {vendor.name}
@@ -1313,8 +1313,8 @@ export default function MaintenancePage() {
                     <FormItem>
                       <FormLabel>Assign to Vendor</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(value ? Number(value) : null)}
-                        defaultValue={field.value?.toString() || ""}
+                        onValueChange={(value) => field.onChange(value === "unassigned" ? null : Number(value))}
+                        defaultValue={field.value?.toString() || "unassigned"}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -1322,7 +1322,7 @@ export default function MaintenancePage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {vendors?.map((vendor) => (
                             <SelectItem key={vendor.id} value={vendor.id.toString()}>
                               {vendor.name}
