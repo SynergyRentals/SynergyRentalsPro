@@ -68,13 +68,11 @@ export default function CleaningPage() {
   // Fetch units for reference
   const { data: units } = useQuery({
     queryKey: ["/api/units"],
-    queryFn: undefined,
   });
 
   // Fetch users for reference (cleaners)
   const { data: users } = useQuery({
     queryKey: ["/api/users"],
-    queryFn: undefined,
   });
 
   // Helper function to get unit name
@@ -218,8 +216,8 @@ export default function CleaningPage() {
                         </label>
                         <select className="w-full p-2 border border-gray-300 rounded">
                           <option value="">Select a property</option>
-                          {units &&
-                            units.map((unit) => (
+                          {units && Array.isArray(units) &&
+                            units.map((unit: any) => (
                               <option key={unit.id} value={unit.id}>
                                 {unit.name}
                               </option>
@@ -232,10 +230,10 @@ export default function CleaningPage() {
                         </label>
                         <select className="w-full p-2 border border-gray-300 rounded">
                           <option value="">Select a cleaner</option>
-                          {users &&
+                          {users && Array.isArray(users) &&
                             users
-                              .filter((user) => user.role === "cleaner")
-                              .map((user) => (
+                              .filter((user: any) => user.role === "cleaner")
+                              .map((user: any) => (
                                 <option key={user.id} value={user.id}>
                                   {user.name}
                                 </option>
