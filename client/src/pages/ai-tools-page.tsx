@@ -32,6 +32,16 @@ export default function AiToolsPage() {
     keyPoints: string[];
   } | null>(null);
   const [isSentimentLoading, setIsSentimentLoading] = useState(false);
+  
+  // Forecasting states
+  const [forecastType, setForecastType] = useState("revenue");
+  const [timeframe, setTimeframe] = useState("month");
+  const [forecastResult, setForecastResult] = useState<{
+    forecast: Array<{date: string; value: number; prediction: boolean}>;
+    insights: Array<{title: string; description: string}>;
+    summary: string;
+  } | null>(null);
+  const [isForecastLoading, setIsForecastLoading] = useState(false);
 
   const askQuestion = async () => {
     if (!question.trim()) {
