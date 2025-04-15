@@ -163,6 +163,36 @@ export class GuestyAPIClient {
     console.log(`[${timestamp}] GuestyClient: Getting user info`);
     return this.makeRequest('GET', '/me');
   }
+
+  /**
+   * Get properties from Guesty API with pagination support
+   * @param params Query parameters for the request
+   */
+  public async getProperties(params: {
+    limit?: number;
+    skip?: number;
+    [key: string]: any;
+  } = {}) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] GuestyClient: Getting properties with params:`, JSON.stringify(params));
+    return this.makeRequest('GET', '/listings', { params });
+  }
+
+  /**
+   * Get reservations from Guesty API with pagination support
+   * @param params Query parameters for the request
+   */
+  public async getReservations(params: {
+    limit?: number;
+    skip?: number;
+    checkIn?: { $gte?: string; $lte?: string };
+    checkOut?: { $gte?: string; $lte?: string };
+    [key: string]: any;
+  } = {}) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] GuestyClient: Getting reservations with params:`, JSON.stringify(params));
+    return this.makeRequest('GET', '/reservations', { params });
+  }
 }
 
 export const guestyClient = new GuestyAPIClient();
