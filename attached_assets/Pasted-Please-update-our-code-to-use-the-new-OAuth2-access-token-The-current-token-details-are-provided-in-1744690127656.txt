@@ -1,0 +1,19 @@
+Please update our code to use the new OAuth2 access token. The current token details are provided in the following JSON:
+
+{
+    "token_type": "Bearer",
+    "expires_in": 86400,
+    "access_token": "eyJraWQiOiJwNTVFdjZtU1lNLVN3blliNmVZQTZ6elptSkQxSm1KMmNLSEhTejhqMDhNIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULkJKR0xWb0JiX1FrckR6MHZGVi1OQk9IQ2RnMnVUUFdId3VzREliVUh3QmsiLCJpc3MiOiJodHRwczovL2xvZ2luLmd1ZXN0eS5jb20vb2F1dGgyL2F1czFwOHFyaDUzQ2NRVEk5NWQ3IiwiYXVkIjoiaHR0cHM6Ly9vcGVuLWFwaS5ndWVzdHkuY29tIiwiaWF0IjoxNzQ0NjkwMDMzLCJleHAiOjE3NDQ3NzY0MzMsImNpZCI6IjBvYW9hYWxqMmJEMkNhRjRCNWQ3Iiwic2NwIjpbIm9wZW4tYXBpIl0sInJlcXVlc3RlciI6IkVYVEVSTkFMIiwiYWNjb3VudElkIjoiNjVlMTFjZWM3OWI0M2I1M2UxYWY1YzgxIiwic3ViIjoiMG9hb2FhbGoyYkQyQ2FGNEI1ZDciLCJ1c2VyUm9sZXMiOlt7InJvbGVJZCI6eyJwZXJtaXNzaW9ucyI6WyJhZG1pbiJdfX1dLCJyb2xlIjoidXNlciIsImNsaWVudFR5cGUiOiJvcGVuYXBpIiwiaWFtIjoidjMiLCJhY2NvdW50TmFtZSI6IlN5bmVyZ3kgUmVudGFsIEdyb3VwIiwibmFtZSI6IlN5bmVyZ3kgUmVudGFsIEdyb3VwIEFJIE9wZXJhdGlvbnMgU29mdHdhcmUifQ.llw0NaBCt4ZbigFMs8vl5q1cflcc43KrjqWm9PU6WpcFSu_MbGVVl-IwrTxQPsNbSdACwySeeRwRSsigQB0Bms4Cwbt0I77poN8Ww0WA327_VxECDc5nKIa8PK9rZlmr5i0-uRSvU-utqqbmjVylY25K6sTDlZe50srUoGeLXUfVItga7n28TcQPoxGpPo-wZu_H6E2NDFpcshWKCVj4if_ys3nhGNniAGDtZy3LfkumblAbYOnOvphstdo9beoWOzK4P8XBVtHvRV2ytEDkAdu6dv8prIfANxgl9D-jdgWlfSEnDw5cTQvwcMpSuviRiYJm1FZOcF5RcYzo-yCd5w",
+    "scope": "open-api"
+}
+
+Please make the following changes:
+
+1. Update any constant or configuration variable in our source code that stores the access token to now contain the new "access_token" value.
+2. Make sure that every API request uses the "Authorization" header formatted as:
+   Authorization: Bearer <new_access_token>
+   (Include the word "Bearer" followed by a single space, then the new token.)
+3. Verify that the new token is used in our functions (such as get_listings()) for authenticated requests.
+4. Once updated, run a test to display the token and a sample API response (e.g., from the listings endpoint) to confirm the new token is in effect.
+
+Please update the code accordingly.
