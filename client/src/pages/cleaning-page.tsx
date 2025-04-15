@@ -50,15 +50,20 @@ export default function CleaningPage() {
     error,
   } = useQuery({
     queryKey: ["/api/cleaning-tasks"],
-    queryFn: undefined,
   });
+
+  console.log("Cleaning Tasks Response:", { tasks, isLoading, error });
 
   // Use all cleaning tasks from API endpoint (they're already filtered)
   const cleaningTasks = tasks || [];
 
   // Group by status
-  const scheduledTasks = cleaningTasks.filter((task) => task.status !== "completed");
-  const completedTasks = cleaningTasks.filter((task) => task.status === "completed");
+  const scheduledTasks = Array.isArray(cleaningTasks) 
+    ? cleaningTasks.filter((task) => task.status !== "completed") 
+    : [];
+  const completedTasks = Array.isArray(cleaningTasks)
+    ? cleaningTasks.filter((task) => task.status === "completed")
+    : [];
 
   // Fetch units for reference
   const { data: units } = useQuery({
@@ -74,15 +79,15 @@ export default function CleaningPage() {
 
   // Helper function to get unit name
   const getUnitName = (unitId: number) => {
-    if (!units) return `Unit #${unitId}`;
-    const unit = units.find((u) => u.id === unitId);
+    if (!units || !Array.isArray(units)) return `Unit #${unitId}`;
+    const unit = units.find((u: any) => u.id === unitId);
     return unit ? unit.name : `Unit #${unitId}`;
   };
 
   // Helper function to get cleaner name
   const getCleanerName = (userId: number | null | undefined) => {
-    if (!userId || !users) return "Unassigned";
-    const user = users.find((u) => u.id === userId);
+    if (!userId || !users || !Array.isArray(users)) return "Unassigned";
+    const user = users.find((u: any) => u.id === userId);
     return user ? user.name : "Unknown";
   };
 
