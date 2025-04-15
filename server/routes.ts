@@ -1201,25 +1201,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get latest sync log and test Guesty API OAuth2 connection
+  // In-memory cache for health check results to reduce API calls
+  const healthCheckCache = {
+    lastCheckedAt: 0,
+    cachedResult: null as { success: boolean; message: string; timestamp: Date } | null,
+    cacheValidityMs: 5 * 60 * 1000 // 5 minutes
+  };
+
   // Basic health check for Guesty API domain (no auth required)
+  // Uses isTokenPotentiallyValid helper and caching to minimize API calls
   app.get("/api/guesty/health-check", async (req: Request, res: Response) => {
+    console.log("Health check endpoint triggered");
+    
     try {
-      const result = await healthCheck();
+      // Strategy A: First, check if we have a token and it appears valid without API call
+      const tokenValid = guestyClient.isTokenPotentiallyValid();
+      
+      // If token is valid, we can return success without making an actual API call
+      if (tokenValid) {
+        console.log("Health check: Token is valid, returning success without API call");
+        
+        // Log the health check result
+        await storage.createLog({
+          action: "GUESTY_HEALTH_CHECK",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: "Health check success - token validation only (no API call)",
+          ipAddress: req.ip
+        });
+        
+        return res.json({
+          success: true,
+          message: 'Guesty API appears healthy (token validation)',
+          timestamp: new Date()
+        });
+      }
+      
+      // If token isn't valid, check if we have a recent cached result to avoid API call
+      const now = Date.now();
+      if (healthCheckCache.cachedResult && (now - healthCheckCache.lastCheckedAt) < healthCheckCache.cacheValidityMs) {
+        console.log("Health check: Using cached result from", new Date(healthCheckCache.lastCheckedAt));
+        
+        // Log the cached health check
+        await storage.createLog({
+          action: "GUESTY_HEALTH_CHECK",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: `Health check using cached result: ${healthCheckCache.cachedResult.success ? 'success' : 'failed'} - ${healthCheckCache.cachedResult.message}`,
+          ipAddress: req.ip
+        });
+        
+        // Return cached result with same status code
+        if (healthCheckCache.cachedResult.success) {
+          return res.json(healthCheckCache.cachedResult);
+        } else {
+          return res.status(500).json(healthCheckCache.cachedResult);
+        }
+      }
+      
+      // No valid token and no recent cache: we need to make an actual API call
+      console.log("Health check: No valid token or cache, making API call");
+      const result = await guestyClient.healthCheck();
+      
+      // Update the cache
+      healthCheckCache.lastCheckedAt = now;
+      healthCheckCache.cachedResult = {
+        ...result,
+        timestamp: new Date()
+      };
       
       // Log the health check result
       await storage.createLog({
         action: "GUESTY_HEALTH_CHECK",
         userId: req.user?.id,
         targetTable: "guesty",
-        notes: `Health check result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
+        notes: `Health check API call result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
         ipAddress: req.ip
       });
       
       if (result.success) {
-        return res.json(result);
+        return res.json({
+          ...result,
+          timestamp: new Date()
+        });
       } else {
-        return res.status(500).json(result);
+        return res.status(500).json({
+          ...result,
+          timestamp: new Date()
+        });
       }
     } catch (error) {
       console.error("Health check error:", error);
@@ -1245,13 +1314,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // In-memory cache for connection test results to reduce API calls
+  const connectionTestCache = {
+    lastCheckedAt: 0,
+    cachedResult: null as any,
+    cacheValidityMs: 10 * 60 * 1000 // 10 minutes
+  };
+
   // Full OAuth connection test (requires authentication)
+  // Uses caching to minimize API calls and prevent 429 errors
   app.get("/api/guesty/test-connection", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    console.log("Connection test endpoint triggered");
+    
     try {
+      // Strategy B: Check if we have a recent cached result to avoid API call
+      const now = Date.now();
+      if (connectionTestCache.cachedResult && (now - connectionTestCache.lastCheckedAt) < connectionTestCache.cacheValidityMs) {
+        console.log("Connection test: Using cached result from", new Date(connectionTestCache.lastCheckedAt));
+        
+        // Log the cached connection test
+        await storage.createLog({
+          action: "GUESTY_CONNECTION_TEST",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: `Connection test using cached result: ${connectionTestCache.cachedResult.success ? 'success' : 'failed'}`,
+          ipAddress: req.ip
+        });
+        
+        // Return cached result with same status code
+        if (connectionTestCache.cachedResult.success) {
+          return res.json(connectionTestCache.cachedResult);
+        } else {
+          return res.status(500).json(connectionTestCache.cachedResult);
+        }
+      }
+      
       console.log("Testing Guesty API OAuth connection...");
       
-      // First check if the domain is reachable
-      const healthCheckResult = await healthCheck();
+      // First check if the domain is reachable - use the client's healthCheck method
+      const healthCheckResult = await guestyClient.healthCheck();
       
       if (!healthCheckResult.success) {
         // Log the domain check failure
@@ -1263,13 +1364,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ipAddress: req.ip
         });
         
-        return res.status(500).json({
+        const result = {
           success: false,
           message: `Guesty API domain not reachable: ${healthCheckResult.message}`,
           domainReachable: false,
           tokenReceived: false,
-          apiCallSuccess: false
-        });
+          apiCallSuccess: false,
+          timestamp: new Date()
+        };
+        
+        // Update cache even on failure
+        connectionTestCache.lastCheckedAt = now;
+        connectionTestCache.cachedResult = result;
+        
+        return res.status(500).json(result);
       }
       
       // Test API access through our client - this will handle token retrieval internally
@@ -1278,13 +1386,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userInfo = await guestyClient.getUserInfo();
         
         if (!userInfo) {
-          return res.status(500).json({
+          const result = {
             success: false,
             message: 'Failed to retrieve user information',
             domainReachable: true,
             tokenReceived: false,
-            apiCallSuccess: false
-          });
+            apiCallSuccess: false,
+            timestamp: new Date()
+          };
+          
+          // Update cache
+          connectionTestCache.lastCheckedAt = now;
+          connectionTestCache.cachedResult = result;
+          
+          return res.status(500).json(result);
         }
         
         console.log("Successfully retrieved user info from Guesty API");
@@ -1298,14 +1413,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ipAddress: req.ip
         });
         
-        return res.json({
+        const result = {
           success: true,
           message: 'Successfully connected to Guesty API',
           domainReachable: true,
           tokenReceived: true,
           apiCallSuccess: true,
-          userData: userInfo
-        });
+          userData: userInfo,
+          timestamp: new Date()
+        };
+        
+        // Update cache
+        connectionTestCache.lastCheckedAt = now;
+        connectionTestCache.cachedResult = result;
+        
+        return res.json(result);
       } catch (apiError) {
         console.error("API call failed despite successful token retrieval:", apiError);
         
@@ -1319,13 +1441,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // If we got a token but API call failed
-        return res.status(500).json({
+        const result = {
           success: false,
           message: `Token obtained but API call failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`,
           domainReachable: true,
           tokenReceived: true,
-          apiCallSuccess: false
-        });
+          apiCallSuccess: false,
+          timestamp: new Date()
+        };
+        
+        // Update cache
+        connectionTestCache.lastCheckedAt = now;
+        connectionTestCache.cachedResult = result;
+        
+        return res.status(500).json(result);
       }
     } catch (error) {
       console.error("Guesty connection test failed:", error);
@@ -1343,12 +1472,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Failed to log connection test failure:", logError);
       }
       
-      return res.status(500).json({
+      const result = {
         success: false,
         message: `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         tokenReceived: false,
-        apiCallSuccess: false
-      });
+        apiCallSuccess: false,
+        timestamp: new Date()
+      };
+      
+      // We still update the cache on errors to prevent hammering the API
+      connectionTestCache.lastCheckedAt = Date.now();
+      connectionTestCache.cachedResult = result;
+      
+      return res.status(500).json(result);
     }
   });
 

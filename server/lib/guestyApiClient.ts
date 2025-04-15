@@ -186,6 +186,24 @@ class GuestyAPIClient {
     return this.makeRequest('GET', '/users/me');
   }
 
+  /**
+   * Checks if the current token is potentially valid without making an API call
+   * @returns boolean indicating if the token appears to be valid
+   */
+  public isTokenPotentiallyValid(): boolean {
+    const bufferMs = 60 * 1000; // 1 minute buffer
+    if (this.accessToken && this.tokenExpiresAt && this.tokenExpiresAt > (Date.now() + bufferMs)) {
+      // Token exists and is not expired (with buffer)
+      return true;
+    }
+    // Token is missing, expired, or very close to expiring
+    return false;
+  }
+  
+  /**
+   * Performs a lightweight health check against the Guesty API domain
+   * @returns Object with health check status
+   */
   async healthCheck(): Promise<{ success: boolean; message: string }> {
     try {
       await axios.get(`${GUESTY_BASE_URL.replace('/v1', '')}/health`, {

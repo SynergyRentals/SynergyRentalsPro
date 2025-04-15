@@ -1,0 +1,51 @@
+Context:
+Our Node.js/Express/TypeScript backend uses a GuestyAPIClient (located at src/server/lib/guestyApiClient.ts) to interact with the Guesty API. While the client handles token refresh and retries (including for 429 errors), we are still experiencing frequent 429 Too Many Requests errors specifically triggered by our "Health Check" and "Connection Test" endpoints. This indicates these endpoints are calling the Guesty API too often.
+
+Goal:
+Modify the existing backend code for the Health Check and Connection Test endpoints to significantly reduce the frequency of calls made to the Guesty API, thereby avoiding 429 rate limit errors.
+
+Instructions:
+
+Locate Endpoints: Find the route handlers or functions in our Express application responsible for the "Health Check" and "Connection Test". (Look for files possibly named healthCheck.ts, status.ts, connectionTest.ts, or similar, or specific routes within router files).
+
+Analyze Calls: Identify exactly where and how these endpoints are currently interacting with the guestyClient instance. Are they calling guestyClient.getListings(), guestyClient.makeRequest(), or perhaps trying to get a new token repeatedly?
+
+Implement Reduction Strategy (Choose A or B, prioritize A for Health Checks):
+
+A) Minimize/Eliminate Direct Calls (Especially for Health Check):
+
+Modify the health check to primarily rely on internal application status.
+Add Helper to Client: If needed, add a non-async, non-API-calling method to the GuestyAPIClient class like isTokenPotentiallyValid(): boolean that simply checks if this.accessToken exists and this.tokenExpiresAt is in the future (minus a small buffer).
+Update Health Check: Use this new isTokenPotentiallyValid() method as a basic check for Guesty connectivity status instead of making a live API call every time. The health check should only fail regarding Guesty if the token is persistently invalid after the client has had time to refresh internally.
+B) Implement Internal Caching (For Connection Test or if Guesty call deemed essential):
+
+Introduce simple in-memory caching within the endpoint handler's module.
+Store the timestamp and result (success/failure) of the last actual Guesty API call made by this endpoint.
+When the endpoint is hit, check the timestamp of the last call.
+Only if sufficient time has passed (e.g., 5-10 minutes), make a new call using guestyClient. Update the cached timestamp and result.
+For all requests within the time window, return the cached result immediately without calling guestyClient.
+Add Logging: Add console.log statements within the modified endpoint handlers to:
+
+Show when the endpoint is triggered.
+Indicate whether it's returning a cached result or attempting a new Guesty API call.
+Log the result of any Guesty API call it does make.
+Check Trigger Frequency (If applicable): If these endpoints are triggered by timers (setInterval) or external monitoring configurations (like Kubernetes probes), locate that configuration and significantly increase the polling interval (e.g., from seconds to minutes). Instruct the agent on where to potentially find this configuration if known.
+
+Example Helper Method for GuestyAPIClient (Strategy A):
+
+TypeScript
+
+// Add this inside the GuestyAPIClient class in src/server/lib/guestyApiClient.ts
+
+public isTokenPotentiallyValid(): boolean {
+    const bufferMs = 60 * 1000; // 1 minute buffer
+    if (this.accessToken && this.tokenExpiresAt && this.tokenExpiresAt > (Date.now() + bufferMs)) {
+        // Token exists and is not expired (with buffer)
+        return true;
+    }
+    // Token is missing, expired, or very close to expiring
+    return false;
+}
+Instructions for Agent:
+"Please modify our existing Health Check and Connection Test endpoints as described above to reduce Guesty API calls and prevent 429 errors. Prioritize removing direct API calls from the health check if possible, potentially using a new isTokenPotentiallyValid helper method in the GuestyAPIClient. For the Connection Test, implement internal caching if a Guesty call is still required periodically. Add relevant logging."
+
