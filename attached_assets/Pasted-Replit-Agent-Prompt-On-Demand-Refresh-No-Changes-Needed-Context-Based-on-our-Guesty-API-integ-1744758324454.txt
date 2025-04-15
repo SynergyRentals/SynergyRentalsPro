@@ -1,0 +1,28 @@
+Replit Agent Prompt (On-Demand Refresh - No Changes Needed):
+
+Context:
+Based on our Guesty API integration using guestyClient (src/server/lib/guestyApiClient.ts) and facing rate limits, we are shifting strategy. We need a way to perform an "on-demand refresh" or "initial sync" of data (e.g., all listings) from Guesty, storing it in our database (managed by Drizzle ORM). This will be triggered manually or infrequently, replacing constant automatic checks.
+
+Goal:
+Create a backend service function and a corresponding API endpoint (e.g., within a tRPC router or a standard Express route) that triggers a full refresh of Guesty listings, handling pagination, and saving the data to our database.
+
+Instructions:
+
+Create Service Function: Create a new function (e.g., syncAllGuestyListings in a relevant service file like src/server/services/guestySyncService.ts).
+Implement Pagination: Inside this function, use the existing guestyClient to fetch listings from the GET /v1/listings endpoint.
+You must implement pagination logic. Guesty's API won't return all listings at once.
+Use a loop (while or similar). In each iteration:
+Call guestyClient.getListings({ limit: 100, skip: currentSkip }) (adjust limit as appropriate, max 100 is common).
+Process the results array from the response.
+Check the total count and the number of returned results to determine if more pages exist.
+Increment currentSkip by the number of results received (or the limit).
+Include logging for progress (e.g., "Fetched page X, Y listings total").
+Add a small delay (await new Promise(resolve => setTimeout(resolve, 200));) between pages to be kind to the API, even during a sync.
+Database Interaction: For each listing received:
+Use Drizzle ORM to perform an "upsert" operation (update the listing if it exists based on its Guesty ID, or insert it if it's new). Map the Guesty listing fields to your Drizzle schema. (Agent will need context on your schema or you'll need to refine this part).
+Create API Endpoint:
+Expose the syncAllGuestyListings function via a new API endpoint (e.g., a tRPC mutation guesty.syncListings or an Express POST route /api/guesty-sync/listings).
+This endpoint should simply call the service function.
+Include error handling and return a success/failure status.
+Error Handling: Wrap the sync logic in try/catch blocks. Log errors appropriately.
+Instructions for Agent: "Please implement an on-demand data refresh mechanism for Guesty listings. Create a service function syncAllGuestyListings that uses the existing guestyClient to fetch all listings from GET /v1/listings, correctly handling pagination using limit and skip. Inside the loop, use Drizzle ORM to upsert each listing into our database (provide schema context if needed). Add logging for progress and a small delay between page fetches. Expose this function via a new API endpoint (e.g., tRPC mutation guesty.syncListings or Express POST route /api/guesty-sync/listings) with basic error handling."
