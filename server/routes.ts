@@ -1607,6 +1607,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get a single Guesty property by ID
+  app.get("/api/guesty/properties/:id", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const [property] = await db.select()
+        .from(guestyProperties)
+        .where(eq(guestyProperties.id, propertyId));
+        
+      if (!property) {
+        return res.status(404).json({ message: "Guesty property not found" });
+      }
+      
+      res.json(property);
+    } catch (error) {
+      console.error("Error fetching Guesty property:", error);
+      res.status(500).json({ message: "Error fetching Guesty property" });
+    }
+  });
+  
   // Get all Guesty reservations
   app.get("/api/guesty/reservations", checkAuth, async (req: Request, res: Response) => {
     try {

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Building2, MapPin, AlertTriangle, Bed, Bath, Link, ExternalLink } from "lucide-react";
+import { Loader2, Plus, Building2, MapPin, AlertTriangle, Bed, Bath, Link, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GuestyProperty } from "@shared/schema";
+import { Link as WouterLink } from "wouter";
 
 export default function GuestyPropertiesTab() {
   const { toast } = useToast();
@@ -146,8 +147,17 @@ export default function GuestyPropertiesTab() {
                 )}
               </CardContent>
               
-              {property.listingUrl && (
-                <CardFooter className="pt-2">
+              <CardFooter className="pt-2 flex flex-wrap gap-2">
+                <WouterLink to={`/unit/${property.id}`} className="flex-1">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Eye className="h-4 w-4 mr-1" /> View Details
+                  </Button>
+                </WouterLink>
+                {property.listingUrl && (
                   <a 
                     href={property.listingUrl} 
                     target="_blank" 
@@ -157,8 +167,8 @@ export default function GuestyPropertiesTab() {
                     <ExternalLink className="h-4 w-4 mr-1" />
                     View Listing
                   </a>
-                </CardFooter>
-              )}
+                )}
+              </CardFooter>
             </Card>
           ))}
         </div>
