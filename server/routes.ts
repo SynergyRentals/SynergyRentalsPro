@@ -28,6 +28,7 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
+import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } from "./services/guestySyncService";
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
 
@@ -1543,15 +1544,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Current implementation is preserved for now to ensure backward compatibility
   app.post("/api/guesty/sync-properties", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
-      const result = await syncProperties();
-      res.json(result);
+      // Use the new pagination-enabled sync service
+      const result = await syncAllGuestyListings();
+      
+      // Format response to maintain backwards compatibility
+      const response = {
+        success: result.success,
+        message: result.message,
+        properties_synced: result.propertiesCount
+      };
+      
+      res.json(response);
       
       // Log the sync
       await storage.createLog({
         action: "GUESTY_SYNC_PROPERTIES",
         userId: req.user?.id,
         targetTable: "guesty_properties",
-        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
+        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}. Processed ${result.propertiesCount} properties.`,
         ipAddress: req.ip
       });
     } catch (error) {
@@ -1568,15 +1578,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Current implementation is preserved for now to ensure backward compatibility
   app.post("/api/guesty/sync-reservations", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
-      const result = await syncReservations();
-      res.json(result);
+      // Use the new pagination-enabled sync service
+      const result = await syncAllGuestyReservations();
+      
+      // Format response to maintain backwards compatibility
+      const response = {
+        success: result.success,
+        message: result.message,
+        reservations_synced: result.reservationsCount
+      };
+      
+      res.json(response);
       
       // Log the sync
       await storage.createLog({
         action: "GUESTY_SYNC_RESERVATIONS",
         userId: req.user?.id,
         targetTable: "guesty_reservations",
-        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
+        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}. Processed ${result.reservationsCount} reservations.`,
         ipAddress: req.ip
       });
     } catch (error) {
@@ -1687,15 +1706,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Current implementation is preserved for now to ensure backward compatibility
   app.post("/api/guesty/sync", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
-      const result = await syncAll();
-      res.json(result);
+      // Use the new syncAllGuestyData service function that handles pagination
+      const result = await syncAllGuestyData();
+      
+      // Format response in a backwards-compatible way
+      const response = {
+        success: result.success,
+        message: result.message,
+        properties_synced: result.propertiesResult?.propertiesCount || 0,
+        reservations_synced: result.reservationsResult?.reservationsCount || 0,
+        sync_status: result.success ? "success" : "error"
+      };
+      
+      res.json(response);
       
       // Log the sync
       await storage.createLog({
         action: "GUESTY_SYNC_ALL",
         userId: req.user?.id,
         targetTable: "guesty_sync_logs",
-        notes: `Synced ${result.properties_synced} properties and ${result.reservations_synced} reservations. Status: ${result.sync_status}`,
+        notes: `Synced ${response.properties_synced} properties and ${response.reservations_synced} reservations. Status: ${response.sync_status}`,
         ipAddress: req.ip
       });
     } catch (error) {
