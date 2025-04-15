@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Wrench } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -782,8 +782,9 @@ export default function MaintenancePage() {
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="tickets">Tickets</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
             <TabsTrigger value="vendors">Vendors</TabsTrigger>
           </TabsList>
@@ -956,6 +957,51 @@ export default function MaintenancePage() {
                       )}
                     </TableBody>
                   </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Calendar Tab */}
+          <TabsContent value="calendar" className="mt-4">
+            <div className="space-y-6">
+              <CalendarView maintenance={maintenance || []} />
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-medium">Upcoming Maintenance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {filteredMaintenance && filteredMaintenance.length > 0 ? (
+                      filteredMaintenance
+                        .filter(item => item.status !== "completed")
+                        .slice(0, 5)
+                        .map((item) => (
+                          <div key={item.id} className="flex items-start justify-between border-b pb-4 last:border-0 last:pb-0">
+                            <div className="space-y-1">
+                              <div className="font-medium">{item.description}</div>
+                              <div className="text-sm text-gray-500">
+                                <span className="flex items-center">
+                                  <Home className="h-3 w-3 mr-1" />
+                                  {getUnitName(item.unitId)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              {getPriorityBadge(item.priority)}
+                              <div className="text-sm text-gray-500 mt-2">
+                                {format(new Date(item.createdAt), "MMM dd, yyyy")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        No maintenance tickets scheduled
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -64,7 +64,7 @@ export function CalendarView({ maintenance, className }: CalendarViewProps) {
                   >
                     <div className="flex items-center">
                       {item.status === "completed" && <Check className="h-3 w-3 mr-1 text-green-600" />}
-                      {item.status === "in-progress" && <Engineering className="h-3 w-3 mr-1 text-blue-600" />}
+                      {item.status === "in-progress" && <Wrench className="h-3 w-3 mr-1 text-blue-600" />}
                       <span className="truncate">{item.description}</span>
                     </div>
                   </div>
