@@ -146,7 +146,7 @@ export class MemStorage implements IStorage {
       name: "Admin User",
       username: "admin",
       // Pre-hashed "password123" using the same algorithm in auth.ts
-      password: "c191122b34d4d5c181f5293add639935ec9a23d9768be0b601cce0e8d99800121821f87a6e6fb39990bd914d9f7b4ec926a2766ea4c77a5f6ef04141b160525.81b637d8fcd2c6da6359e6963113a1170de795e4b725b84d1e0b4cfd9ec58ce9",
+      password: "09531004adc7027d36b9cb3dcd9ba44f9cca120e46637ced58b6d35d0e969cc0f93a096c4d4d2ae71d3f00125f882654ce8d7c736788571dcebaeb0fc8e572d4.1e63c98694b3f13f45be49fbc67af531",
       email: "admin@synergyrentals.com",
       role: "admin",
       phone: "555-123-4567",
@@ -162,7 +162,7 @@ export class MemStorage implements IStorage {
       name: "Manager User",
       username: "manager",
       // Pre-hashed "password123" 
-      password: "c191122b34d4d5c181f5293add639935ec9a23d9768be0b601cce0e8d99800121821f87a6e6fb39990bd914d9f7b4ec926a2766ea4c77a5f6ef04141b160525.81b637d8fcd2c6da6359e6963113a1170de795e4b725b84d1e0b4cfd9ec58ce9",
+      password: "09531004adc7027d36b9cb3dcd9ba44f9cca120e46637ced58b6d35d0e969cc0f93a096c4d4d2ae71d3f00125f882654ce8d7c736788571dcebaeb0fc8e572d4.1e63c98694b3f13f45be49fbc67af531",
       email: "manager@synergyrentals.com",
       role: "manager",
       phone: "555-987-6543",
