@@ -1124,6 +1124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // These endpoints sync data from Guesty to our database
   
   // Properties sync route
+  // TODO: This will be migrated to use guestyClient.getProperties() directly in a future update
+  // Current implementation is preserved for now to ensure backward compatibility
   app.post("/api/guesty/sync-properties", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
       const result = await syncProperties();
@@ -1147,6 +1149,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Reservations sync route
+  // TODO: This will be migrated to use guestyClient.getReservations() directly in a future update
+  // Current implementation is preserved for now to ensure backward compatibility
   app.post("/api/guesty/sync-reservations", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
       const result = await syncReservations();
@@ -1170,6 +1174,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Full sync route (properties and reservations)
+  // TODO: This will be migrated to use guestyClient for all sync operations in a future update
+  // Current implementation is preserved for now to ensure backward compatibility
   app.post("/api/guesty/sync", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
       const result = await syncAll();
