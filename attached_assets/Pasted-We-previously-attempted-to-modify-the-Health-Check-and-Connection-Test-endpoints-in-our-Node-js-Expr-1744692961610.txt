@@ -1,0 +1,34 @@
+We previously attempted to modify the Health Check and Connection Test endpoints in our Node.js/Express/TypeScript backend to reduce Guesty API calls and avoid 429 errors. However, the application is still reporting the same 429 errors originating from these checks. We need to add detailed logging to understand precisely when and why these calls are being made and how the GuestyAPIClient is responding.
+
+Goal:
+Add comprehensive console.log statements to key areas related to the Health Check endpoints, Connection Test endpoints, and the GuestyAPIClient (src/server/lib/guestyApiClient.ts) to trace the execution flow and identify the source of excessive API calls.
+
+Instructions:
+
+Locate Health Check / Connection Test Endpoints: Re-identify the route handlers or functions for these checks.
+
+Add Logging to Endpoints: Inside these handlers, add logs:
+
+console.log('[Timestamp] HealthCheck Endpoint Triggered'); (Replace "HealthCheck" with the actual check name).
+Before any logic that might call Guesty: console.log('[Timestamp] HealthCheck: Evaluating need for Guesty API call...');
+If implementing caching: console.log('[Timestamp] HealthCheck: Cache status: [Hit/Miss/Expired]');
+Immediately before any call to guestyClient.makeRequest, guestyClient.getListings, or similar: console.log('[Timestamp] HealthCheck: Attempting Guesty API call: [Method Name]');
+After the call attempt: console.log('[Timestamp] HealthCheck: Guesty API call attempt finished. Result: [Success/Failure]');
+Add Logging to GuestyAPIClient (src/server/lib/guestyApiClient.ts):
+
+Inside _ensureTokenValid:
+At the beginning: console.log('[Timestamp] GuestyClient: _ensureTokenValid called.');
+If it decides to refresh: console.log('[Timestamp] GuestyClient: Token invalid or expiring, attempting refresh via _getNewAccessToken.');
+If token is deemed valid: console.log('[Timestamp] GuestyClient: Existing token is valid.');
+Inside _getNewAccessToken:
+At the beginning: console.log('[Timestamp] GuestyClient: _getNewAccessToken called.');
+On success: console.log('[Timestamp] GuestyClient: Successfully obtained new token.');
+On failure (in the catch block): console.error('[Timestamp] GuestyClient: ERROR in _getNewAccessToken:', error);
+Inside makeRequest:
+At the beginning: console.log('[Timestamp] GuestyClient: makeRequest called for [Method] [Endpoint]');
+When a 429 error is caught and retry is attempted: console.warn('[Timestamp] GuestyClient: Caught 429 (Retry ${currentRetry + 1}/${maxRetries}). Waiting ${finalWaitTime}ms before retry...'); (Include relevant variables).
+When any other HTTPError is caught: console.error('[Timestamp] GuestyClient: HTTP Error in makeRequest:', error.response?.status, error.response?.data);
+When a non-HTTP error is caught: console.error('[Timestamp] GuestyClient: Network/Other Error in makeRequest:', error);
+On final success before returning: console.log('[Timestamp] GuestyClient: makeRequest successful for [Method] [Endpoint]');
+Instructions for Agent:
+"Please add detailed console logging as specified above to our Health Check handlers, Connection Test handlers, and within the GuestyAPIClient methods (_ensureTokenValid, _getNewAccessToken, makeRequest) located in src/server/lib/guestyApiClient.ts. Use timestamps in the logs to help trace execution frequency and flow."
