@@ -19,7 +19,8 @@ import { sendSlackMessage } from "./slack";
 import { z } from "zod";
 import { 
   askAI, generateAiInsights, trainAI, generateMaintenanceTicket,
-  generateCompanyInsights, analyzeUnitHealth, generateProactiveRecommendations 
+  generateCompanyInsights, analyzeUnitHealth, generateProactiveRecommendations,
+  generateForecast
 } from "./openai";
 import { 
   syncProperties, syncReservations, syncAll, getLatestSyncLog,
@@ -2370,6 +2371,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error generating recommendations:", error);
       res.status(500).json({ 
         message: "Error generating recommendations", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Generate forecast data
+  app.post("/api/ai/forecast", checkAuth, async (req, res) => {
+    try {
+      const { forecastType, timeframe } = req.body;
+      
+      if (!forecastType || !timeframe) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Forecast type and timeframe are required" 
+        });
+      }
+      
+      // Check if OpenAI API key is available
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({ 
+          success: false,
+          message: "AI service unavailable", 
+          details: "API key not configured"
+        });
+      }
+      
+      // Generate forecast
+      const forecastData = await generateForecast(forecastType, timeframe);
+      
+      res.json({
+        success: true,
+        ...forecastData,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error("Error generating forecast:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error generating forecast", 
         error: error instanceof Error ? error.message : "Unknown error" 
       });
     }
