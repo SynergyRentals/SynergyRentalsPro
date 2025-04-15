@@ -33,15 +33,30 @@ export default function UnitDetailPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Fetch unit details
+  // Fetch unit details - try regular units first, then fallback to Guesty properties
   const { data: unit, isLoading: isLoadingUnit } = useQuery({
     queryKey: ["/api/units", unitId],
     queryFn: async () => {
-      const res = await fetch(`/api/units/${unitId}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch unit");
+      try {
+        // First try to get as a regular unit
+        const res = await fetch(`/api/units/${unitId}`);
+        if (res.ok) {
+          const unitData = await res.json();
+          return { ...unitData, source: 'internal' };
+        }
+        
+        // If not found, try as a Guesty property
+        const guestyRes = await fetch(`/api/guesty/properties/${unitId}`);
+        if (!guestyRes.ok) {
+          throw new Error("Unit not found");
+        }
+        
+        const guestyProperty = await guestyRes.json();
+        // Add a source field to identify this as a Guesty property
+        return { ...guestyProperty, source: 'guesty' };
+      } catch (error) {
+        throw new Error("Failed to fetch unit details");
       }
-      return res.json();
     },
     enabled: !!unitId
   });
@@ -237,18 +252,35 @@ export default function UnitDetailPage() {
             </div>
             <div className="flex flex-col md:flex-row justify-between md:items-center">
               <div>
-                <h1 className="text-3xl font-bold mb-2">{unit.name}</h1>
+                <div className="flex items-center gap-2 mb-2">
+                  <h1 className="text-3xl font-bold">{unit.name}</h1>
+                  {unit.source === 'guesty' && (
+                    <Badge variant="outline" className="text-blue-500 bg-blue-50">
+                      Guesty
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-muted-foreground">{unit.address}</p>
               </div>
               <div className="flex space-x-2 mt-4 md:mt-0">
-                <Button variant="outline" size="sm">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Edit Details
-                </Button>
+                {unit.source !== 'guesty' && (
+                  <Button variant="outline" size="sm">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Edit Details
+                  </Button>
+                )}
                 <Button>
                   <ClipboardList className="h-4 w-4 mr-2" />
                   Create Task
                 </Button>
+                {unit.source === 'guesty' && unit.listingUrl && (
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={unit.listingUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View Listing
+                    </a>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -340,6 +372,27 @@ export default function UnitDetailPage() {
                         <p>{unit.address}</p>
                       </div>
                       
+                      {unit.source === 'guesty' && unit.propertyType && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Property Type</p>
+                          <p>{unit.propertyType}</p>
+                        </div>
+                      )}
+                      
+                      {unit.source === 'guesty' && unit.bedrooms && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Bedrooms</p>
+                          <p>{unit.bedrooms}</p>
+                        </div>
+                      )}
+                      
+                      {unit.source === 'guesty' && unit.bathrooms && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Bathrooms</p>
+                          <p>{unit.bathrooms}</p>
+                        </div>
+                      )}
+                      
                       {unit.wifiInfo && (
                         <div>
                           <p className="text-sm text-muted-foreground">WiFi</p>
@@ -362,6 +415,22 @@ export default function UnitDetailPage() {
                         <div>
                           <p className="text-sm text-muted-foreground">Notes</p>
                           <p className="text-sm">{unit.notes}</p>
+                        </div>
+                      )}
+                      
+                      {unit.source === 'guesty' && unit.guestyId && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Guesty ID</p>
+                          <p className="text-xs font-mono text-muted-foreground">{unit.guestyId}</p>
+                        </div>
+                      )}
+                      
+                      {unit.source === 'guesty' && unit.lastSync && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Last Synced</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(unit.lastSync).toLocaleString()}
+                          </p>
                         </div>
                       )}
                     </div>
