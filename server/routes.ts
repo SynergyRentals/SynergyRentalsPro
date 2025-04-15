@@ -5,7 +5,9 @@ import { setupAuth } from "./auth";
 import { 
   insertTaskSchema, insertUnitSchema, insertGuestSchema, 
   insertMaintenanceSchema, insertInventorySchema, insertVendorSchema,
-  insertProjectSchema, insertDocumentSchema, insertLogSchema
+  insertProjectSchema, insertDocumentSchema, insertLogSchema,
+  insertCleaningTaskSchema, insertCleaningChecklistSchema, 
+  insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
