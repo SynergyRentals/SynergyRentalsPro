@@ -1,5 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import fs from 'fs';
+import fileUpload from 'express-fileupload';
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { db } from "./db";
@@ -9,7 +11,7 @@ import {
   insertProjectSchema, insertDocumentSchema, insertLogSchema,
   insertCleaningTaskSchema, insertCleaningChecklistSchema, 
   insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema,
-  guestyProperties, guestyReservations
+  guestyProperties, guestyReservations, guestySyncLogs
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
@@ -1173,7 +1175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // CSV Import route for properties
+  // CSV Import route for properties (using fixed file path)
   // This endpoint imports properties data from a CSV file when API is rate limited
   app.post("/api/guesty/import-csv", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
@@ -1201,6 +1203,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: `Error importing CSV: ${error instanceof Error ? error.message : "Unknown error"}`
+      });
+    }
+  });
+  
+  // CSV File Upload Import route for properties
+  // This endpoint allows uploading a CSV file directly via multipart/form-data
+  app.post("/api/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      // Check if the request includes a file
+      if (!req.files || !req.files.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No file was uploaded"
+        });
+      }
+      
+      const uploadedFile = req.files.file;
+      
+      // Ensure it's a CSV file
+      if (!uploadedFile.name.endsWith('.csv') && uploadedFile.mimetype !== 'text/csv') {
+        return res.status(400).json({
+          success: false,
+          message: "Uploaded file must be a CSV file"
+        });
+      }
+      
+      // Create temporary file to process
+      const tempFilePath = `./tmp/upload_${Date.now()}.csv`;
+      
+      // Ensure tmp directory exists
+      if (!fs.existsSync('./tmp')) {
+        fs.mkdirSync('./tmp', { recursive: true });
+      }
+      
+      // Move the uploaded file to the temp location
+      await uploadedFile.mv(tempFilePath);
+      
+      // Import the CSV importer function
+      const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
+      
+      // Process the CSV file
+      const result = await importGuestyPropertiesFromCSV(tempFilePath);
+      
+      // Clean up the temp file
+      fs.unlinkSync(tempFilePath);
+      
+      // Log the action
+      await storage.createLog({
+        action: "GUESTY_CSV_UPLOAD_IMPORT",
+        userId: req.user?.id,
+        targetTable: "guesty_properties",
+        notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV`,
+        ipAddress: req.ip
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error processing uploaded CSV:", error);
+      res.status(500).json({ 
+        success: false,
+        message: `Error processing uploaded CSV: ${error instanceof Error ? error.message : "Unknown error"}`
       });
     }
   });
