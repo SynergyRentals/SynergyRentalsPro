@@ -16,6 +16,7 @@ import AiToolsPage from "@/pages/ai-tools-page";
 import AdminPage from "@/pages/admin-page";
 import PropertiesPage from "@/pages/properties-page";
 import PropertyDetailPage from "@/pages/property-detail-page";
+import UnitDetailPage from "@/pages/unit-detail-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -34,6 +35,7 @@ function Router() {
       <ProtectedRoute path="/admin" component={AdminPage} />
       <ProtectedRoute path="/properties" component={PropertiesPage} />
       <ProtectedRoute path="/properties/:id" component={PropertyDetailPage} />
+      <ProtectedRoute path="/unit/:id" component={UnitDetailPage} />
       <Route component={NotFound} />
     </Switch>
   );

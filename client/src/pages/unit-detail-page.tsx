@@ -1,26 +1,17 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, Link } from "wouter";
-import { 
-  Container,
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Button,
-  Badge
-} from "@/components/ui";
+import { Container } from "@/components/ui/container";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   Calendar, 
   Clock,
   Home, 
   Users, 
   ClipboardList, 
-  Tool, 
+  Wrench, 
   Package, 
   FileText,
   ArrowLeft
@@ -31,7 +22,7 @@ import { format } from "date-fns";
 
 // Components
 import { Skeleton } from "@/components/ui/skeleton";
-import { TaskCard } from "@/components/dashboard/TaskCard";
+import TaskCard from "@/components/dashboard/TaskCard";
 import { CalendarView } from "@/components/dashboard/CalendarView";
 import { Separator } from "@/components/ui/separator";
 
@@ -311,7 +302,7 @@ export default function UnitDetailPage() {
             <Card>
               <CardContent className="p-4 flex items-center space-x-4">
                 <div className="bg-primary/20 p-3 rounded-full">
-                  <Tool className="h-5 w-5 text-primary" />
+                  <Wrench className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Maintenance</p>
