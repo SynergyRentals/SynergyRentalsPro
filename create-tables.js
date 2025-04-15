@@ -1,81 +1,103 @@
-const { Pool } = require('@neondatabase/serverless');
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { pool } from './server/db.ts';
 
 async function createTables() {
+  const client = await pool.connect();
+  
   try {
-    console.log('Creating tables...');
+    // Start transaction
+    await client.query('BEGIN');
     
-    // Create cleaning_tasks table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cleaning_tasks (
+    console.log('Creating insights table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS insights (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL,
+        unit_id INTEGER,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        insight_type TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'info',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        actionable BOOLEAN DEFAULT TRUE,
+        data JSONB
+      );
+    `);
+    
+    console.log('Creating unit_health_scores table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS unit_health_scores (
         id SERIAL PRIMARY KEY,
         unit_id INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'scheduled',
-        scheduled_for TIMESTAMP NOT NULL,
-        assigned_to INTEGER,
-        assigned_by INTEGER,
-        completed_at TIMESTAMP,
-        verified_at TIMESTAMP,
-        verified_by INTEGER,
-        cleaning_type TEXT NOT NULL DEFAULT 'turnover',
-        estimated_duration INTEGER,
-        actual_duration INTEGER,
+        score INTEGER NOT NULL,
+        revenue_score INTEGER,
+        maintenance_score INTEGER,
+        guest_satisfaction_score INTEGER,
+        inventory_score INTEGER,
+        cleaning_score INTEGER,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         notes TEXT,
-        photos TEXT[],
-        checklist_template_id INTEGER,
-        score INTEGER,
-        is_inspection BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT NOW()
+        trend_direction TEXT,
+        trend_value INTEGER
       );
     `);
     
-    // Create cleaning_checklists table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cleaning_checklists (
+    console.log('Creating review_sentiment table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS review_sentiment (
         id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        description TEXT,
-        property_type TEXT,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        created_by INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        review_id INTEGER,
+        unit_id INTEGER,
+        sentiment_score REAL NOT NULL,
+        analysis_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        positive_aspects JSONB,
+        negative_aspects JSONB,
+        keywords JSONB
       );
     `);
     
-    // Create cleaning_checklist_items table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cleaning_checklist_items (
+    console.log('Creating revenue_snapshots table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS revenue_snapshots (
         id SERIAL PRIMARY KEY,
-        checklist_id INTEGER NOT NULL,
-        description TEXT NOT NULL,
-        room TEXT NOT NULL,
-        "order" INTEGER NOT NULL,
-        requires_photo BOOLEAN,
-        is_required BOOLEAN DEFAULT TRUE,
-        notes TEXT
+        snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        unit_id INTEGER,
+        daily_revenue REAL,
+        weekly_revenue REAL,
+        monthly_revenue REAL,
+        quarterly_revenue REAL,
+        yearly_revenue REAL,
+        occupancy_rate REAL,
+        avg_booking_value REAL,
+        forecasted_revenue JSONB
       );
     `);
     
-    // Create cleaning_checklist_completions table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cleaning_checklist_completions (
+    console.log('Creating insight_logs table...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS insight_logs (
         id SERIAL PRIMARY KEY,
-        cleaning_task_id INTEGER NOT NULL,
-        checklist_item_id INTEGER NOT NULL,
-        completed BOOLEAN,
-        completed_at TIMESTAMP,
-        completed_by INTEGER,
-        photo_url TEXT,
-        notes TEXT
+        analysis_type TEXT NOT NULL,
+        unit_id INTEGER,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        input_data JSONB,
+        result_data JSONB,
+        actionability_score REAL,
+        processing_time INTEGER,
+        prompt_tokens INTEGER,
+        completion_tokens INTEGER
       );
     `);
     
-    console.log('Tables created successfully');
-  } catch (error) {
-    console.error('Error creating tables:', error);
+    // Commit transaction
+    await client.query('COMMIT');
+    console.log('All tables created successfully!');
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error creating tables:', err);
+    throw err;
   } finally {
+    client.release();
     await pool.end();
   }
 }
