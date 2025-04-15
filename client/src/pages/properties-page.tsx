@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertUnitSchema } from "@shared/schema";
+import GuestyPropertiesTab from "@/components/properties/GuestyPropertiesTab";
 
 export default function PropertiesPage() {
   const { toast } = useToast();
@@ -221,6 +222,9 @@ export default function PropertiesPage() {
     );
   }
   
+  // Add a state to track source tab (internal vs guesty)
+  const [sourceTab, setSourceTab] = useState<string>("internal");
+
   return (
     <div className="container mx-auto py-6">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6">
@@ -233,138 +237,154 @@ export default function PropertiesPage() {
         </Button>
       </div>
       
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search properties by name, address, or tags..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              onClick={() => setSearchQuery("")}
-            >
-              <X className="h-4 w-4 text-gray-400" />
-            </button>
-          )}
-        </div>
-      </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4 overflow-x-auto">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="inactive">Inactive</TabsTrigger>
-          {allTags.map((tag) => (
-            <TabsTrigger key={tag} value={tag}>
-              {tag}
-            </TabsTrigger>
-          ))}
+      {/* Source tabs - Internal vs Guesty */}
+      <Tabs value={sourceTab} onValueChange={setSourceTab} className="mb-6">
+        <TabsList className="mb-4 w-full justify-start">
+          <TabsTrigger value="internal" className="flex-1">Internal Properties</TabsTrigger>
+          <TabsTrigger value="guesty" className="flex-1">Guesty Properties</TabsTrigger>
         </TabsList>
         
-        <TabsContent value={activeTab}>
-          {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {/* Internal Properties Tab */}
+        <TabsContent value="internal">
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search properties by name, address, or tags..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-4 w-4 text-gray-400" />
+                </button>
+              )}
             </div>
-          ) : filteredUnits && filteredUnits.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredUnits.map((unit) => (
-                <Card key={unit.id} className={unit.active ? "" : "opacity-60"}>
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="mr-2">{unit.name}</CardTitle>
-                      {!unit.active && (
-                        <Badge variant="outline" className="text-gray-500">
-                          Inactive
-                        </Badge>
-                      )}
-                    </div>
-                    <CardDescription className="flex items-center text-gray-500">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {unit.address}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    {unit.wifiInfo && (
-                      <div className="flex items-center text-sm mb-2">
-                        <Wifi className="h-4 w-4 mr-2 text-blue-500" />
-                        <span className="font-medium">WiFi Info:</span>
-                        <span className="ml-1 text-gray-600">{unit.wifiInfo}</span>
-                      </div>
-                    )}
-                    
-                    {unit.leaseUrl && (
-                      <div className="flex items-center text-sm mb-2">
-                        <FileText className="h-4 w-4 mr-2 text-gray-500" />
-                        <a 
-                          href={unit.leaseUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View Lease
-                        </a>
-                      </div>
-                    )}
-                    
-                    {unit.tags && unit.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {unit.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {unit.notes && (
-                      <p className="text-sm text-gray-600 mt-2">
-                        {unit.notes.length > 100 
-                          ? `${unit.notes.substring(0, 100)}...` 
-                          : unit.notes}
-                      </p>
-                    )}
-                  </CardContent>
-                  <CardFooter className="pt-2 flex justify-between gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleEditUnit(unit)}
-                    >
-                      <Pencil className="h-4 w-4 mr-1" /> Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDeleteUnit(unit)}
-                    >
-                      <Trash className="h-4 w-4 mr-1" /> Delete
-                    </Button>
-                  </CardFooter>
-                </Card>
+          </div>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4 overflow-x-auto">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="inactive">Inactive</TabsTrigger>
+              {allTags.map((tag) => (
+                <TabsTrigger key={tag} value={tag}>
+                  {tag}
+                </TabsTrigger>
               ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-lg border border-dashed">
-              <Building2 className="h-12 w-12 text-gray-300 mb-2" />
-              <h3 className="text-xl font-medium text-gray-600">No properties found</h3>
-              <p className="text-gray-500 mb-4">
-                {searchQuery
-                  ? "No properties match your search criteria."
-                  : "You haven't added any properties yet."}
-              </p>
-              <Button onClick={handleCreateNew}>
-                <Plus className="h-4 w-4 mr-2" /> Add New Property
-              </Button>
-            </div>
-          )}
+            </TabsList>
+            
+            <TabsContent value={activeTab}>
+              {isLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : filteredUnits && filteredUnits.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredUnits.map((unit) => (
+                    <Card key={unit.id} className={unit.active ? "" : "opacity-60"}>
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <CardTitle className="mr-2">{unit.name}</CardTitle>
+                          {!unit.active && (
+                            <Badge variant="outline" className="text-gray-500">
+                              Inactive
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className="flex items-center text-gray-500">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {unit.address}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        {unit.wifiInfo && (
+                          <div className="flex items-center text-sm mb-2">
+                            <Wifi className="h-4 w-4 mr-2 text-blue-500" />
+                            <span className="font-medium">WiFi Info:</span>
+                            <span className="ml-1 text-gray-600">{unit.wifiInfo}</span>
+                          </div>
+                        )}
+                        
+                        {unit.leaseUrl && (
+                          <div className="flex items-center text-sm mb-2">
+                            <FileText className="h-4 w-4 mr-2 text-gray-500" />
+                            <a 
+                              href={unit.leaseUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              View Lease
+                            </a>
+                          </div>
+                        )}
+                        
+                        {unit.tags && unit.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {unit.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-xs">
+                                <Tag className="h-3 w-3 mr-1" />
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {unit.notes && (
+                          <p className="text-sm text-gray-600 mt-2">
+                            {unit.notes.length > 100 
+                              ? `${unit.notes.substring(0, 100)}...` 
+                              : unit.notes}
+                          </p>
+                        )}
+                      </CardContent>
+                      <CardFooter className="pt-2 flex justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleEditUnit(unit)}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDeleteUnit(unit)}
+                        >
+                          <Trash className="h-4 w-4 mr-1" /> Delete
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-lg border border-dashed">
+                  <Building2 className="h-12 w-12 text-gray-300 mb-2" />
+                  <h3 className="text-xl font-medium text-gray-600">No properties found</h3>
+                  <p className="text-gray-500 mb-4">
+                    {searchQuery
+                      ? "No properties match your search criteria."
+                      : "You haven't added any properties yet."}
+                  </p>
+                  <Button onClick={handleCreateNew}>
+                    <Plus className="h-4 w-4 mr-2" /> Add New Property
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+        
+        {/* Guesty Properties Tab */}
+        <TabsContent value="guesty">
+          <GuestyPropertiesTab />
         </TabsContent>
       </Tabs>
       
