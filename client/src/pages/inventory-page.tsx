@@ -91,22 +91,26 @@ export default function InventoryPage() {
     },
   });
   
-  // Fetch inventory items
+  // Skip API calls for now and use mock data
   const {
     data: inventoryItems,
-    isLoading,
-    error,
-    refetch: refetchInventory
-  } = useQuery({
-    queryKey: ["/api/inventory"],
-    queryFn: undefined,
-  });
+    isLoading: inventoryLoading,
+    error: inventoryError,
+  } = { 
+    data: undefined, 
+    isLoading: false, 
+    error: null 
+  };
 
-  // Fetch units for reference
-  const { data: units } = useQuery({
-    queryKey: ["/api/units"],
-    queryFn: undefined,
-  });
+  // Mock units data
+  const mockUnits = [
+    { id: 1, name: "Beachside Villa" },
+    { id: 2, name: "Mountain Cabin" },
+    { id: 3, name: "Downtown Loft" }
+  ];
+  
+  // Use mock units
+  const { data: units } = { data: mockUnits };
   
   // Create inventory mutation
   const createInventoryMutation = useMutation({
@@ -261,11 +265,11 @@ export default function InventoryPage() {
     }
   ];
 
-  // Use real or mock data depending on availability
-  const inventoryData = inventoryItems || mockInventoryItems;
+  // Use mock data since API isn't fully implemented yet
+  const mockData = [...mockInventoryItems]; // Create a copy to avoid mutating the original
 
   // Filter inventory based on search, active tab, and status
-  const filteredInventory = inventoryData.filter(
+  const filteredInventory = mockData.filter(
     (item) =>
       item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (activeTab === "unit-inventory"
@@ -347,7 +351,9 @@ export default function InventoryPage() {
     });
   };
 
-  if (isLoading) {
+  // Since we're using mock data, loading and error states aren't needed
+  // But we'll keep these for when we move to real API data
+  if (inventoryLoading) {
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
@@ -357,7 +363,7 @@ export default function InventoryPage() {
     );
   }
 
-  if (error) {
+  if (inventoryError) {
     return (
       <Layout>
         <div className="text-center py-10">
