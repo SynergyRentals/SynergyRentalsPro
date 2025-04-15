@@ -468,17 +468,40 @@ export const insertGuestyReservationSchema = createInsertSchema(guestyReservatio
 // Guesty Sync Logs
 export const guestySyncLogs = pgTable("guesty_sync_logs", {
   id: serial("id").primaryKey(),
-  syncType: text("sync_type").notNull(), // properties, reservations
+  syncType: text("sync_type").notNull(), // properties, reservations, webhook_property, webhook_reservation
   status: text("status").notNull(), // success, error
   propertiesCount: integer("properties_count"),
   reservationsCount: integer("reservations_count"),
   errorMessage: text("error_message"),
+  notes: text("notes"), // Additional context such as webhook event type
   syncDate: timestamp("sync_date").defaultNow(),
 });
 
 export const insertGuestySyncLogSchema = createInsertSchema(guestySyncLogs).omit({
   id: true,
   syncDate: true,
+});
+
+// Guesty Webhook Events
+export const guestyWebhookEvents = pgTable("guesty_webhook_events", {
+  id: serial("id").primaryKey(),
+  eventType: text("event_type").notNull(), // property.created, property.updated, reservation.created, etc.
+  entityId: text("entity_id").notNull(), // Guesty ID of the entity
+  entityType: text("entity_type").notNull(), // property, reservation, etc.
+  eventData: jsonb("event_data").notNull(), // Raw webhook payload
+  signature: text("signature"), // X-Guesty-Signature-V2 value
+  processed: boolean("processed").default(false),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  ipAddress: text("ip_address"),
+  processingErrors: text("processing_errors"),
+});
+
+export const insertGuestyWebhookEventSchema = createInsertSchema(guestyWebhookEvents).omit({
+  id: true,
+  processed: true,
+  processedAt: true,
+  createdAt: true,
 });
 
 // AI Prompt Schema
@@ -560,6 +583,9 @@ export type InsertGuestyReservation = z.infer<typeof insertGuestyReservationSche
 
 export type GuestySyncLog = typeof guestySyncLogs.$inferSelect;
 export type InsertGuestySyncLog = z.infer<typeof insertGuestySyncLogSchema>;
+
+export type GuestyWebhookEvent = typeof guestyWebhookEvents.$inferSelect;
+export type InsertGuestyWebhookEvent = z.infer<typeof insertGuestyWebhookEventSchema>;
 
 // Company Insights module - AI powered analytics
 export const insights = pgTable("insights", {
