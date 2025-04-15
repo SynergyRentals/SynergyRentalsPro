@@ -13,6 +13,7 @@ import {
   AdminPanelSettings,
   Add,
   HomeWork,
+  Assignment,
 } from "@mui/icons-material";
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
     { name: "Dashboard", href: "/", icon: Dashboard },
     { name: "Properties", href: "/properties", icon: HomeWork },
     { name: "Guests", href: "/guests", icon: Users },
+    { name: "Projects & Tasks", href: "/projects", icon: Assignment },
     { name: "Cleaning", href: "/cleaning", icon: CleaningServices },
     { name: "Maintenance", href: "/maintenance", icon: Construction },
     { name: "Inventory", href: "/inventory", icon: Inventory2 },
@@ -107,6 +109,7 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
           <div className="p-4 border-t border-gray-700">
             <Button
               className="w-full bg-[#FFCF45] text-[#2C2E3E] hover:bg-opacity-90"
+              onClick={() => handleNavClick("/projects")}
             >
               <Add className="mr-2 h-4 w-4" />
               <span>New Task</span>
