@@ -45,7 +45,6 @@ export default function GuestsPage() {
     error,
   } = useQuery({
     queryKey: ["/api/guests"],
-    queryFn: undefined,
   });
 
   // Fetch units for the dropdown
@@ -54,12 +53,11 @@ export default function GuestsPage() {
     isLoading: isLoadingUnits,
   } = useQuery({
     queryKey: ["/api/units"],
-    queryFn: undefined,
   });
 
   const getUnitName = (unitId: number) => {
-    if (!units) return `Unit #${unitId}`;
-    const unit = units.find(u => u.id === unitId);
+    if (!units || !Array.isArray(units)) return `Unit #${unitId}`;
+    const unit = units.find((u: any) => u.id === unitId);
     return unit ? unit.name : `Unit #${unitId}`;
   };
 
@@ -69,7 +67,7 @@ export default function GuestsPage() {
   };
 
   // Filter guests based on search term
-  const filteredGuests = guests ? guests.filter(guest => 
+  const filteredGuests = guests && Array.isArray(guests) ? guests.filter((guest: any) => 
     guest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (guest.email && guest.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (guest.phone && guest.phone.includes(searchTerm))
@@ -165,7 +163,7 @@ export default function GuestsPage() {
                         <label className="block text-sm font-medium mb-1">Unit</label>
                         <select className="w-full p-2 border border-gray-300 rounded">
                           <option value="">Select a unit</option>
-                          {units && units.map(unit => (
+                          {units && Array.isArray(units) && units.map((unit: any) => (
                             <option key={unit.id} value={unit.id}>{unit.name}</option>
                           ))}
                         </select>
@@ -258,8 +256,8 @@ export default function GuestsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {guest.flags && guest.flags.length > 0 ? (
-                            guest.flags.map((flag, index) => (
+                          {guest.flags && Array.isArray(guest.flags) && guest.flags.length > 0 ? (
+                            guest.flags.map((flag: any, index: number) => (
                               <Badge key={index} variant="outline" className="bg-red-50 text-red-500 border-red-200">
                                 <Flag className="h-3 w-3 mr-1" />
                                 {flag}
