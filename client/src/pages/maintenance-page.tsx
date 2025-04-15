@@ -18,7 +18,6 @@ import {
   CalendarMonth,
   AttachMoney,
   Description,
-  Engineering,
   Business,
   AssignmentInd,
   Delete,
@@ -336,7 +335,7 @@ export default function MaintenancePage() {
       case "in-progress":
         return (
           <Badge className="bg-blue-100 text-blue-800 border-0">
-            <Engineering className="h-3 w-3 mr-1" />
+            <Wrench className="h-3 w-3 mr-1" />
             In Progress
           </Badge>
         );
@@ -492,7 +491,7 @@ export default function MaintenancePage() {
             <Dialog open={isAiPromptOpen} onOpenChange={setIsAiPromptOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="mr-2">
-                  <Engineering className="h-4 w-4 mr-2" />
+                  <Wrench className="h-4 w-4 mr-2" />
                   <span>AI Generate</span>
                 </Button>
               </DialogTrigger>
@@ -744,7 +743,7 @@ export default function MaintenancePage() {
                   <h3 className="text-2xl font-bold">{openTicketsCount}</h3>
                 </div>
                 <div className="bg-yellow-50 p-3 rounded-full">
-                  <Engineering className="text-yellow-500" />
+                  <Wrench className="text-yellow-500" />
                 </div>
               </div>
             </CardContent>
@@ -1159,7 +1158,7 @@ export default function MaintenancePage() {
                         <div className="border rounded-lg p-3">
                           <div className="flex justify-between items-start">
                             <div className="flex items-start">
-                              <Engineering className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+                              <Wrench className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
                               <div>
                                 <div className="font-medium">Tile installation</div>
                                 <div className="text-sm text-[#9EA2B1]">In progress</div>
