@@ -1195,18 +1195,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get latest sync log and test Guesty API OAuth2 connection
+  // Basic health check for Guesty API domain (no auth required)
+  app.get("/api/guesty/health-check", async (req: Request, res: Response) => {
+    try {
+      const result = await healthCheck();
+      
+      // Log the health check result
+      await storage.createLog({
+        action: "GUESTY_HEALTH_CHECK",
+        userId: req.user?.id,
+        targetTable: "guesty",
+        notes: `Health check result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
+        ipAddress: req.ip
+      });
+      
+      if (result.success) {
+        return res.json(result);
+      } else {
+        return res.status(500).json(result);
+      }
+    } catch (error) {
+      console.error("Health check error:", error);
+      
+      // Log the health check failure
+      try {
+        await storage.createLog({
+          action: "GUESTY_HEALTH_CHECK",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: `Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ipAddress: req.ip
+        });
+      } catch (logError) {
+        console.error("Failed to log health check failure:", logError);
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: `Health check error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
+      });
+    }
+  });
+
+  // Full OAuth connection test (requires authentication)
   app.get("/api/guesty/test-connection", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
       console.log("Testing Guesty API OAuth connection...");
       
-      // First test token retrieval
+      // First check if the domain is reachable
+      const healthCheckResult = await healthCheck();
+      
+      if (!healthCheckResult.success) {
+        // Log the domain check failure
+        await storage.createLog({
+          action: "GUESTY_CONNECTION_TEST",
+          userId: req.user?.id,
+          targetTable: "guesty",
+          notes: `API domain not reachable: ${healthCheckResult.message}`,
+          ipAddress: req.ip
+        });
+        
+        return res.status(500).json({
+          success: false,
+          message: `Guesty API domain not reachable: ${healthCheckResult.message}`,
+          domainReachable: false,
+          tokenReceived: false,
+          apiCallSuccess: false
+        });
+      }
+      
+      // Next test token retrieval
       const token = await getAccessToken();
       
       if (!token) {
         return res.status(500).json({
           success: false,
           message: 'Failed to retrieve OAuth token',
-          tokenReceived: false
+          domainReachable: true,
+          tokenReceived: false,
+          apiCallSuccess: false
         });
       }
       
@@ -1230,6 +1298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({
           success: true,
           message: 'Successfully connected to Guesty API',
+          domainReachable: true,
           tokenReceived: true,
           apiCallSuccess: true,
           userData: testResponse
@@ -1250,6 +1319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({
           success: false,
           message: `Token obtained but API call failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`,
+          domainReachable: true,
           tokenReceived: true,
           apiCallSuccess: false
         });

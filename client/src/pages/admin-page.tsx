@@ -13,6 +13,97 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 
+function GuestyHealthCheck() {
+  const { toast } = useToast();
+  const [healthStatus, setHealthStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [details, setDetails] = useState<any>(null);
+
+  const healthCheckMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('GET', '/api/guesty/health-check');
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      setHealthStatus(data.success ? 'success' : 'error');
+      setDetails(data);
+      toast({
+        title: data.success ? 'Domain Reachable' : 'Domain Unreachable',
+        description: data.message,
+        variant: data.success ? 'default' : 'destructive',
+      });
+    },
+    onError: (error) => {
+      setHealthStatus('error');
+      toast({
+        title: 'Health Check Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
+      });
+    }
+  });
+
+  const handleHealthCheck = () => {
+    setHealthStatus('loading');
+    healthCheckMutation.mutate();
+  };
+
+  const getStatusDisplay = () => {
+    if (healthStatus === 'idle') return null;
+    
+    if (healthStatus === 'loading') {
+      return <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700">Checking...</Badge>;
+    }
+    
+    if (healthStatus === 'success') {
+      return <Badge variant="outline" className="ml-2 bg-green-50 text-green-700">Domain Reachable</Badge>;
+    }
+    
+    if (healthStatus === 'error') {
+      return <Badge variant="outline" className="ml-2 bg-red-50 text-red-700">Domain Unreachable</Badge>;
+    }
+  };
+
+  return (
+    <div className="flex flex-col space-y-2">
+      <div className="flex items-center">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleHealthCheck}
+          disabled={healthStatus === 'loading'}
+          className="flex items-center"
+        >
+          {healthStatus === 'loading' ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Checking Domain...
+            </>
+          ) : healthStatus === 'success' ? (
+            <>
+              <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+              Check API Domain
+            </>
+          ) : healthStatus === 'error' ? (
+            <>
+              <XCircle className="mr-2 h-4 w-4 text-red-500" />
+              Check API Domain
+            </>
+          ) : (
+            <>Check API Domain</>
+          )}
+        </Button>
+        {getStatusDisplay()}
+      </div>
+      {healthStatus === 'success' && details && (
+        <div className="text-xs text-muted-foreground">
+          <p>Domain: open-api.guesty.com</p>
+          <p>Response Time: {new Date(details.timestamp).toLocaleTimeString()}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GuestyConnectionTest() {
   const { toast } = useToast();
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -81,15 +172,15 @@ function GuestyConnectionTest() {
           ) : testStatus === 'success' ? (
             <>
               <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-              Test Connection
+              Test Full Connection
             </>
           ) : testStatus === 'error' ? (
             <>
               <XCircle className="mr-2 h-4 w-4 text-red-500" />
-              Test Connection
+              Test Full Connection
             </>
           ) : (
-            <>Test Connection</>
+            <>Test Full Connection</>
           )}
         </Button>
         {getStatusDisplay()}
@@ -354,13 +445,24 @@ export default function AdminPage() {
 
                     <div>
                       <Label>Guesty API Integration</Label>
-                      <div className="flex flex-col space-y-2 mt-2">
-                        <div className="flex items-center space-x-2">
-                          <GuestyConnectionTest />
+                      <div className="flex flex-col space-y-4 mt-2">
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <GuestyHealthCheck />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Check if the Guesty API domain (open-api.guesty.com) is reachable
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          OAuth2 integration with Guesty API for property and reservation synchronization
-                        </p>
+                        
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <GuestyConnectionTest />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Test OAuth2 integration with Guesty API for property and reservation synchronization
+                          </p>
+                        </div>
                       </div>
                     </div>
                     
