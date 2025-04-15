@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 import { Loader2, Plus, Building2, MapPin, Wifi, AlertTriangle, Search, X, Check, FileText, Tag, Eye, Download, Pencil, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -343,23 +344,34 @@ export default function PropertiesPage() {
                           </p>
                         )}
                       </CardContent>
-                      <CardFooter className="pt-2 flex justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleEditUnit(unit)}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" /> Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeleteUnit(unit)}
-                        >
-                          <Trash className="h-4 w-4 mr-1" /> Delete
-                        </Button>
+                      <CardFooter className="pt-2 flex flex-wrap gap-2">
+                        <Link to={`/unit/${unit.id}`} className="flex-1">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="w-full"
+                          >
+                            <Eye className="h-4 w-4 mr-1" /> View Details
+                          </Button>
+                        </Link>
+                        <div className="flex flex-1 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleEditUnit(unit)}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteUnit(unit)}
+                          >
+                            <Trash className="h-4 w-4 mr-1" /> Delete
+                          </Button>
+                        </div>
                       </CardFooter>
                     </Card>
                   ))}
