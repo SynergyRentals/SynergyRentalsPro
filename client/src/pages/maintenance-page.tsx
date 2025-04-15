@@ -729,13 +729,44 @@ export default function MaintenancePage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm">
-                                <AssignmentInd className="h-4 w-4 mr-1" />
-                                Assign
-                              </Button>
-                              <Button variant="default" size="sm">
-                                <Check className="h-4 w-4 mr-1" />
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <AssignmentInd className="h-4 w-4 mr-1" />
+                                    Assign
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {vendors?.map((vendor) => (
+                                    <DropdownMenuItem
+                                      key={vendor.id}
+                                      onClick={() => assignVendorMutation.mutate({ id: item.id, vendorId: vendor.id })}
+                                    >
+                                      {vendor.name}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => completeMaintenanceMutation.mutate(item.id)}
+                                disabled={completeMaintenanceMutation.isPending}
+                              >
+                                {completeMaintenanceMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4 mr-1" />
+                                )}
                                 Complete
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditClick(item)}
+                              >
+                                <Edit className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -795,7 +826,11 @@ export default function MaintenancePage() {
                               <div className="font-medium">{formatCurrency(item.cost)}</div>
                             </TableCell>
                             <TableCell>
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleEditClick(item)}
+                              >
                                 <Description className="h-4 w-4 mr-1" />
                                 View Details
                               </Button>
@@ -1187,6 +1222,189 @@ export default function MaintenancePage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Maintenance Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Maintenance Ticket</DialogTitle>
+          </DialogHeader>
+          {editingMaintenance && (
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-6">
+                <FormField
+                  control={editForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe the maintenance issue"
+                          rows={3}
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value || "normal"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {editingMaintenance.status !== "completed" && (
+                  <FormField
+                    control={editForm.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value || editingMaintenance.status}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="open">Open</SelectItem>
+                            <SelectItem value="in-progress">In Progress</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={editForm.control}
+                  name="vendorId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign to Vendor</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value ? Number(value) : null)}
+                        defaultValue={field.value?.toString() || ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select vendor" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Unassigned</SelectItem>
+                          {vendors?.map((vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id.toString()}>
+                              {vendor.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="cost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cost</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="pl-6"
+                            placeholder="0.00"
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter any additional notes"
+                          rows={2}
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsEditDialogOpen(false);
+                      setEditingMaintenance(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={updateMaintenanceMutation.isPending}
+                  >
+                    {updateMaintenanceMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
