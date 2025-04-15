@@ -2,12 +2,14 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
+import { db } from "./db";
 import { 
   insertTaskSchema, insertUnitSchema, insertGuestSchema, 
   insertMaintenanceSchema, insertInventorySchema, insertVendorSchema,
   insertProjectSchema, insertDocumentSchema, insertLogSchema,
   insertCleaningTaskSchema, insertCleaningChecklistSchema, 
-  insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema
+  insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema,
+  guestyProperties, guestyReservations
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
@@ -1111,6 +1113,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(completion);
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Guesty API integration routes
+  // These endpoints sync data from Guesty to our database
+  
+  // Properties sync route
+  app.post("/api/guesty/sync-properties", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      const result = await syncProperties();
+      res.json(result);
+      
+      // Log the sync
+      await storage.createLog({
+        action: "GUESTY_SYNC_PROPERTIES",
+        userId: req.user?.id,
+        targetTable: "guesty_properties",
+        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
+        ipAddress: req.ip
+      });
+    } catch (error) {
+      console.error("Error syncing Guesty properties:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error occurred" 
+      });
+    }
+  });
+  
+  // Reservations sync route
+  app.post("/api/guesty/sync-reservations", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      const result = await syncReservations();
+      res.json(result);
+      
+      // Log the sync
+      await storage.createLog({
+        action: "GUESTY_SYNC_RESERVATIONS",
+        userId: req.user?.id,
+        targetTable: "guesty_reservations",
+        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}`,
+        ipAddress: req.ip
+      });
+    } catch (error) {
+      console.error("Error syncing Guesty reservations:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error occurred" 
+      });
+    }
+  });
+  
+  // Full sync route (properties and reservations)
+  app.post("/api/guesty/sync", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      const result = await syncAll();
+      res.json(result);
+      
+      // Log the sync
+      await storage.createLog({
+        action: "GUESTY_SYNC_ALL",
+        userId: req.user?.id,
+        targetTable: "guesty_sync_logs",
+        notes: `Synced ${result.properties_synced} properties and ${result.reservations_synced} reservations. Status: ${result.sync_status}`,
+        ipAddress: req.ip
+      });
+    } catch (error) {
+      console.error("Error performing full Guesty sync:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error occurred",
+        properties_synced: 0,
+        reservations_synced: 0,
+        sync_status: "error"
+      });
+    }
+  });
+  
+  // Get latest sync log
+  app.get("/api/guesty/sync-status", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const latestLog = await getLatestSyncLog();
+      res.json(latestLog || { message: "No sync logs found" });
+    } catch (error) {
+      console.error("Error fetching sync logs:", error);
+      res.status(500).json({ message: "Error fetching sync logs" });
+    }
+  });
+  
+  // Get all Guesty properties
+  app.get("/api/guesty/properties", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const properties = await db.select().from(guestyProperties);
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching Guesty properties:", error);
+      res.status(500).json({ message: "Error fetching Guesty properties" });
+    }
+  });
+  
+  // Get all Guesty reservations
+  app.get("/api/guesty/reservations", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const reservations = await db.select().from(guestyReservations);
+      res.json(reservations);
+    } catch (error) {
+      console.error("Error fetching Guesty reservations:", error);
+      res.status(500).json({ message: "Error fetching Guesty reservations" });
     }
   });
 

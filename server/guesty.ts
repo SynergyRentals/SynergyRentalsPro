@@ -1,85 +1,110 @@
-import axios from 'axios';
-import { db } from './db';
+import fetch from "node-fetch";
+import { db } from "./db";
 import { 
-  guestyProperties, insertGuestyPropertySchema, 
-  guestyReservations, insertGuestyReservationSchema,
-  guestySyncLogs, insertGuestySyncLogSchema,
-  type InsertGuestyProperty, type InsertGuestyReservation, type InsertGuestySyncLog
-} from '@shared/schema';
-import { eq } from 'drizzle-orm';
+  guestyProperties, guestyReservations, guestySyncLogs,
+  InsertGuestyProperty, InsertGuestyReservation, InsertGuestySyncLog
+} from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 
-// Base Guesty API configuration
-const GUESTY_API_BASE_URL = 'https://open-api.guesty.com/v1';
+// Check if Guesty API keys are configured
+const GUESTY_API_KEY = process.env.GUESTY_API_KEY;
+const GUESTY_API_SECRET = process.env.GUESTY_API_SECRET;
 
-// Check if API key is available
-if (!process.env.GUESTY_API_KEY) {
-  console.warn('GUESTY_API_KEY environment variable is not set. Guesty API functionality will be disabled.');
+const BASE_URL = "https://api.guesty.com/api/v2";
+
+// Configure the API authentication
+const authHeaders = {
+  "Content-Type": "application/json",
+  "Authorization": `Basic ${Buffer.from(`${GUESTY_API_KEY}:${GUESTY_API_SECRET}`).toString("base64")}`
+};
+
+/**
+ * Make a request to the Guesty API
+ * @param endpoint - API endpoint path
+ * @param method - HTTP method
+ * @param data - Optional data for POST/PUT requests
+ * @returns API response JSON
+ */
+async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
+  if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
+    throw new Error("Guesty API credentials are not configured. Please set GUESTY_API_KEY and GUESTY_API_SECRET environment variables.");
+  }
+  
+  const url = `${BASE_URL}${endpoint}`;
+  const options: any = {
+    method,
+    headers: authHeaders,
+  };
+  
+  if (data && (method === "POST" || method === "PUT")) {
+    options.body = JSON.stringify(data);
+  }
+  
+  try {
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Guesty API error (${response.status}): ${errorText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`Guesty API request failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    throw error;
+  }
 }
 
-// Create axios instance for Guesty API
-const guestyApi = axios.create({
-  baseURL: GUESTY_API_BASE_URL,
-  headers: {
-    'Authorization': `Bearer ${process.env.GUESTY_API_KEY}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-});
-
-// Add response interceptor for error handling
-guestyApi.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Guesty API Error:', {
-        status: error.response.status,
-        data: error.response.data,
-        endpoint: error.config.url,
-        method: error.config.method
-      });
-      
-      if (error.response.status === 401) {
-        throw new Error('Guesty API authentication failed. Please check your API key.');
-      }
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('Guesty API No Response:', error.request);
-      throw new Error('No response received from Guesty API. Please check your internet connection.');
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Guesty API Request Error:', error.message);
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Helper function to clean property data
+/**
+ * Clean and transform a Guesty property object to match our schema
+ */
 function cleanPropertyData(property: any): InsertGuestyProperty {
   return {
-    propertyId: property.id,
-    name: property.title || 'Unnamed Property',
-    address: property.address?.full || 'No address provided',
-    bedrooms: property.accommodations?.bedrooms || null,
-    bathrooms: property.accommodations?.bathrooms || null,
-    amenities: Array.isArray(property.amenities) ? property.amenities : [],
-    listingUrl: property.publicUrl || null,
+    guestyId: property._id,
+    name: property.title || "Unnamed Property",
+    description: property.description || null,
+    propertyType: property.propertyType || null,
+    address: property.address ? JSON.stringify(property.address) : null,
+    city: property.address?.city || null,
+    state: property.address?.state || null,
+    zipCode: property.address?.zipCode || null,
+    country: property.address?.country || null,
+    bedrooms: property.bedrooms || 0,
+    bathrooms: property.bathrooms || 0,
+    accommodates: property.accommodates || 0,
+    amenities: property.amenities || [],
+    images: property.pictures?.map((pic: any) => pic.original) || [],
+    active: property.active !== false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 1, // Admin user
+    rawData: JSON.stringify(property)
   };
 }
 
-// Helper function to clean reservation data
+/**
+ * Clean and transform a Guesty reservation object to match our schema
+ */
 function cleanReservationData(reservation: any): InsertGuestyReservation {
   return {
-    reservationId: reservation.id,
-    guestName: `${reservation.guest?.firstName || ''} ${reservation.guest?.lastName || ''}`.trim() || 'Unknown Guest',
+    guestyId: reservation._id,
+    propertyId: reservation.listing?._id || null,
+    guestId: reservation.guest?._id || null,
+    guestName: `${reservation.guest?.firstName || ''} ${reservation.guest?.lastName || ''}`.trim() || "Unknown Guest",
     guestEmail: reservation.guest?.email || null,
-    propertyId: reservation.listingId,
-    checkIn: new Date(reservation.checkIn),
-    checkOut: new Date(reservation.checkOut),
-    status: reservation.status || 'unknown',
-    channel: reservation.source || null,
-    totalPrice: reservation.money?.netAmount ? Math.round(reservation.money.netAmount * 100) : null, // Convert to cents
+    guestPhone: reservation.guest?.phone || null,
+    checkIn: reservation.checkIn ? new Date(reservation.checkIn) : null,
+    checkOut: reservation.checkOut ? new Date(reservation.checkOut) : null,
+    status: reservation.status || "pending",
+    adults: reservation.guests?.adults || 0,
+    children: reservation.guests?.children || 0,
+    infants: reservation.guests?.infants || 0,
+    totalPrice: reservation.money?.totalPrice || 0,
+    currency: reservation.money?.currency || "USD",
+    source: reservation.source || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    rawData: JSON.stringify(reservation)
   };
 }
 
@@ -88,101 +113,124 @@ function cleanReservationData(reservation: any): InsertGuestyReservation {
  * @returns Object with sync results
  */
 export async function syncProperties(): Promise<{ 
-  count: number, 
-  success: boolean, 
-  message: string 
+  success: boolean; 
+  message: string; 
+  properties_synced?: number;
+  errors?: string[];
 }> {
-  // If API key is not set, return early
-  if (!process.env.GUESTY_API_KEY) {
-    return { 
-      count: 0, 
-      success: false, 
-      message: 'GUESTY_API_KEY environment variable is not set'
+  if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
+    const syncResult: InsertGuestySyncLog = {
+      type: "properties",
+      startTime: new Date(),
+      endTime: new Date(),
+      recordsSynced: 0,
+      status: "failed",
+      errors: ["Guesty API credentials not configured"],
+      details: null
+    };
+    
+    await db.insert(guestySyncLogs).values(syncResult);
+    
+    return {
+      success: false,
+      message: "Guesty API credentials not configured. Please set GUESTY_API_KEY and GUESTY_API_SECRET environment variables.",
     };
   }
   
   try {
-    // Fetch properties from Guesty API
-    const response = await guestyApi.get('/listings', {
-      params: {
-        limit: 100,
-        fields: 'id,title,address,accommodations,amenities,publicUrl',
-        // Filter for active properties only
-        filters: JSON.stringify({
-          isActive: true
-        })
-      }
-    });
+    // Start sync log
+    const startTime = new Date();
+    console.log("Starting Guesty properties sync at:", startTime.toISOString());
     
-    const properties = response.data.results || [];
+    // Fetch properties from Guesty API
+    const response = await makeGuestyRequest("/listings?limit=100");
+    const properties = response.results || [];
+    
+    if (!Array.isArray(properties)) {
+      throw new Error("Invalid response format from Guesty API");
+    }
+    
+    console.log(`Retrieved ${properties.length} properties from Guesty API`);
     
     // Process each property
-    let newCount = 0;
-    let updatedCount = 0;
+    const errors: string[] = [];
+    let successCount = 0;
     
     for (const property of properties) {
-      const cleanProperty = cleanPropertyData(property);
-      
-      // Check if property already exists
-      const existingProperty = await db.select()
-        .from(guestyProperties)
-        .where(eq(guestyProperties.propertyId, cleanProperty.propertyId))
-        .limit(1);
-      
-      if (existingProperty.length === 0) {
-        // Insert new property
-        await db.insert(guestyProperties).values(cleanProperty);
-        newCount++;
-      } else {
-        // Update existing property
-        await db.update(guestyProperties)
-          .set({ 
-            name: cleanProperty.name,
-            address: cleanProperty.address,
-            bedrooms: cleanProperty.bedrooms,
-            bathrooms: cleanProperty.bathrooms,
-            amenities: cleanProperty.amenities,
-            listingUrl: cleanProperty.listingUrl,
-            updatedAt: new Date()
-          })
-          .where(eq(guestyProperties.propertyId, cleanProperty.propertyId));
-        updatedCount++;
+      try {
+        const cleanedProperty = cleanPropertyData(property);
+        
+        // Check if property already exists
+        const existingProperty = await db.select()
+          .from(guestyProperties)
+          .where(eq(guestyProperties.guestyId, cleanedProperty.guestyId))
+          .limit(1);
+        
+        if (existingProperty.length > 0) {
+          // Update existing property
+          await db.update(guestyProperties)
+            .set({
+              ...cleanedProperty,
+              updatedAt: new Date()
+            })
+            .where(eq(guestyProperties.guestyId, cleanedProperty.guestyId));
+        } else {
+          // Insert new property
+          await db.insert(guestyProperties).values(cleanedProperty);
+        }
+        
+        successCount++;
+      } catch (error) {
+        const errorMessage = `Error processing property ${property._id}: ${error instanceof Error ? error.message : "Unknown error"}`;
+        console.error(errorMessage);
+        errors.push(errorMessage);
       }
     }
     
-    // Log sync results
+    // Complete sync log
+    const endTime = new Date();
+    
     const syncResult: InsertGuestySyncLog = {
-      syncType: 'properties',
-      status: 'success',
-      propertiesCount: newCount + updatedCount,
-      errorMessage: null
+      type: "properties",
+      startTime,
+      endTime,
+      recordsSynced: successCount,
+      status: errors.length > 0 ? "partial" : "complete",
+      errors: errors.length > 0 ? errors : null,
+      details: JSON.stringify({
+        total_retrieved: properties.length,
+        successfully_processed: successCount,
+        duration_ms: endTime.getTime() - startTime.getTime()
+      })
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
     
     return {
-      count: newCount + updatedCount,
       success: true,
-      message: `Successfully synced ${newCount} new and ${updatedCount} updated properties from Guesty`
+      message: `Successfully synced ${successCount} of ${properties.length} properties`,
+      properties_synced: successCount,
+      errors: errors.length > 0 ? errors : undefined
     };
-    
   } catch (error) {
-    // Log sync error
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Error syncing properties:", error);
     
     const syncResult: InsertGuestySyncLog = {
-      syncType: 'properties',
-      status: 'error',
-      propertiesCount: 0,
-      errorMessage: errorMessage
+      type: "properties",
+      startTime: new Date(),
+      endTime: new Date(),
+      recordsSynced: 0,
+      status: "failed",
+      errors: [error instanceof Error ? error.message : "Unknown error"],
+      details: null
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
     
     return {
-      count: 0,
       success: false,
-      message: `Failed to sync properties: ${errorMessage}`
+      message: `Error syncing properties: ${error instanceof Error ? error.message : "Unknown error"}`,
+      properties_synced: 0
     };
   }
 }
@@ -192,107 +240,133 @@ export async function syncProperties(): Promise<{
  * @returns Object with sync results
  */
 export async function syncReservations(): Promise<{ 
-  count: number, 
-  success: boolean, 
-  message: string 
+  success: boolean; 
+  message: string; 
+  reservations_synced?: number;
+  errors?: string[];
 }> {
-  // If API key is not set, return early
-  if (!process.env.GUESTY_API_KEY) {
-    return { 
-      count: 0, 
-      success: false, 
-      message: 'GUESTY_API_KEY environment variable is not set'
+  if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
+    const syncResult: InsertGuestySyncLog = {
+      type: "reservations",
+      startTime: new Date(),
+      endTime: new Date(),
+      recordsSynced: 0,
+      status: "failed",
+      errors: ["Guesty API credentials not configured"],
+      details: null
+    };
+    
+    await db.insert(guestySyncLogs).values(syncResult);
+    
+    return {
+      success: false,
+      message: "Guesty API credentials not configured. Please set GUESTY_API_KEY and GUESTY_API_SECRET environment variables.",
     };
   }
   
   try {
-    // Calculate dates for filtering (last 30 days and future)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Start sync log
+    const startTime = new Date();
+    console.log("Starting Guesty reservations sync at:", startTime.toISOString());
     
-    // Fetch reservations from Guesty API
-    const response = await guestyApi.get('/reservations', {
-      params: {
-        limit: 100,
-        fields: 'id,listingId,guest,checkIn,checkOut,status,source,money',
-        filters: JSON.stringify({
-          checkIn: {
-            $gte: thirtyDaysAgo.toISOString().split('T')[0] // Format as YYYY-MM-DD
-          }
-        })
-      }
-    });
+    // Calculate date ranges for recent and upcoming reservations
+    const now = new Date();
+    const oneMonthAgo = new Date(now);
+    oneMonthAgo.setMonth(now.getMonth() - 1);
     
-    const reservations = response.data.results || [];
+    const sixMonthsAhead = new Date(now);
+    sixMonthsAhead.setMonth(now.getMonth() + 6);
+    
+    // Fetch reservations from Guesty API with date filtering
+    const queryParams = `?checkIn[$gte]=${oneMonthAgo.toISOString()}&checkOut[$lte]=${sixMonthsAhead.toISOString()}&limit=100`;
+    const response = await makeGuestyRequest(`/reservations${queryParams}`);
+    const reservations = response.results || [];
+    
+    if (!Array.isArray(reservations)) {
+      throw new Error("Invalid response format from Guesty API");
+    }
+    
+    console.log(`Retrieved ${reservations.length} reservations from Guesty API`);
     
     // Process each reservation
-    let newCount = 0;
-    let updatedCount = 0;
+    const errors: string[] = [];
+    let successCount = 0;
     
     for (const reservation of reservations) {
-      const cleanReservation = cleanReservationData(reservation);
-      
-      // Check if reservation already exists
-      const existingReservation = await db.select()
-        .from(guestyReservations)
-        .where(eq(guestyReservations.reservationId, cleanReservation.reservationId))
-        .limit(1);
-      
-      if (existingReservation.length === 0) {
-        // Insert new reservation
-        await db.insert(guestyReservations).values(cleanReservation);
-        newCount++;
-      } else {
-        // Update existing reservation
-        await db.update(guestyReservations)
-          .set({ 
-            guestName: cleanReservation.guestName,
-            guestEmail: cleanReservation.guestEmail,
-            checkIn: cleanReservation.checkIn,
-            checkOut: cleanReservation.checkOut,
-            status: cleanReservation.status,
-            channel: cleanReservation.channel,
-            totalPrice: cleanReservation.totalPrice,
-            updatedAt: new Date()
-          })
-          .where(eq(guestyReservations.reservationId, cleanReservation.reservationId));
-        updatedCount++;
+      try {
+        const cleanedReservation = cleanReservationData(reservation);
+        
+        // Check if reservation already exists
+        const existingReservation = await db.select()
+          .from(guestyReservations)
+          .where(eq(guestyReservations.guestyId, cleanedReservation.guestyId))
+          .limit(1);
+        
+        if (existingReservation.length > 0) {
+          // Update existing reservation
+          await db.update(guestyReservations)
+            .set({
+              ...cleanedReservation,
+              updatedAt: new Date()
+            })
+            .where(eq(guestyReservations.guestyId, cleanedReservation.guestyId));
+        } else {
+          // Insert new reservation
+          await db.insert(guestyReservations).values(cleanedReservation);
+        }
+        
+        successCount++;
+      } catch (error) {
+        const errorMessage = `Error processing reservation ${reservation._id}: ${error instanceof Error ? error.message : "Unknown error"}`;
+        console.error(errorMessage);
+        errors.push(errorMessage);
       }
     }
     
-    // Log sync results
+    // Complete sync log
+    const endTime = new Date();
+    
     const syncResult: InsertGuestySyncLog = {
-      syncType: 'reservations',
-      status: 'success',
-      reservationsCount: newCount + updatedCount,
-      errorMessage: null
+      type: "reservations",
+      startTime,
+      endTime,
+      recordsSynced: successCount,
+      status: errors.length > 0 ? "partial" : "complete",
+      errors: errors.length > 0 ? errors : null,
+      details: JSON.stringify({
+        total_retrieved: reservations.length,
+        successfully_processed: successCount,
+        duration_ms: endTime.getTime() - startTime.getTime()
+      })
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
     
     return {
-      count: newCount + updatedCount,
       success: true,
-      message: `Successfully synced ${newCount} new and ${updatedCount} updated reservations from Guesty`
+      message: `Successfully synced ${successCount} of ${reservations.length} reservations`,
+      reservations_synced: successCount,
+      errors: errors.length > 0 ? errors : undefined
     };
-    
   } catch (error) {
-    // Log sync error
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Error syncing reservations:", error);
     
     const syncResult: InsertGuestySyncLog = {
-      syncType: 'reservations',
-      status: 'error',
-      reservationsCount: 0,
-      errorMessage: errorMessage
+      type: "reservations",
+      startTime: new Date(),
+      endTime: new Date(),
+      recordsSynced: 0,
+      status: "failed",
+      errors: [error instanceof Error ? error.message : "Unknown error"],
+      details: null
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
     
     return {
-      count: 0,
       success: false,
-      message: `Failed to sync reservations: ${errorMessage}`
+      message: `Error syncing reservations: ${error instanceof Error ? error.message : "Unknown error"}`,
+      reservations_synced: 0
     };
   }
 }
@@ -302,22 +376,42 @@ export async function syncReservations(): Promise<{
  * @returns Object with combined sync results
  */
 export async function syncAll(): Promise<{
-  properties_synced: number,
-  reservations_synced: number,
-  sync_status: string
+  success: boolean;
+  message: string;
+  properties_synced: number;
+  reservations_synced: number;
+  sync_status: string;
 }> {
-  const propertiesResult = await syncProperties();
-  const reservationsResult = await syncReservations();
-  
-  const sync_status = propertiesResult.success && reservationsResult.success 
-    ? 'success' 
-    : 'error';
-  
-  return {
-    properties_synced: propertiesResult.count,
-    reservations_synced: reservationsResult.count,
-    sync_status
-  };
+  try {
+    const propertiesResult = await syncProperties();
+    const reservationsResult = await syncReservations();
+    
+    const success = propertiesResult.success || reservationsResult.success;
+    let status = "failed";
+    
+    if (propertiesResult.success && reservationsResult.success) {
+      status = "complete";
+    } else if (propertiesResult.success || reservationsResult.success) {
+      status = "partial";
+    }
+    
+    return {
+      success,
+      message: `Properties: ${propertiesResult.message}. Reservations: ${reservationsResult.message}`,
+      properties_synced: propertiesResult.properties_synced || 0,
+      reservations_synced: reservationsResult.reservations_synced || 0,
+      sync_status: status
+    };
+  } catch (error) {
+    console.error("Error during full Guesty sync:", error);
+    return {
+      success: false,
+      message: `Error during full sync: ${error instanceof Error ? error.message : "Unknown error"}`,
+      properties_synced: 0,
+      reservations_synced: 0,
+      sync_status: "failed"
+    };
+  }
 }
 
 /**
@@ -325,10 +419,58 @@ export async function syncAll(): Promise<{
  * @returns The latest sync log entry
  */
 export async function getLatestSyncLog(): Promise<any> {
-  const logs = await db.select()
-    .from(guestySyncLogs)
-    .orderBy(guestySyncLogs.syncDate, 'desc')
-    .limit(1);
-  
-  return logs[0] || null;
+  try {
+    const logs = await db
+      .select()
+      .from(guestySyncLogs)
+      .orderBy(desc(guestySyncLogs.startTime as any))
+      .limit(5);
+    
+    if (logs.length === 0) {
+      return null;
+    }
+    
+    // Calculate overall status
+    const latestPropertiesSync = logs.find(log => log.type === "properties");
+    const latestReservationsSync = logs.find(log => log.type === "reservations");
+    
+    const now = new Date();
+    const oneDayAgo = new Date(now);
+    oneDayAgo.setDate(now.getDate() - 1);
+    
+    // Check if syncs are recent (within last 24 hours)
+    const propertiesRecent = latestPropertiesSync && new Date(latestPropertiesSync.endTime) > oneDayAgo;
+    const reservationsRecent = latestReservationsSync && new Date(latestReservationsSync.endTime) > oneDayAgo;
+    
+    // Check if syncs were successful
+    const propertiesSuccess = latestPropertiesSync && latestPropertiesSync.status !== "failed";
+    const reservationsSuccess = latestReservationsSync && latestReservationsSync.status !== "failed";
+    
+    let overallStatus = "unknown";
+    
+    if (propertiesRecent && reservationsRecent) {
+      if (propertiesSuccess && reservationsSuccess) {
+        overallStatus = "healthy";
+      } else if (propertiesSuccess || reservationsSuccess) {
+        overallStatus = "partial";
+      } else {
+        overallStatus = "error";
+      }
+    } else if (propertiesRecent || reservationsRecent) {
+      overallStatus = "stale";
+    } else {
+      overallStatus = "outdated";
+    }
+    
+    return {
+      latest_logs: logs,
+      properties_sync: latestPropertiesSync,
+      reservations_sync: latestReservationsSync,
+      status: overallStatus,
+      last_sync: logs[0].endTime
+    };
+  } catch (error) {
+    console.error("Error fetching sync logs:", error);
+    return null;
+  }
 }
