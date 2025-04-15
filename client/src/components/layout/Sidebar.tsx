@@ -12,6 +12,7 @@ import {
   Psychology,
   AdminPanelSettings,
   Add,
+  HomeWork,
 } from "@mui/icons-material";
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: Dashboard },
+    { name: "Properties", href: "/properties", icon: HomeWork },
     { name: "Guests", href: "/guests", icon: Users },
     { name: "Cleaning", href: "/cleaning", icon: CleaningServices },
     { name: "Maintenance", href: "/maintenance", icon: Construction },
