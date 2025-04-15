@@ -6,17 +6,134 @@ import {
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
-// Check if Guesty API keys are configured
-const GUESTY_API_KEY = process.env.GUESTY_API_KEY;
-const GUESTY_API_SECRET = process.env.GUESTY_API_SECRET;
-
+// Guesty OAuth2 configuration
+const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
+const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
 const BASE_URL = "https://api.guesty.com/api/v2";
+const OAUTH_URL = "https://app.guesty.com/oauth2/token";
 
-// Configure the API authentication
-const authHeaders = {
-  "Content-Type": "application/json",
-  "Authorization": `Basic ${Buffer.from(`${GUESTY_API_KEY}:${GUESTY_API_SECRET}`).toString("base64")}`
-};
+// Token storage - in production this should be stored in a database
+interface TokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number; // timestamp when the token expires
+}
+
+// In-memory token cache
+let tokenCache: TokenData | null = null;
+
+/**
+ * Get a valid OAuth2 access token, retrieving a new one if necessary
+ * @returns A valid access token
+ */
+async function getAccessToken(): Promise<string> {
+  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
+    throw new Error("Guesty OAuth credentials are not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.");
+  }
+
+  // Check if we have a valid cached token
+  const now = Date.now();
+  if (tokenCache && tokenCache.expires_at > now + 60000) { // Add 1 minute buffer
+    return tokenCache.access_token;
+  }
+
+  // If we have a refresh token, try to use it
+  if (tokenCache && tokenCache.refresh_token) {
+    try {
+      const newToken = await refreshAccessToken(tokenCache.refresh_token);
+      return newToken;
+    } catch (error) {
+      console.error('Error refreshing token, will try to get a new one', error);
+      // If refresh fails, continue to get a new token
+    }
+  }
+
+  // Get a new token using client credentials flow
+  return await getNewAccessToken();
+}
+
+/**
+ * Get a new OAuth2 access token using client credentials flow
+ * @returns A new access token
+ */
+async function getNewAccessToken(): Promise<string> {
+  const params = new URLSearchParams();
+  params.append('grant_type', 'client_credentials');
+  params.append('client_id', GUESTY_CLIENT_ID!);
+  params.append('client_secret', GUESTY_CLIENT_SECRET!);
+  params.append('scope', 'users listings reservations');
+
+  try {
+    const response = await fetch(OAUTH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Guesty OAuth error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Cache the token
+    tokenCache = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token || '', // May not be provided in client credentials flow
+      expires_at: Date.now() + (data.expires_in * 1000)
+    };
+
+    return data.access_token;
+  } catch (error) {
+    console.error('Error getting new access token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Refresh an OAuth2 access token using a refresh token
+ * @param refreshToken The refresh token
+ * @returns A new access token
+ */
+async function refreshAccessToken(refreshToken: string): Promise<string> {
+  const params = new URLSearchParams();
+  params.append('grant_type', 'refresh_token');
+  params.append('client_id', GUESTY_CLIENT_ID!);
+  params.append('client_secret', GUESTY_CLIENT_SECRET!);
+  params.append('refresh_token', refreshToken);
+
+  try {
+    const response = await fetch(OAUTH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Guesty OAuth refresh error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Update the token cache
+    tokenCache = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token || refreshToken, // Use new refresh token if provided
+      expires_at: Date.now() + (data.expires_in * 1000)
+    };
+
+    return data.access_token;
+  } catch (error) {
+    console.error('Error refreshing access token:', error);
+    throw error;
+  }
+}
 
 /**
  * Make a request to the Guesty API
@@ -26,14 +143,16 @@ const authHeaders = {
  * @returns API response JSON
  */
 async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
-  if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
-    throw new Error("Guesty API credentials are not configured. Please set GUESTY_API_KEY and GUESTY_API_SECRET environment variables.");
-  }
+  // Get a valid access token
+  const accessToken = await getAccessToken();
   
   const url = `${BASE_URL}${endpoint}`;
   const options: any = {
     method,
-    headers: authHeaders,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${accessToken}`
+    },
   };
   
   if (data && (method === "POST" || method === "PUT")) {
@@ -44,6 +163,24 @@ async function makeGuestyRequest(endpoint: string, method: string = "GET", data:
     const response = await fetch(url, options);
     
     if (!response.ok) {
+      // If unauthorized, try to refresh the token and retry once
+      if (response.status === 401) {
+        // Clear token cache to force a new token request
+        tokenCache = null;
+        const newAccessToken = await getAccessToken();
+        
+        // Retry the request with the new token
+        options.headers.Authorization = `Bearer ${newAccessToken}`;
+        const retryResponse = await fetch(url, options);
+        
+        if (!retryResponse.ok) {
+          const errorText = await retryResponse.text();
+          throw new Error(`Guesty API error after token refresh (${retryResponse.status}): ${errorText}`);
+        }
+        
+        return await retryResponse.json();
+      }
+      
       const errorText = await response.text();
       throw new Error(`Guesty API error (${response.status}): ${errorText}`);
     }
@@ -97,11 +234,11 @@ export async function syncProperties(): Promise<{
   properties_synced?: number;
   errors?: string[];
 }> {
-  if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
+  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
     const syncResult: InsertGuestySyncLog = {
       syncType: "properties",
       status: "failed",
-      errorMessage: "Guesty API credentials not configured",
+      errorMessage: "Guesty OAuth credentials not configured",
       propertiesCount: 0,
       reservationsCount: null
     };
@@ -110,7 +247,7 @@ export async function syncProperties(): Promise<{
     
     return {
       success: false,
-      message: "Guesty API credentials not configured. Please set GUESTY_API_KEY and GUESTY_API_SECRET environment variables.",
+      message: "Guesty OAuth credentials not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.",
     };
   }
   
@@ -214,11 +351,11 @@ export async function syncReservations(): Promise<{
   reservations_synced?: number;
   errors?: string[];
 }> {
-  if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
+  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
     const syncResult: InsertGuestySyncLog = {
       syncType: "reservations",
       status: "failed",
-      errorMessage: "Guesty API credentials not configured",
+      errorMessage: "Guesty OAuth credentials not configured",
       propertiesCount: null,
       reservationsCount: 0
     };
@@ -227,7 +364,7 @@ export async function syncReservations(): Promise<{
     
     return {
       success: false,
-      message: "Guesty API credentials not configured. Please set GUESTY_API_KEY and GUESTY_API_SECRET environment variables.",
+      message: "Guesty OAuth credentials not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.",
     };
   }
   
