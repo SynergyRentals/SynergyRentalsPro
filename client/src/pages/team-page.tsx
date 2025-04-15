@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,10 +21,12 @@ import {
   Star,
   Edit,
   Description,
+  Delete,
 } from "@mui/icons-material";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -39,6 +41,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+// Import team components
+import TeamMemberForm from "@/components/team/TeamMemberForm";
+import TeamWorkload from "@/components/team/TeamWorkload";
+import TrainingAndSops from "@/components/team/TrainingAndSops";
+import TeamPerformance from "@/components/team/TeamPerformance";
 
 export default function TeamPage() {
   const [searchTerm, setSearchTerm] = useState("");
