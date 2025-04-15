@@ -542,6 +542,243 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/projects/:id", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      
+      // For now, we'll just return success after updating the status
+      await storage.updateProject(projectId, { status: "cancelled" });
+      
+      // Log activity if we have a user
+      if (req.user) {
+        await storage.createLog({
+          action: "delete",
+          userId: req.user.id,
+          targetTable: "projects",
+          targetId: projectId,
+          timestamp: new Date(),
+          notes: `Project deleted: ${project.title}`,
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting project" });
+    }
+  });
+
+  // Project Milestones endpoints
+  app.get("/api/projects/:projectId/milestones", checkAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const milestones = await storage.getProjectMilestonesByProject(projectId);
+      res.json(milestones);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching milestones" });
+    }
+  });
+
+  app.post("/api/project-milestones", checkAuth, async (req, res) => {
+    try {
+      const milestoneData = req.body;
+      const milestone = await storage.createProjectMilestone(milestoneData);
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "create",
+          userId: req.user.id,
+          targetTable: "project_milestones",
+          targetId: milestone.id,
+          timestamp: new Date(),
+          notes: `Project milestone created: ${milestone.title}`,
+        });
+      }
+      
+      res.status(201).json(milestone);
+    } catch (error) {
+      res.status(400).json({ message: "Error creating milestone" });
+    }
+  });
+
+  app.patch("/api/project-milestones/:id", checkAuth, async (req, res) => {
+    try {
+      const milestoneId = parseInt(req.params.id);
+      const milestoneData = req.body;
+      const milestone = await storage.updateProjectMilestone(milestoneId, milestoneData);
+      
+      if (!milestone) return res.status(404).json({ message: "Milestone not found" });
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "update",
+          userId: req.user.id,
+          targetTable: "project_milestones",
+          targetId: milestoneId,
+          timestamp: new Date(),
+          notes: `Project milestone updated: ${milestone.title}`,
+        });
+      }
+      
+      res.json(milestone);
+    } catch (error) {
+      res.status(400).json({ message: "Error updating milestone" });
+    }
+  });
+
+  app.delete("/api/project-milestones/:id", checkAuth, async (req, res) => {
+    try {
+      const milestoneId = parseInt(req.params.id);
+      const milestone = await storage.getProjectMilestone(milestoneId);
+      
+      if (!milestone) return res.status(404).json({ message: "Milestone not found" });
+      
+      // TODO: Implement actual deletion logic
+      // For now, we'll just return success
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "delete",
+          userId: req.user.id,
+          targetTable: "project_milestones",
+          targetId: milestoneId,
+          timestamp: new Date(),
+          notes: `Project milestone deleted: ${milestone.title}`,
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting milestone" });
+    }
+  });
+
+  // Project Tasks endpoints
+  app.get("/api/projects/:projectId/tasks", checkAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const tasks = await storage.getProjectTasksByProject(projectId);
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching tasks" });
+    }
+  });
+
+  app.post("/api/project-tasks", checkAuth, async (req, res) => {
+    try {
+      const taskData = req.body;
+      const task = await storage.createProjectTask(taskData);
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "create",
+          userId: req.user.id,
+          targetTable: "project_tasks",
+          targetId: task.id,
+          timestamp: new Date(),
+          notes: `Project task created: ${task.description.substring(0, 50)}${task.description.length > 50 ? '...' : ''}`,
+        });
+      }
+      
+      res.status(201).json(task);
+    } catch (error) {
+      res.status(400).json({ message: "Error creating task" });
+    }
+  });
+
+  app.patch("/api/project-tasks/:id", checkAuth, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const taskData = req.body;
+      const task = await storage.updateProjectTask(taskId, taskData);
+      
+      if (!task) return res.status(404).json({ message: "Task not found" });
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "update",
+          userId: req.user.id,
+          targetTable: "project_tasks",
+          targetId: taskId,
+          timestamp: new Date(),
+          notes: `Project task updated: ${task.description.substring(0, 50)}${task.description.length > 50 ? '...' : ''}`,
+        });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      res.status(400).json({ message: "Error updating task" });
+    }
+  });
+
+  app.delete("/api/project-tasks/:id", checkAuth, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const task = await storage.getProjectTask(taskId);
+      
+      if (!task) return res.status(404).json({ message: "Task not found" });
+      
+      // TODO: Implement actual deletion logic
+      // For now, we'll just return success
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "delete",
+          userId: req.user.id,
+          targetTable: "project_tasks",
+          targetId: taskId,
+          timestamp: new Date(),
+          notes: `Project task deleted: ${task.description.substring(0, 50)}${task.description.length > 50 ? '...' : ''}`,
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting task" });
+    }
+  });
+
+  // Task Comments endpoints
+  app.get("/api/project-tasks/:taskId/comments", checkAuth, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const comments = await storage.getTaskCommentsByTask(taskId);
+      res.json(comments);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching comments" });
+    }
+  });
+
+  app.post("/api/task-comments", checkAuth, async (req, res) => {
+    try {
+      const commentData = req.body;
+      const comment = await storage.createTaskComment(commentData);
+      
+      // Log activity
+      if (req.user) {
+        await storage.createLog({
+          action: "create",
+          userId: req.user.id,
+          targetTable: "task_comments",
+          targetId: comment.id,
+          timestamp: new Date(),
+          notes: `Comment added to task ${comment.taskId}`,
+        });
+      }
+      
+      res.status(201).json(comment);
+    } catch (error) {
+      res.status(400).json({ message: "Error creating comment" });
+    }
+  });
+
   // Documents
   app.get("/api/documents", checkAuth, async (req, res) => {
     const documents = await storage.getAllDocuments();

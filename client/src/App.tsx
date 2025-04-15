@@ -18,6 +18,8 @@ import AdminPage from "@/pages/admin-page";
 import PropertiesPage from "@/pages/properties-page";
 import PropertyDetailPage from "@/pages/property-detail-page";
 import UnitDetailPage from "@/pages/unit-detail-page";
+import ProjectsPage from "@/pages/projects-page";
+import ProjectDetailPage from "@/pages/project-detail-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -38,6 +40,8 @@ function Router() {
       <ProtectedRoute path="/properties" component={PropertiesPage} />
       <ProtectedRoute path="/properties/:id" component={PropertyDetailPage} />
       <ProtectedRoute path="/unit/:id" component={UnitDetailPage} />
+      <ProtectedRoute path="/projects" component={ProjectsPage} />
+      <ProtectedRoute path="/projects/:id" component={ProjectDetailPage} />
       <Route component={NotFound} />
     </Switch>
   );
