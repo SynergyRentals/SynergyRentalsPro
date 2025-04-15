@@ -161,124 +161,29 @@ export default function InventoryPage() {
   const getUnitName = (unitId: number | null) => {
     if (unitId === null) return "Garage Inventory";
     if (!units) return `Unit #${unitId}`;
-    const unit = units.find((u) => u.id === unitId);
+    const unit = Array.isArray(units) ? units.find((u) => u.id === unitId) : null;
     return unit ? unit.name : `Unit #${unitId}`;
   };
 
-  // Mock inventory data for now (replace with real API data later)
-  const mockInventoryItems = [
-    {
-      id: 1,
-      itemName: "Towels (Bath)",
-      unitId: 1,
-      parLevel: 8,
-      currentStock: 6,
-      lastUpdated: new Date(2023, 3, 15),
-      category: "Linens",
-      reorderThreshold: 4,
-      notes: "White cotton bath towels",
-      sku: "TOW-BAT-01",
-      upc: "123456789012",
-      cost: 1500, // $15.00
-      supplier: "Synergy Linen Supply",
-      location: "Bathroom closet",
-      minOrderQuantity: 4
-      // isConsumable and imageUrl commented out since they don't exist in DB
-    },
-    {
-      id: 2,
-      itemName: "Shampoo (Travel)",
-      unitId: 1,
-      parLevel: 10,
-      currentStock: 2,
-      lastUpdated: new Date(2023, 3, 20),
-      category: "Toiletries",
-      reorderThreshold: 5,
-      notes: "2oz bottles",
-      sku: "TOI-SHA-01",
-      upc: "123456789013",
-      cost: 250, // $2.50
-      supplier: "Synergy Amenities",
-      location: "Bathroom cabinet",
-      minOrderQuantity: 20
-      // isConsumable and imageUrl removed - they don't exist in DB
-    },
-    {
-      id: 3,
-      itemName: "Coffee Pods",
-      unitId: 1,
-      parLevel: 15,
-      currentStock: 0,
-      lastUpdated: new Date(2023, 3, 22),
-      category: "Kitchen",
-      reorderThreshold: 6,
-      notes: "Dark roast",
-      sku: "KIT-COF-01",
-      upc: "123456789014",
-      cost: 120, // $1.20
-      supplier: "Synergy Foods",
-      location: "Kitchen drawer",
-      minOrderQuantity: 30
-      // isConsumable and imageUrl fields removed - they don't exist in DB
-    },
-    {
-      id: 4,
-      itemName: "All-Purpose Cleaner",
-      unitId: null,
-      parLevel: 6,
-      currentStock: 3,
-      lastUpdated: new Date(2023, 3, 18),
-      category: "Cleaning",
-      reorderThreshold: 3,
-      notes: "Multi-surface spray",
-      sku: "CLN-APC-01",
-      upc: "123456789015",
-      cost: 550, // $5.50
-      supplier: "Synergy Cleaning",
-      location: "Garage shelf B1",
-      minOrderQuantity: 6
-      // isConsumable and imageUrl fields removed - they don't exist in DB
-    },
-    {
-      id: 5,
-      itemName: "Toilet Paper",
-      unitId: null,
-      parLevel: 20,
-      currentStock: 8,
-      lastUpdated: new Date(2023, 3, 21),
-      category: "Toiletries",
-      reorderThreshold: 10,
-      notes: "Double roll, 12-pack",
-      sku: "TOI-TP-01",
-      upc: "123456789016",
-      cost: 1200, // $12.00
-      supplier: "Synergy Supplies",
-      location: "Garage shelf A3",
-      minOrderQuantity: 5
-      // isConsumable and imageUrl fields removed - they don't exist in DB
-    }
-  ];
-
-  // Use mock data since API isn't fully implemented yet
-  const mockData = [...mockInventoryItems]; // Create a copy to avoid mutating the original
-
   // Filter inventory based on search, active tab, and status
-  const filteredInventory = mockData.filter(
-    (item) =>
-      item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (activeTab === "unit-inventory"
-        ? item.unitId !== null
-        : activeTab === "garage-inventory"
-        ? item.unitId === null
-        : true) &&
-      (filterStatus === "all" 
-        ? true 
-        : filterStatus === "low-stock" 
-        ? (item.reorderThreshold && item.currentStock < item.reorderThreshold)
-        : filterStatus === "out-of-stock"
-        ? item.currentStock <= 0
-        : true)
-  );
+  const filteredInventory = inventoryItems && Array.isArray(inventoryItems) 
+    ? inventoryItems.filter(
+        (item) =>
+          item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) &&
+          (activeTab === "unit-inventory"
+            ? item.unitId !== null
+            : activeTab === "garage-inventory"
+            ? item.unitId === null
+            : true) &&
+          (filterStatus === "all" 
+            ? true 
+            : filterStatus === "low-stock" 
+            ? (item.reorderThreshold && item.currentStock < item.reorderThreshold)
+            : filterStatus === "out-of-stock"
+            ? item.currentStock <= 0
+            : true)
+      ) 
+    : [];
 
   // Get stock status
   const getStockStatus = (item: any) => {
@@ -436,7 +341,7 @@ export default function InventoryPage() {
                         <select className="w-full p-2 border border-gray-300 rounded">
                           <option value="">Select location</option>
                           <option value="garage">Garage Inventory</option>
-                          {units &&
+                          {units && Array.isArray(units) &&
                             units.map((unit) => (
                               <option key={unit.id} value={unit.id}>
                                 {unit.name}
@@ -684,7 +589,7 @@ export default function InventoryPage() {
 
           {/* QR Code Requests Tab */}
           <TabsContent value="qr-requests" className="mt-4">
-            <UnitQrRequestCard units={units || mockUnits} />
+            <UnitQrRequestCard units={Array.isArray(units) ? units : []} />
           </TabsContent>
 
           {/* Order Queue Tab */}
