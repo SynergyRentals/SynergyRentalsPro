@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
@@ -12,6 +12,7 @@ import {
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
 import { askAI, generateAiInsights, trainAI, generateMaintenanceTicket } from "./openai";
+import { syncProperties, syncReservations, syncAll, getLatestSyncLog } from "./guesty";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -327,6 +327,64 @@ export const insertCleaningChecklistCompletionSchema = createInsertSchema(cleani
   completedAt: true,
 });
 
+// Guesty Properties
+export const guestyProperties = pgTable("guesty_properties", {
+  id: serial("id").primaryKey(),
+  propertyId: text("property_id").notNull().unique(), // from Guesty API
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  bedrooms: integer("bedrooms"),
+  bathrooms: real("bathrooms"),
+  amenities: text("amenities").array(),
+  listingUrl: text("listing_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGuestyPropertySchema = createInsertSchema(guestyProperties).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Guesty Reservations
+export const guestyReservations = pgTable("guesty_reservations", {
+  id: serial("id").primaryKey(),
+  reservationId: text("reservation_id").notNull().unique(), // from Guesty API
+  guestName: text("guest_name").notNull(),
+  guestEmail: text("guest_email"),
+  propertyId: text("property_id").notNull(), // references Guesty's property_id
+  checkIn: timestamp("check_in").notNull(),
+  checkOut: timestamp("check_out").notNull(),
+  status: text("status").notNull(), // confirmed, canceled, etc.
+  channel: text("channel"), // booking source: Airbnb, VRBO, etc.
+  totalPrice: integer("total_price"), // store in cents
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGuestyReservationSchema = createInsertSchema(guestyReservations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Guesty Sync Logs
+export const guestySyncLogs = pgTable("guesty_sync_logs", {
+  id: serial("id").primaryKey(),
+  syncType: text("sync_type").notNull(), // properties, reservations
+  status: text("status").notNull(), // success, error
+  propertiesCount: integer("properties_count"),
+  reservationsCount: integer("reservations_count"),
+  errorMessage: text("error_message"),
+  syncDate: timestamp("sync_date").defaultNow(),
+});
+
+export const insertGuestySyncLogSchema = createInsertSchema(guestySyncLogs).omit({
+  id: true,
+  syncDate: true,
+});
+
 // AI Prompt Schema
 export const aiPromptSchema = z.object({
   prompt: z.string().min(10, "Please provide a detailed description of at least 10 characters"),
@@ -382,3 +440,12 @@ export type InsertCleaningChecklistItem = z.infer<typeof insertCleaningChecklist
 
 export type CleaningChecklistCompletion = typeof cleaningChecklistCompletions.$inferSelect;
 export type InsertCleaningChecklistCompletion = z.infer<typeof insertCleaningChecklistCompletionSchema>;
+
+export type GuestyProperty = typeof guestyProperties.$inferSelect;
+export type InsertGuestyProperty = z.infer<typeof insertGuestyPropertySchema>;
+
+export type GuestyReservation = typeof guestyReservations.$inferSelect;
+export type InsertGuestyReservation = z.infer<typeof insertGuestyReservationSchema>;
+
+export type GuestySyncLog = typeof guestySyncLogs.$inferSelect;
+export type InsertGuestySyncLog = z.infer<typeof insertGuestySyncLogSchema>;

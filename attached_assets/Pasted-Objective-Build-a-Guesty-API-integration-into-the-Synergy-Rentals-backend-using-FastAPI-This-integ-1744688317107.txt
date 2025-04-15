@@ -1,0 +1,74 @@
+Objective:
+Build a Guesty API integration into the Synergy Rentals backend using FastAPI. This integration will retrieve property and reservation data from the Guesty Open API and store it in a PostgreSQL database. The integration must support Bearer token authentication and run on scheduled sync intervals.
+
+1. Guesty API Setup
+Base URL:
+https://open-api.guesty.com/v1
+
+Authentication:
+Use Bearer token stored as an environment variable: GUESTY_API_KEY
+Include in headers:
+
+pgsql
+Copy
+Edit
+Authorization: Bearer <token>
+Content-Type: application/json
+Accept: application/json
+2. Endpoints to Build
+a. GET /properties
+Fetch list of active properties.
+
+Store: property_id, name, address, bedrooms, bathrooms, amenities, listing_url.
+
+b. GET /reservations
+Fetch reservations from last 30 days (and include upcoming).
+
+Store: reservation_id, guest_name, guest_email, property_id, check_in, check_out, status, channel, total_price.
+
+3. Backend Tasks
+Create FastAPI routes:
+
+/guesty/sync-properties – Fetch and store properties
+
+/guesty/sync-reservations – Fetch and store reservations
+
+Create models and database tables:
+
+properties: property_id (str), name, address, bedrooms, bathrooms, listing_url
+
+reservations: reservation_id (str), guest_name, guest_email, property_id (FK), check_in, check_out, status, channel, price
+
+Add validation for duplicate entries (avoid re-adding same reservation/property)
+
+Log sync results (number of new/updated entries)
+
+4. Environment & Security
+Store GUESTY_API_KEY securely as Replit secret or .env
+
+Use httpx or requests for API calls with error handling
+
+Raise exceptions with response details on 401 or failed requests
+
+5. Scheduling (Optional)
+Add /guesty/sync route to trigger both syncs
+
+Optional: use APScheduler or equivalent to run daily sync automatically
+
+6. Testing & Output
+On successful sync:
+
+Log how many new properties and reservations were saved
+
+Return JSON summary of synced data
+
+Example response:
+
+json
+Copy
+Edit
+{
+  "properties_synced": 12,
+  "reservations_synced": 48,
+  "sync_status": "success"
+}
