@@ -60,25 +60,13 @@ async function makeGuestyRequest(endpoint: string, method: string = "GET", data:
  */
 function cleanPropertyData(property: any): InsertGuestyProperty {
   return {
-    guestyId: property._id,
+    propertyId: property._id,
     name: property.title || "Unnamed Property",
-    description: property.description || null,
-    propertyType: property.propertyType || null,
-    address: property.address ? JSON.stringify(property.address) : null,
-    city: property.address?.city || null,
-    state: property.address?.state || null,
-    zipCode: property.address?.zipCode || null,
-    country: property.address?.country || null,
-    bedrooms: property.bedrooms || 0,
-    bathrooms: property.bathrooms || 0,
-    accommodates: property.accommodates || 0,
+    address: property.address ? JSON.stringify(property.address) : "Unknown Address",
+    bedrooms: property.bedrooms || null,
+    bathrooms: property.bathrooms || null,
     amenities: property.amenities || [],
-    images: property.pictures?.map((pic: any) => pic.original) || [],
-    active: property.active !== false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 1, // Admin user
-    rawData: JSON.stringify(property)
+    listingUrl: property.listingUrl || null
   };
 }
 
@@ -87,24 +75,15 @@ function cleanPropertyData(property: any): InsertGuestyProperty {
  */
 function cleanReservationData(reservation: any): InsertGuestyReservation {
   return {
-    guestyId: reservation._id,
-    propertyId: reservation.listing?._id || null,
-    guestId: reservation.guest?._id || null,
+    reservationId: reservation._id,
+    propertyId: reservation.listing?._id || "",
     guestName: `${reservation.guest?.firstName || ''} ${reservation.guest?.lastName || ''}`.trim() || "Unknown Guest",
     guestEmail: reservation.guest?.email || null,
-    guestPhone: reservation.guest?.phone || null,
-    checkIn: reservation.checkIn ? new Date(reservation.checkIn) : null,
-    checkOut: reservation.checkOut ? new Date(reservation.checkOut) : null,
+    checkIn: reservation.checkIn ? new Date(reservation.checkIn) : new Date(),
+    checkOut: reservation.checkOut ? new Date(reservation.checkOut) : new Date(Date.now() + 86400000), // Next day as fallback
     status: reservation.status || "pending",
-    adults: reservation.guests?.adults || 0,
-    children: reservation.guests?.children || 0,
-    infants: reservation.guests?.infants || 0,
-    totalPrice: reservation.money?.totalPrice || 0,
-    currency: reservation.money?.currency || "USD",
-    source: reservation.source || null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    rawData: JSON.stringify(reservation)
+    channel: reservation.source || null,
+    totalPrice: Math.round((reservation.money?.totalPrice || 0) * 100) // Convert to cents
   };
 }
 
@@ -120,13 +99,11 @@ export async function syncProperties(): Promise<{
 }> {
   if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
     const syncResult: InsertGuestySyncLog = {
-      type: "properties",
-      startTime: new Date(),
-      endTime: new Date(),
-      recordsSynced: 0,
+      syncType: "properties",
       status: "failed",
-      errors: ["Guesty API credentials not configured"],
-      details: null
+      errorMessage: "Guesty API credentials not configured",
+      propertiesCount: 0,
+      reservationsCount: null
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
@@ -191,17 +168,11 @@ export async function syncProperties(): Promise<{
     const endTime = new Date();
     
     const syncResult: InsertGuestySyncLog = {
-      type: "properties",
-      startTime,
-      endTime,
-      recordsSynced: successCount,
-      status: errors.length > 0 ? "partial" : "complete",
-      errors: errors.length > 0 ? errors : null,
-      details: JSON.stringify({
-        total_retrieved: properties.length,
-        successfully_processed: successCount,
-        duration_ms: endTime.getTime() - startTime.getTime()
-      })
+      syncType: "properties",
+      status: errors.length > 0 ? "partial" : "success",
+      propertiesCount: successCount,
+      reservationsCount: null,
+      errorMessage: errors.length > 0 ? errors.join("; ") : null
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
@@ -216,13 +187,11 @@ export async function syncProperties(): Promise<{
     console.error("Error syncing properties:", error);
     
     const syncResult: InsertGuestySyncLog = {
-      type: "properties",
-      startTime: new Date(),
-      endTime: new Date(),
-      recordsSynced: 0,
+      syncType: "properties",
       status: "failed",
-      errors: [error instanceof Error ? error.message : "Unknown error"],
-      details: null
+      propertiesCount: 0,
+      reservationsCount: null,
+      errorMessage: error instanceof Error ? error.message : "Unknown error"
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
@@ -247,13 +216,11 @@ export async function syncReservations(): Promise<{
 }> {
   if (!GUESTY_API_KEY || !GUESTY_API_SECRET) {
     const syncResult: InsertGuestySyncLog = {
-      type: "reservations",
-      startTime: new Date(),
-      endTime: new Date(),
-      recordsSynced: 0,
+      syncType: "reservations",
       status: "failed",
-      errors: ["Guesty API credentials not configured"],
-      details: null
+      errorMessage: "Guesty API credentials not configured",
+      propertiesCount: null,
+      reservationsCount: 0
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
@@ -327,17 +294,11 @@ export async function syncReservations(): Promise<{
     const endTime = new Date();
     
     const syncResult: InsertGuestySyncLog = {
-      type: "reservations",
-      startTime,
-      endTime,
-      recordsSynced: successCount,
-      status: errors.length > 0 ? "partial" : "complete",
-      errors: errors.length > 0 ? errors : null,
-      details: JSON.stringify({
-        total_retrieved: reservations.length,
-        successfully_processed: successCount,
-        duration_ms: endTime.getTime() - startTime.getTime()
-      })
+      syncType: "reservations",
+      status: errors.length > 0 ? "partial" : "success",
+      propertiesCount: null,
+      reservationsCount: successCount,
+      errorMessage: errors.length > 0 ? errors.join("; ") : null
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
