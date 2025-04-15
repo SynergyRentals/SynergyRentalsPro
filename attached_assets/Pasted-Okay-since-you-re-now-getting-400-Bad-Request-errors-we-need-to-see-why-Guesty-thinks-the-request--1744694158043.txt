@@ -1,0 +1,24 @@
+Okay, since you're now getting 400 Bad Request errors, we need to see why Guesty thinks the request is bad. The detailed logging we asked the agent to add should capture this information.
+
+Let's ask the Replit Agent to run the code and show us the specific logs around the failure.
+
+Replit Agent Prompt:
+
+Context:
+After previous fixes, our Health Check / Connection Test endpoints are now causing 400 Bad Request errors when calling the Guesty API (likely GET /v1/listings). This indicates an issue with the request parameters or formatting. Detailed logging should already be implemented in the GuestyAPIClient and the check endpoints from previous steps.
+
+Goal:
+Run the application, trigger the failing check(s), and capture the relevant console logs to identify the exact reason for the 400 Bad Request error by examining the error response body provided by Guesty.
+
+Instructions:
+
+Run Application: Ensure the Node.js backend application is running in the Replit environment.
+Trigger Check (If Necessary): If the Health Check or Connection Test requires manual triggering, please do so. Otherwise, allow them to run automatically.
+Monitor Console Logs: Observe the output in the Replit Console.
+Capture Error Sequence: Find and display the specific sequence of log messages from the console that corresponds to one of the 400 Bad Request failures. Please include:
+The log message indicating the Health Check or Connection Test endpoint was triggered.
+The log message showing the check deciding to make the Guesty API call.
+The log message from GuestyAPIClient like: GuestyClient: makeRequest called for GET /v1/listings (or similar, showing method and path).
+(Most Important): The subsequent error log message from GuestyAPIClient like: GuestyClient: HTTP Error in makeRequest: 400 [Guesty Error Details] --- Please ensure you include the full [Guesty Error Details] part, as this contains the specific error message from Guesty's API.
+(Optional but helpful): If a log showing the exact params object being sent (e.g., { limit: 1 }) exists just before the call, include that too. If it doesn't exist, please add console.log('[Timestamp] GuestyClient: makeRequest params:', options?.params); inside the makeRequest function just before the axios.request call, re-run, and capture the logs again.
+Instructions for Agent: "Please run the backend application, trigger the health/connection check if needed, and monitor the console logs. Find and display the specific log sequence detailing a 400 Bad Request error received from the Guesty API, making sure to include the detailed error response body logged by our GuestyAPIClient's error handler (error.response?.data). Add logging for the request parameters (options.params) within makeRequest if it's not already present and capture the logs again."

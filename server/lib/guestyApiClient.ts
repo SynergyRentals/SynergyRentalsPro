@@ -46,12 +46,21 @@ export class GuestyAPIClient {
 
     try {
       // Changed from '/api/v2/oauth2/token' to '/oauth2/token' to match the correct auth URL
-      const response = await axios.post('https://open-api.guesty.com/oauth2/token', {
-        grant_type: 'client_credentials',
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        scope: 'read write'
-      });
+      // Added proper headers as required by the Guesty API
+      const response = await axios.post('https://open-api.guesty.com/oauth2/token', 
+        {
+          grant_type: 'client_credentials',
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          scope: 'read write'
+        },
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
       this.accessToken = response.data.access_token;
       this.tokenExpiry = new Date(Date.now() + response.data.expires_in * 1000);
@@ -92,7 +101,8 @@ export class GuestyAPIClient {
           data,
           headers: {
             'Authorization': `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
         });
 
