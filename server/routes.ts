@@ -880,6 +880,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cleaning Tasks
+  app.get("/api/cleaning-tasks", checkAuth, async (req, res) => {
+    const cleaningTasks = await storage.getAllCleaningTasks();
+    res.json(cleaningTasks);
+  });
+
+  app.get("/api/cleaning-tasks/:id", checkAuth, async (req, res) => {
+    const cleaningTask = await storage.getCleaningTask(parseInt(req.params.id));
+    if (!cleaningTask) {
+      return res.status(404).json({ message: "Cleaning task not found" });
+    }
+    res.json(cleaningTask);
+  });
+
+  app.post("/api/cleaning-tasks", checkAuth, async (req, res) => {
+    try {
+      const validatedData = insertCleaningTaskSchema.parse(req.body);
+      const cleaningTask = await storage.createCleaningTask(validatedData);
+      
+      // Send Slack notification for urgent cleaning tasks
+      if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID && cleaningTask.priority === "urgent") {
+        try {
+          const unit = await storage.getUnit(cleaningTask.unitId);
+          const unitName = unit ? unit.name : `Unit #${cleaningTask.unitId}`;
+          const assignee = cleaningTask.assignedTo ? await storage.getUser(cleaningTask.assignedTo) : null;
+          const assigneeName = assignee ? assignee.name : "Unassigned";
+          
+          await sendSlackMessage({
+            channel: process.env.SLACK_CHANNEL_ID,
+            text: `🧹 URGENT CLEANING REQUIRED at ${unitName}!`,
+            blocks: [
+              {
+                type: "header",
+                text: {
+                  type: "plain_text",
+                  text: `🧹 URGENT CLEANING REQUIRED!`,
+                  emoji: true
+                }
+              },
+              {
+                type: "section",
+                fields: [
+                  {
+                    type: "mrkdwn",
+                    text: `*Property:*\n${unitName}`
+                  },
+                  {
+                    type: "mrkdwn",
+                    text: `*Assigned To:*\n${assigneeName}`
+                  },
+                  {
+                    type: "mrkdwn",
+                    text: `*Due:*\n${cleaningTask.scheduledFor ? new Date(cleaningTask.scheduledFor).toLocaleString() : 'ASAP'}`
+                  },
+                  {
+                    type: "mrkdwn",
+                    text: `*Type:*\n${cleaningTask.isInspection ? "Inspection" : "Cleaning"}`
+                  }
+                ]
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `*Notes:*\n${cleaningTask.notes || "No additional notes"}`
+                }
+              }
+            ]
+          });
+        } catch (slackError) {
+          console.error("Failed to send Slack notification:", slackError);
+          // Continue even if Slack notification fails
+        }
+      }
+      
+      res.status(201).json(cleaningTask);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/cleaning-tasks/:id", checkAuth, async (req, res) => {
+    try {
+      const cleaningTask = await storage.updateCleaningTask(parseInt(req.params.id), req.body);
+      if (!cleaningTask) {
+        return res.status(404).json({ message: "Cleaning task not found" });
+      }
+      res.json(cleaningTask);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Cleaning Checklists
+  app.get("/api/cleaning-checklists", checkAuth, async (req, res) => {
+    const checklists = await storage.getAllCleaningChecklists();
+    res.json(checklists);
+  });
+
+  app.get("/api/cleaning-checklists/:id", checkAuth, async (req, res) => {
+    const checklist = await storage.getCleaningChecklist(parseInt(req.params.id));
+    if (!checklist) {
+      return res.status(404).json({ message: "Checklist not found" });
+    }
+    res.json(checklist);
+  });
+
+  app.post("/api/cleaning-checklists", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const validatedData = insertCleaningChecklistSchema.parse(req.body);
+      const checklist = await storage.createCleaningChecklist(validatedData);
+      res.status(201).json(checklist);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/cleaning-checklists/:id", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const checklist = await storage.updateCleaningChecklist(parseInt(req.params.id), req.body);
+      if (!checklist) {
+        return res.status(404).json({ message: "Checklist not found" });
+      }
+      res.json(checklist);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Checklist Items 
+  app.get("/api/cleaning-checklist-items", checkAuth, async (req, res) => {
+    const checklistId = req.query.checklistId ? parseInt(req.query.checklistId as string) : undefined;
+    
+    if (checklistId) {
+      const items = await storage.getCleaningChecklistItemsByChecklist(checklistId);
+      return res.json(items);
+    }
+    
+    const items = await storage.getAllCleaningChecklistItems();
+    res.json(items);
+  });
+
+  app.get("/api/cleaning-checklist-items/:id", checkAuth, async (req, res) => {
+    const item = await storage.getCleaningChecklistItem(parseInt(req.params.id));
+    if (!item) {
+      return res.status(404).json({ message: "Checklist item not found" });
+    }
+    res.json(item);
+  });
+
+  app.post("/api/cleaning-checklist-items", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const validatedData = insertCleaningChecklistItemSchema.parse(req.body);
+      const item = await storage.createCleaningChecklistItem(validatedData);
+      res.status(201).json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/cleaning-checklist-items/:id", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const item = await storage.updateCleaningChecklistItem(parseInt(req.params.id), req.body);
+      if (!item) {
+        return res.status(404).json({ message: "Checklist item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Checklist Completions
+  app.get("/api/cleaning-checklist-completions", checkAuth, async (req, res) => {
+    const taskId = req.query.taskId ? parseInt(req.query.taskId as string) : undefined;
+    
+    if (taskId) {
+      const completions = await storage.getCleaningChecklistCompletionsByTask(taskId);
+      return res.json(completions);
+    }
+    
+    const completions = await storage.getAllCleaningChecklistCompletions();
+    res.json(completions);
+  });
+
+  app.post("/api/cleaning-checklist-completions", checkAuth, async (req, res) => {
+    try {
+      const validatedData = insertCleaningChecklistCompletionSchema.parse(req.body);
+      const completion = await storage.createCleaningChecklistCompletion({
+        ...validatedData,
+        completed: true
+      });
+      res.status(201).json(completion);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/cleaning-checklist-completions/:id", checkAuth, async (req, res) => {
+    try {
+      const completion = await storage.updateCleaningChecklistCompletion(parseInt(req.params.id), req.body);
+      if (!completion) {
+        return res.status(404).json({ message: "Completion record not found" });
+      }
+      res.json(completion);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Create HTTP server
   const httpServer = createServer(app);
 
