@@ -319,6 +319,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.json(item);
   });
+  
+  // Handle QR code supply requests
+  app.post("/api/inventory/request-supplies", checkAuth, async (req, res) => {
+    try {
+      const { unitId, items, urgency, notes } = req.body;
+      
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Items are required" });
+      }
+      
+      // Create log entry for the request
+      const logEntry = await storage.createLog({
+        action: "SUPPLY_REQUEST",
+        userId: req.user?.id,
+        targetTable: "inventory",
+        notes: `Supply request for unit #${unitId}: ${items.map(i => `${i.name} x ${i.quantity}`).join(", ")}. Urgency: ${urgency}. Notes: ${notes}`,
+        ipAddress: req.ip
+      });
+      
+      // If Slack is configured, send notification
+      if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID) {
+        try {
+          const unit = unitId ? await storage.getUnit(unitId) : null;
+          const unitName = unit ? unit.name : "Unknown";
+          const user = req.user ? await storage.getUser(req.user.id) : null;
+          const userName = user ? user.name : "Unknown";
+          
+          await sendSlackMessage({
+            channel: process.env.SLACK_CHANNEL_ID,
+            text: `🧹 Supply Request for ${unitName}`,
+            blocks: [
+              {
+                type: "header",
+                text: {
+                  type: "plain_text",
+                  text: `🧹 Supply Request for ${unitName}`,
+                  emoji: true
+                }
+              },
+              {
+                type: "section",
+                fields: [
+                  {
+                    type: "mrkdwn",
+                    text: `*Requested by:*\n${userName}`
+                  },
+                  {
+                    type: "mrkdwn",
+                    text: `*Urgency:*\n${urgency === "urgent" ? "🔴 URGENT" : "🟢 Normal"}`
+                  }
+                ]
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `*Items Requested:*\n${items.map(i => `• ${i.name} (x${i.quantity})`).join("\n")}`
+                }
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `*Notes:*\n${notes || "No additional notes"}`
+                }
+              }
+            ]
+          });
+        } catch (slackError) {
+          console.error("Failed to send Slack notification:", slackError);
+          // We continue even if Slack notification fails
+        }
+      }
+      
+      res.status(201).json({ 
+        success: true, 
+        message: "Supply request submitted successfully", 
+        logId: logEntry.id 
+      });
+    } catch (error) {
+      console.error("Error processing supply request:", error);
+      res.status(500).json({ message: "Error processing supply request" });
+    }
+  });
 
   app.post("/api/inventory", checkAuth, async (req, res) => {
     try {
