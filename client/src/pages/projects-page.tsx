@@ -449,8 +449,8 @@ export default function ProjectsPage() {
                     <FormItem>
                       <FormLabel>Associated Unit</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                        value={field.value?.toString() || ""}
+                        onValueChange={(value) => field.onChange(value !== "none" ? parseInt(value) : null)}
+                        value={field.value?.toString() || "none"}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -458,7 +458,7 @@ export default function ProjectsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {units?.map((unit: any) => (
                             <SelectItem key={unit.id} value={unit.id.toString()}>
                               {unit.name}
