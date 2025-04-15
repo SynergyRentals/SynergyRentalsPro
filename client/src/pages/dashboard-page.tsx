@@ -9,6 +9,9 @@ import CleanerPerformance from '@/components/dashboard/CleanerPerformance';
 import GuestSentiment from '@/components/dashboard/GuestSentiment';
 import InventoryAlerts from '@/components/dashboard/InventoryAlerts';
 import AiAssistant from '@/components/dashboard/AiAssistant';
+import OccupancyChart from '@/components/dashboard/OccupancyChart';
+import MaintenanceStatusChart from '@/components/dashboard/MaintenanceStatusChart';
+import GuestAnalytics from '@/components/dashboard/GuestAnalytics';
 import { Button } from '@/components/ui/button';
 import { 
   Today, 
@@ -153,6 +156,64 @@ export default function DashboardPage() {
     urgentMaintenance: 2,
   };
 
+  // Sample data for the occupancy chart
+  const occupancyData = [
+    { name: 'Jan', occupancy: 72, revenue: 28000 },
+    { name: 'Feb', occupancy: 75, revenue: 30000 },
+    { name: 'Mar', occupancy: 81, revenue: 35000 },
+    { name: 'Apr', occupancy: 84, revenue: 38000 },
+    { name: 'May', occupancy: 78, revenue: 32000 },
+    { name: 'Jun', occupancy: 92, revenue: 45000 },
+    { name: 'Jul', occupancy: 96, revenue: 52000 },
+    { name: 'Aug', occupancy: 87, revenue: 48000 },
+  ];
+
+  // Sample data for maintenance status chart
+  const maintenanceStatusData = [
+    { name: 'Urgent', value: 2, color: '#ef4444' },
+    { name: 'In Progress', value: 8, color: '#f59e0b' },
+    { name: 'Scheduled', value: 5, color: '#3b82f6' },
+    { name: 'Completed', value: 23, color: '#22c55e' },
+  ];
+
+  // Sample data for guest analytics
+  const stayLengthData = [
+    { name: '1-2', count: 24 },
+    { name: '3-4', count: 42 },
+    { name: '5-7', count: 18 },
+    { name: '8-14', count: 8 },
+    { name: '15+', count: 3 },
+  ];
+
+  const currentGuests = [
+    { 
+      id: 1, 
+      name: 'Sarah Johnson', 
+      location: 'Beach House #2', 
+      checkIn: 'Aug 12', 
+      checkOut: 'Aug 18', 
+      guestCount: 4,
+      rating: 5.0
+    },
+    { 
+      id: 2, 
+      name: 'Michael Chen', 
+      location: 'Downtown Loft', 
+      checkIn: 'Aug 13', 
+      checkOut: 'Aug 17', 
+      guestCount: 2,
+      rating: 4.8
+    },
+    { 
+      id: 3, 
+      name: 'Emily Davis', 
+      location: 'Lakeside Cabin', 
+      checkIn: 'Aug 15', 
+      checkOut: 'Aug 22', 
+      guestCount: 6
+    },
+  ];
+
   return (
     <Layout>
       <div className="space-y-6 pb-8">
@@ -219,6 +280,12 @@ export default function DashboardPage() {
           />
         </div>
         
+        {/* Occupancy Chart */}
+        <OccupancyChart 
+          data={occupancyData} 
+          timeRange="Last 8 Months"
+        />
+        
         {/* Tasks and Calendar Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Upcoming Tasks */}
@@ -250,14 +317,24 @@ export default function DashboardPage() {
             currentDay={15}
           />
         </div>
+
+        {/* Guest Analytics */}
+        <GuestAnalytics 
+          stayLengthData={stayLengthData}
+          currentGuests={currentGuests}
+          totalGuests={95}
+          newGuestsPercent={32}
+          repeatGuestsPercent={68}
+          averageStayLength={4.7}
+        />
         
-        {/* Performance and Inventory Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Cleaner Performance */}
-          <CleanerPerformance cleaners={cleanersData} />
-          
-          {/* Guest Sentiment */}
-          <GuestSentiment data={sentimentData} />
+        {/* Maintenance Status and Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Maintenance Status */}
+          <MaintenanceStatusChart 
+            data={maintenanceStatusData}
+            total={maintenanceStatusData.reduce((sum, item) => sum + item.value, 0)}
+          />
           
           {/* Inventory Alerts */}
           <InventoryAlerts 
@@ -265,6 +342,15 @@ export default function DashboardPage() {
             onViewAll={handleViewAllInventory}
             onRestock={handleRestockItem}
           />
+        </div>
+        
+        {/* Performance and Guest Sentiment */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Cleaner Performance */}
+          <CleanerPerformance cleaners={cleanersData} />
+          
+          {/* Guest Sentiment */}
+          <GuestSentiment data={sentimentData} />
         </div>
         
         {/* AI Brain Assistant */}
