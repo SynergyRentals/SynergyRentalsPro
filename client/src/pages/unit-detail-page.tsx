@@ -23,7 +23,7 @@ import { format } from "date-fns";
 // Components
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskCard from "@/components/dashboard/TaskCard";
-import { CalendarView } from "@/components/dashboard/CalendarView";
+import { CalendarView } from "../components/dashboard/CalendarView";
 import { Separator } from "@/components/ui/separator";
 
 export default function UnitDetailPage() {
@@ -455,7 +455,7 @@ export default function UnitDetailPage() {
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center space-x-2">
                                   {task.type === "cleaning" && <ClipboardList className="h-4 w-4 text-blue-500" />}
-                                  {task.type === "maintenance" && <Tool className="h-4 w-4 text-orange-500" />}
+                                  {task.type === "maintenance" && <Wrench className="h-4 w-4 text-orange-500" />}
                                   {task.type === "inventory" && <Package className="h-4 w-4 text-green-500" />}
                                   <p className="font-medium text-sm">{task.type.charAt(0).toUpperCase() + task.type.slice(1)}</p>
                                 </div>
@@ -600,7 +600,7 @@ export default function UnitDetailPage() {
                           <div className="flex items-start justify-between">
                             <div className="flex items-center space-x-2">
                               {task.type === "cleaning" && <ClipboardList className="h-5 w-5 text-blue-500" />}
-                              {task.type === "maintenance" && <Tool className="h-5 w-5 text-orange-500" />}
+                              {task.type === "maintenance" && <Wrench className="h-5 w-5 text-orange-500" />}
                               {task.type === "inventory" && <Package className="h-5 w-5 text-green-500" />}
                               <div>
                                 <p className="font-medium">{task.type.charAt(0).toUpperCase() + task.type.slice(1)}</p>
@@ -640,7 +640,7 @@ export default function UnitDetailPage() {
                     <CardDescription>All maintenance records for this unit</CardDescription>
                   </div>
                   <Button>
-                    <Tool className="h-4 w-4 mr-2" />
+                    <Wrench className="h-4 w-4 mr-2" />
                     Report Issue
                   </Button>
                 </CardHeader>
