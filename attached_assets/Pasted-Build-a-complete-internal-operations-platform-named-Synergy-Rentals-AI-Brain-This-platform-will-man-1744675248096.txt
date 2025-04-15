@@ -1,0 +1,190 @@
+Build a complete internal operations platform named Synergy Rentals AI Brain. This platform will manage the daily workflows of a short-term rental management company including guest coordination, cleaning, maintenance, inventory, staff management, and AI-powered insights.
+
+Tech Stack:
+Frontend: React + TailwindCSS (UI framework)
+
+Backend: FastAPI (Python)
+
+Database: PostgreSQL (Relational, hosted with Supabase or Railway)
+
+Authentication: Supabase or Firebase Auth with role-based access
+
+Hosting (Dev): Replit Web App
+
+External Integrations:
+
+OpenAI API (for AI tools)
+
+Google Maps API (for cleaner route optimization)
+
+Slack Webhooks (notifications)
+
+Guesty API (reservation and property sync)
+
+Brand Theme Colors:
+Primary Dark Blue: #2C2E3E
+
+Light Gray Background: #F5F5F7
+
+Accent Yellow: #FFCF45
+
+Slate Gray Text: #9EA2B1
+
+Base White: #FFFFFF
+
+Apply these consistently across layout elements, dashboards, components, and buttons.
+
+UI and Navigation:
+Layout: Responsive sidebar + top bar
+
+Each sidebar menu item must include an icon to the left of the label
+
+Role-based rendering of views (Admin, Ops, VA, Maintenance, Cleaner)
+
+Sidebar Structure (with Feature Pages):
+1. Dashboard
+
+Overview: Occupancy, task summaries, cleaner performance, guest sentiment, inventory alerts
+
+Advanced Analytics: Profitability charts, maintenance trends, QC scores, cost tracking
+
+Calendar View: Unified calendar of cleanings, maintenance, restocks, projects (drag & drop tasks)
+
+2. Guests
+
+Active Guests: Name, unit, contact info, check-in/out dates, booking source
+
+Guest History: Flags, notes, previous stays, exportable
+
+Sentiment Monitor: AI analysis of reviews/messages, keyword trends
+
+Pet & Special Requests Log: Log and fulfillable tracker
+
+3. Cleaning
+
+Cleaning Schedule: Calendar view with assignment + status filters
+
+Checklist & Photo Submission: Required checklist with completion locking
+
+Quality Control: Inspector scorecards, random inspections
+
+Cleaner Mapping View: Google Maps-based route optimizer with stop grouping and reassignment
+
+4. Maintenance
+
+Open Tickets: Track issues by unit, priority, assignment
+
+Projects: Upgrade timelines, costs, documents
+
+Vendor Assignments: Task history and vendor performance
+
+Maintenance Cost Logs: Materials + labor logs
+
+5. Inventory
+
+Unit Inventory: Par level tracking, cleaner input, alerts
+
+Garage Inventory: Master supply list, update history
+
+Restock Alerts: Trigger tasks for garage restock or VA reorder
+
+Order Queue: VA-managed purchase queue with Amazon links
+
+6. Team
+
+Team Directory: Role, contact, permissions
+
+Task Load View: Workload and delay reports
+
+Training & SOP Tracker: Assignment and completion tracking
+
+Performance Metrics: QC pass rate, task time, review feedback
+
+7. Company Info
+
+Units & Properties: Full profiles with leases, access info, SOP links
+
+Projects: Property upgrade tracking
+
+Vendors & Contractors: Directory, documents, service records
+
+Documents & Policies: Uploads of SOPs, training files, legal docs
+
+Financial Logs: Per-unit revenue vs. cost analysis
+
+Permits & Licenses: Renewal tracking, document uploads
+
+8. AI Tools
+
+Ask the Brain: Chat interface powered by OpenAI trained on internal docs
+
+AI Insights & Alerts: Suggestions for operational improvement
+
+AI Training Center: Upload/tag SOPs, leases, FAQs
+
+SOP Builder: Generate formatted SOPs from input or checklist
+
+Forecasting Tools: Maintenance prediction, inventory trends, guest volume
+
+Sentiment Monitor: Real-time feedback scanning across reviews/messages
+
+9. Admin & Support
+
+System Activity Log: Full user event tracking (timestamp, role, affected unit)
+
+User Management: Role assignment, account control
+
+System Settings: Escalation timing, par level defaults, feature toggles
+
+Data Export & Backup: CSV/PDF download, full data snapshots
+
+Support Center: FAQs, bug reporting, team escalation form
+
+Backend Requirements (FastAPI):
+Create REST endpoints for:
+
+/tasks, /units, /inventory, /guests, /cleaning, /maintenance, /vendors, /projects, /users, /documents, /ai, /logs
+
+Role-based access checks on all endpoints
+
+Slack notifications via POST on critical task changes (missed cleanings, urgent maintenance)
+
+AI routes powered by OpenAI API (via POST to /ai/ask, /ai/insights, /ai/train)
+
+PostgreSQL Schema Suggestions:
+users: id, name, email, role, active
+
+units: id, address, lease_url, wifi_info, tags, notes
+
+guests: id, name, email, phone, stay_dates, unit_id, flags
+
+tasks: id, type, unit_id, assigned_to, due_date, completed, checklist_url, photos
+
+maintenance: id, description, unit_id, cost, vendor_id, status
+
+inventory: id, item_name, unit_id, par_level, current_stock, last_updated
+
+vendors: id, name, contact, category, rating, documents
+
+projects: id, unit_id, description, timeline, budget
+
+documents: id, name, category, file_url, uploaded_by
+
+logs: id, user_id, action, timestamp, target_table, notes
+
+Functional Requirements:
+User authentication and role-based routing
+
+Fully responsive UI with mobile-first layouts
+
+Slack integration for task status changes
+
+AI assistant trained from uploaded internal documents
+
+Secure file upload for SOPs, images, contracts (via Firebase or Supabase storage)
+
+Map view for cleaner routing
+
+All pages must be CRUD-enabled and paginated
+
+This build will be used by cleaners, virtual assistants, maintenance techs, and admin-level operators to manage short-term rental operations across 25+ properties. The goal is to centralize all day-to-day workflows and introduce AI automation to reduce operational friction and improve guest experience.
