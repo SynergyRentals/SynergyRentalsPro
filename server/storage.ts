@@ -5,10 +5,13 @@ import {
   Project, InsertProject, Document, InsertDocument, 
   Log, InsertLog 
 } from "@shared/schema";
+import { db, pool } from "./db";
+import { eq, and, isNull } from "drizzle-orm";
+import * as schema from "@shared/schema";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 // Storage interface
 export interface IStorage {
@@ -487,4 +490,311 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      pool, 
+      createTableIfMissing: true
+    });
+  }
+
+  // User Methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(schema.users).values({
+      ...insertUser,
+      active: true,
+    }).returning();
+    return user;
+  }
+
+  async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(schema.users)
+      .set(userData)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(schema.users);
+  }
+
+  // Unit Methods
+  async getUnit(id: number): Promise<Unit | undefined> {
+    const [unit] = await db.select().from(schema.units).where(eq(schema.units.id, id));
+    return unit;
+  }
+
+  async createUnit(insertUnit: InsertUnit): Promise<Unit> {
+    const [unit] = await db.insert(schema.units).values({
+      ...insertUnit,
+      active: true,
+    }).returning();
+    return unit;
+  }
+
+  async updateUnit(id: number, unitData: Partial<Unit>): Promise<Unit | undefined> {
+    const [updatedUnit] = await db.update(schema.units)
+      .set(unitData)
+      .where(eq(schema.units.id, id))
+      .returning();
+    return updatedUnit;
+  }
+
+  async getAllUnits(): Promise<Unit[]> {
+    return await db.select().from(schema.units);
+  }
+
+  // Guest Methods
+  async getGuest(id: number): Promise<Guest | undefined> {
+    const [guest] = await db.select().from(schema.guests).where(eq(schema.guests.id, id));
+    return guest;
+  }
+
+  async createGuest(insertGuest: InsertGuest): Promise<Guest> {
+    const [guest] = await db.insert(schema.guests).values(insertGuest).returning();
+    return guest;
+  }
+
+  async updateGuest(id: number, guestData: Partial<Guest>): Promise<Guest | undefined> {
+    const [updatedGuest] = await db.update(schema.guests)
+      .set(guestData)
+      .where(eq(schema.guests.id, id))
+      .returning();
+    return updatedGuest;
+  }
+
+  async getAllGuests(): Promise<Guest[]> {
+    return await db.select().from(schema.guests);
+  }
+
+  async getGuestsByUnit(unitId: number): Promise<Guest[]> {
+    return await db.select().from(schema.guests).where(eq(schema.guests.unitId, unitId));
+  }
+
+  // Task Methods
+  async getTask(id: number): Promise<Task | undefined> {
+    const [task] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id));
+    return task;
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const [task] = await db.insert(schema.tasks).values({
+      ...insertTask,
+      completed: false,
+    }).returning();
+    return task;
+  }
+
+  async updateTask(id: number, taskData: Partial<Task>): Promise<Task | undefined> {
+    // If task is being marked as completed, set completedAt
+    if (taskData.completed === true) {
+      const task = await this.getTask(id);
+      if (task && !task.completed) {
+        taskData.completedAt = new Date();
+      }
+    }
+
+    const [updatedTask] = await db.update(schema.tasks)
+      .set(taskData)
+      .where(eq(schema.tasks.id, id))
+      .returning();
+    return updatedTask;
+  }
+
+  async getAllTasks(): Promise<Task[]> {
+    return await db.select().from(schema.tasks);
+  }
+
+  async getTasksByUnit(unitId: number): Promise<Task[]> {
+    return await db.select().from(schema.tasks).where(eq(schema.tasks.unitId, unitId));
+  }
+
+  async getTasksByAssignee(userId: number): Promise<Task[]> {
+    return await db.select().from(schema.tasks).where(eq(schema.tasks.assignedTo, userId));
+  }
+
+  async getTasksByType(type: string): Promise<Task[]> {
+    return await db.select().from(schema.tasks).where(eq(schema.tasks.type, type));
+  }
+
+  // Maintenance Methods
+  async getMaintenance(id: number): Promise<Maintenance | undefined> {
+    const [maintenance] = await db.select().from(schema.maintenance).where(eq(schema.maintenance.id, id));
+    return maintenance;
+  }
+
+  async createMaintenance(insertMaintenance: InsertMaintenance): Promise<Maintenance> {
+    const [maintenance] = await db.insert(schema.maintenance).values({
+      ...insertMaintenance,
+      status: "open",
+    }).returning();
+    return maintenance;
+  }
+
+  async updateMaintenance(id: number, maintenanceData: Partial<Maintenance>): Promise<Maintenance | undefined> {
+    // If maintenance is being marked as completed, set completedAt
+    if (maintenanceData.status === 'completed') {
+      const maintenance = await this.getMaintenance(id);
+      if (maintenance && maintenance.status !== 'completed') {
+        maintenanceData.completedAt = new Date();
+      }
+    }
+
+    const [updatedMaintenance] = await db.update(schema.maintenance)
+      .set(maintenanceData)
+      .where(eq(schema.maintenance.id, id))
+      .returning();
+    return updatedMaintenance;
+  }
+
+  async getAllMaintenance(): Promise<Maintenance[]> {
+    return await db.select().from(schema.maintenance);
+  }
+
+  async getMaintenanceByUnit(unitId: number): Promise<Maintenance[]> {
+    return await db.select().from(schema.maintenance).where(eq(schema.maintenance.unitId, unitId));
+  }
+
+  // Inventory Methods
+  async getInventory(id: number): Promise<Inventory | undefined> {
+    const [inventory] = await db.select().from(schema.inventory).where(eq(schema.inventory.id, id));
+    return inventory;
+  }
+
+  async createInventory(insertInventory: InsertInventory): Promise<Inventory> {
+    const [inventory] = await db.insert(schema.inventory).values({
+      ...insertInventory,
+      lastUpdated: new Date(),
+    }).returning();
+    return inventory;
+  }
+
+  async updateInventory(id: number, inventoryData: Partial<Inventory>): Promise<Inventory | undefined> {
+    // Update lastUpdated timestamp
+    inventoryData.lastUpdated = new Date();
+
+    const [updatedInventory] = await db.update(schema.inventory)
+      .set(inventoryData)
+      .where(eq(schema.inventory.id, id))
+      .returning();
+    return updatedInventory;
+  }
+
+  async getAllInventory(): Promise<Inventory[]> {
+    return await db.select().from(schema.inventory);
+  }
+
+  async getInventoryByUnit(unitId: number): Promise<Inventory[]> {
+    return await db.select().from(schema.inventory).where(eq(schema.inventory.unitId, unitId));
+  }
+
+  async getGarageInventory(): Promise<Inventory[]> {
+    return await db.select().from(schema.inventory).where(isNull(schema.inventory.unitId));
+  }
+
+  // Vendor Methods
+  async getVendor(id: number): Promise<Vendor | undefined> {
+    const [vendor] = await db.select().from(schema.vendors).where(eq(schema.vendors.id, id));
+    return vendor;
+  }
+
+  async createVendor(insertVendor: InsertVendor): Promise<Vendor> {
+    const [vendor] = await db.insert(schema.vendors).values(insertVendor).returning();
+    return vendor;
+  }
+
+  async updateVendor(id: number, vendorData: Partial<Vendor>): Promise<Vendor | undefined> {
+    const [updatedVendor] = await db.update(schema.vendors)
+      .set(vendorData)
+      .where(eq(schema.vendors.id, id))
+      .returning();
+    return updatedVendor;
+  }
+
+  async getAllVendors(): Promise<Vendor[]> {
+    return await db.select().from(schema.vendors);
+  }
+
+  // Project Methods
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id));
+    return project;
+  }
+
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const [project] = await db.insert(schema.projects).values(insertProject).returning();
+    return project;
+  }
+
+  async updateProject(id: number, projectData: Partial<Project>): Promise<Project | undefined> {
+    const [updatedProject] = await db.update(schema.projects)
+      .set(projectData)
+      .where(eq(schema.projects.id, id))
+      .returning();
+    return updatedProject;
+  }
+
+  async getAllProjects(): Promise<Project[]> {
+    return await db.select().from(schema.projects);
+  }
+
+  async getProjectsByUnit(unitId: number): Promise<Project[]> {
+    return await db.select().from(schema.projects).where(eq(schema.projects.unitId, unitId));
+  }
+
+  // Document Methods
+  async getDocument(id: number): Promise<Document | undefined> {
+    const [document] = await db.select().from(schema.documents).where(eq(schema.documents.id, id));
+    return document;
+  }
+
+  async createDocument(insertDocument: InsertDocument): Promise<Document> {
+    const [document] = await db.insert(schema.documents).values(insertDocument).returning();
+    return document;
+  }
+
+  async updateDocument(id: number, documentData: Partial<Document>): Promise<Document | undefined> {
+    const [updatedDocument] = await db.update(schema.documents)
+      .set(documentData)
+      .where(eq(schema.documents.id, id))
+      .returning();
+    return updatedDocument;
+  }
+
+  async getAllDocuments(): Promise<Document[]> {
+    return await db.select().from(schema.documents);
+  }
+
+  async getDocumentsByUnit(unitId: number): Promise<Document[]> {
+    return await db.select().from(schema.documents).where(eq(schema.documents.unitId, unitId));
+  }
+
+  async getDocumentsByCategory(category: string): Promise<Document[]> {
+    return await db.select().from(schema.documents).where(eq(schema.documents.category, category));
+  }
+
+  // Log Methods
+  async createLog(insertLog: InsertLog): Promise<Log> {
+    const [log] = await db.insert(schema.logs).values(insertLog).returning();
+    return log;
+  }
+
+  async getAllLogs(): Promise<Log[]> {
+    return await db.select().from(schema.logs);
+  }
+}
+
+export const storage = new DatabaseStorage();
