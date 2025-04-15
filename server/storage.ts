@@ -992,8 +992,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createCleaningTask(insertCleaningTask: InsertCleaningTask): Promise<CleaningTask> {
+    // Convert the scheduledFor to Date object if it's a string
+    const { scheduledFor, ...rest } = insertCleaningTask;
+    const scheduledForDate = typeof scheduledFor === 'string' ? new Date(scheduledFor) : scheduledFor;
+    
     const [cleaningTask] = await db.insert(schema.cleaningTasks).values({
-      ...insertCleaningTask,
+      ...rest,
+      scheduledFor: scheduledForDate,
       status: "scheduled",
       verifiedAt: null,
       actualDuration: null,
@@ -1089,10 +1094,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createCleaningChecklistCompletion(insertCompletion: InsertCleaningChecklistCompletion): Promise<CleaningChecklistCompletion> {
+    // Create completion with completed status
+    const now = new Date();
     const [completion] = await db.insert(schema.cleaningChecklistCompletions).values({
       ...insertCompletion,
-      completedAt: new Date(),
-      completed: true,
+      completedAt: now,
+      // Properties need to be added after spread to override any existing values
+      completed: true
     }).returning();
     return completion;
   }

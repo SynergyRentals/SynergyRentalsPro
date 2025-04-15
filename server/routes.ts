@@ -896,8 +896,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cleaning-tasks", checkAuth, async (req, res) => {
     try {
+      console.log("Creating cleaning task with data:", JSON.stringify(req.body));
       const validatedData = insertCleaningTaskSchema.parse(req.body);
+      console.log("Validated data:", JSON.stringify(validatedData));
+      
       const cleaningTask = await storage.createCleaningTask(validatedData);
+      console.log("Created cleaning task:", JSON.stringify(cleaningTask));
       
       // Send Slack notification for urgent cleaning tasks
       if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID && cleaningTask.priority === "urgent") {
@@ -957,10 +961,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json(cleaningTask);
     } catch (error) {
+      console.error("Error creating cleaning task:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: error.errors });
       } else {
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Internal server error", details: error.message });
       }
     }
   });
