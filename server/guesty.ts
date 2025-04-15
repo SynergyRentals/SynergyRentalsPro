@@ -9,7 +9,7 @@ import { eq, desc } from "drizzle-orm";
 // Guesty OAuth2 configuration
 const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
 const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
-const BASE_URL = "https://open-api.guesty.com/api/v2";
+const BASE_URL = "https://open-api.guesty.com/v1";
 const OAUTH_URL = "https://login.guesty.com/oauth2/aus1p8qrh53CcQTI95d7/v1/token";
 
 // Token storage - in production this should be stored in a database
@@ -312,9 +312,9 @@ export async function syncProperties(): Promise<{
     const startTime = new Date();
     console.log("Starting Guesty properties sync at:", startTime.toISOString());
     
-    // Fetch properties from Guesty API
-    const response = await makeGuestyRequest("/listings?limit=100");
-    const properties = response.results || [];
+    // Fetch properties from Guesty API using the new endpoint
+    const response = await makeGuestyRequest("/properties?limit=100");
+    const properties = response.data || [];
     
     if (!Array.isArray(properties)) {
       throw new Error("Invalid response format from Guesty API");
@@ -437,10 +437,10 @@ export async function syncReservations(): Promise<{
     const sixMonthsAhead = new Date(now);
     sixMonthsAhead.setMonth(now.getMonth() + 6);
     
-    // Fetch reservations from Guesty API with date filtering
+    // Fetch reservations from Guesty API with date filtering using the new endpoint
     const queryParams = `?checkIn[$gte]=${oneMonthAgo.toISOString()}&checkOut[$lte]=${sixMonthsAhead.toISOString()}&limit=100`;
     const response = await makeGuestyRequest(`/reservations${queryParams}`);
-    const reservations = response.results || [];
+    const reservations = response.data || [];
     
     if (!Array.isArray(reservations)) {
       throw new Error("Invalid response format from Guesty API");

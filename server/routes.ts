@@ -1282,7 +1282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Then test a simple API call
       try {
-        const testResponse = await makeGuestyRequest('/me');
+        const testResponse = await makeGuestyRequest('/users/me');
         
         console.log("Successfully made test API call to Guesty API");
         
