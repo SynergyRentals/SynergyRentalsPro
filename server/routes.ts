@@ -1173,6 +1173,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // CSV Import route for properties
+  // This endpoint imports properties data from a CSV file when API is rate limited
+  app.post("/api/guesty/import-csv", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      // Use the CSV file in attached_assets directory
+      const filePath = './attached_assets/461800_2025-04-15_00_27_58.csv';
+      
+      // Import the CSV importer function
+      const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
+      
+      // Process the CSV file
+      const result = await importGuestyPropertiesFromCSV(filePath);
+      
+      // Log the action
+      await storage.createLog({
+        action: "GUESTY_CSV_IMPORT",
+        userId: req.user?.id,
+        targetTable: "guesty_properties",
+        notes: `Imported ${result.propertiesCount} Guesty properties from CSV`,
+        ipAddress: req.ip
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      res.status(500).json({ 
+        success: false,
+        message: `Error importing CSV: ${error instanceof Error ? error.message : "Unknown error"}`
+      });
+    }
+  });
+  
   // Full sync route (properties and reservations)
   // TODO: This will be migrated to use guestyClient for all sync operations in a future update
   // Current implementation is preserved for now to ensure backward compatibility
