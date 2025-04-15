@@ -9,7 +9,8 @@ import GuestsPage from "@/pages/guests-page";
 import CleaningPage from "@/pages/cleaning-page";
 import MaintenancePage from "@/pages/maintenance-page";
 import InventoryPage from "@/pages/inventory-page";
-import TeamPage from "@/pages/team-page";
+// Using the new Team page implementation
+import TeamPage from "@/pages/team-page-new";
 import CompanyPage from "@/pages/company-page";
 import AiToolsPage from "@/pages/ai-tools-page";
 import AdminPage from "@/pages/admin-page";

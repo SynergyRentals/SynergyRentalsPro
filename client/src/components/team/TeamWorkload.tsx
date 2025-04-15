@@ -212,7 +212,9 @@ export default function TeamWorkload({ users, tasks, onAssignTask }: TeamWorkloa
                   <Progress 
                     value={workload} 
                     className="h-2"
-                    indicatorClassName={getWorkloadColorClass(workload)}
+                    style={{
+                      ["--progress-background" as any]: getWorkloadColorClass(workload)
+                    }}
                   />
                 </div>
                 

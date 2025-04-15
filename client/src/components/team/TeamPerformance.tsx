@@ -136,8 +136,10 @@ export default function TeamPerformance({
                     </div>
                     <Progress 
                       value={completionRate} 
-                      className="h-2" 
-                      indicatorClassName={getColorClass(completionRate)}
+                      className="h-2"
+                      style={{
+                        ["--progress-background" as any]: getColorClass(completionRate)
+                      }}
                     />
                   </div>
 
@@ -152,8 +154,10 @@ export default function TeamPerformance({
                     </div>
                     <Progress 
                       value={onTimeRate} 
-                      className="h-2" 
-                      indicatorClassName={getColorClass(onTimeRate)}
+                      className="h-2"
+                      style={{
+                        ["--progress-background" as any]: getColorClass(onTimeRate)
+                      }}
                     />
                   </div>
 
