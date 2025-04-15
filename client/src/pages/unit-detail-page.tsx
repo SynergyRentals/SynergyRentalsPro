@@ -317,12 +317,13 @@ export default function UnitDetailPage() {
           </div>
 
           <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+            <TabsList className="grid grid-cols-6 w-full max-w-3xl">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="guests">Guests</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
               <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
+              <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
             </TabsList>
             
             <TabsContent value="overview" className="mt-4">
@@ -787,6 +788,181 @@ export default function UnitDetailPage() {
                       </div>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="knowledge" className="mt-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Knowledge Base</CardTitle>
+                    <CardDescription>Property-specific guides and documentation</CardDescription>
+                  </div>
+                  <Button>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Add Document
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Category: Standard Operating Procedures */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Standard Operating Procedures</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-blue-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Check-In Procedure</h4>
+                                <p className="text-sm text-muted-foreground">Guide for preparing unit for guest arrival</p>
+                                <p className="text-xs text-muted-foreground mt-2">Updated 2 days ago</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-blue-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Check-Out Cleaning</h4>
+                                <p className="text-sm text-muted-foreground">Complete cleaning checklist for after guests leave</p>
+                                <p className="text-xs text-muted-foreground mt-2">Updated 1 week ago</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-blue-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Maintenance Protocol</h4>
+                                <p className="text-sm text-muted-foreground">Steps for addressing common maintenance issues</p>
+                                <p className="text-xs text-muted-foreground mt-2">Updated 3 weeks ago</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                    
+                    {/* Category: Equipment Manuals */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Equipment Manuals</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-green-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">HVAC System</h4>
+                                <p className="text-sm text-muted-foreground">Maintenance and troubleshooting for HVAC</p>
+                                <p className="text-xs text-muted-foreground mt-2">PDF • 3.2 MB</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-green-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Smart Lock</h4>
+                                <p className="text-sm text-muted-foreground">Programming guide for front door lock</p>
+                                <p className="text-xs text-muted-foreground mt-2">PDF • 1.7 MB</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-green-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Appliance Guide</h4>
+                                <p className="text-sm text-muted-foreground">Manuals for kitchen and laundry appliances</p>
+                                <p className="text-xs text-muted-foreground mt-2">PDF • 5.8 MB</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                    
+                    {/* Category: Guest Information */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Guest Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-orange-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Property Guide</h4>
+                                <p className="text-sm text-muted-foreground">Welcome document with house rules and amenities</p>
+                                <p className="text-xs text-muted-foreground mt-2">Updated 1 month ago</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-orange-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Local Attractions</h4>
+                                <p className="text-sm text-muted-foreground">Guide to nearby restaurants and activities</p>
+                                <p className="text-xs text-muted-foreground mt-2">Updated 2 months ago</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <FileText className="h-6 w-6 text-orange-500 mt-1" />
+                              <div>
+                                <h4 className="font-medium">Emergency Contacts</h4>
+                                <p className="text-sm text-muted-foreground">Important phone numbers and procedures</p>
+                                <p className="text-xs text-muted-foreground mt-2">Updated 3 weeks ago</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                    
+                    {/* Add New Document Section */}
+                    <div className="pt-4 border-t">
+                      <h3 className="text-lg font-semibold mb-3">Add New Document</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="border-dashed cursor-pointer hover:bg-muted/50 transition-colors flex flex-col items-center justify-center p-6">
+                          <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="font-medium">Upload Document</p>
+                          <p className="text-sm text-muted-foreground text-center mt-1">
+                            Upload PDF, Word, or other document files
+                          </p>
+                        </Card>
+                        <Card className="border-dashed cursor-pointer hover:bg-muted/50 transition-colors flex flex-col items-center justify-center p-6">
+                          <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="font-medium">Create SOP</p>
+                          <p className="text-sm text-muted-foreground text-center mt-1">
+                            Create a new Standard Operating Procedure
+                          </p>
+                        </Card>
+                        <Card className="border-dashed cursor-pointer hover:bg-muted/50 transition-colors flex flex-col items-center justify-center p-6">
+                          <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="font-medium">Link External Resource</p>
+                          <p className="text-sm text-muted-foreground text-center mt-1">
+                            Link to external documentation or websites
+                          </p>
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
