@@ -1211,7 +1211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Basic health check for Guesty API domain (no auth required)
   // Uses isTokenPotentiallyValid helper and caching to minimize API calls
   app.get("/api/guesty/health-check", async (req: Request, res: Response) => {
-    console.log("Health check endpoint triggered");
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] HealthCheck: Endpoint triggered`);
     
     try {
       // Strategy A: First, check if we have a token and it appears valid without API call
@@ -1240,7 +1241,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If token isn't valid, check if we have a recent cached result to avoid API call
       const now = Date.now();
       if (healthCheckCache.cachedResult && (now - healthCheckCache.lastCheckedAt) < healthCheckCache.cacheValidityMs) {
-        console.log("Health check: Using cached result from", new Date(healthCheckCache.lastCheckedAt));
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] HealthCheck: Cache HIT. Using result from ${new Date(healthCheckCache.lastCheckedAt).toISOString()}`);
         
         // Log the cached health check
         await storage.createLog({
