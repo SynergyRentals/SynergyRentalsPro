@@ -3,6 +3,7 @@
  */
 import { db } from '../db';
 import { guestyWebhookEvents } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
 import { 
   processPropertyWebhook, 
   processReservationWebhook,
@@ -31,13 +32,13 @@ export async function logWebhookEvent(
   try {
     // Insert the webhook event into the database
     const result = await db.insert(guestyWebhookEvents).values({
-      event_type: eventType,
-      entity_type: entityType,
-      entity_id: entityId,
-      event_data: eventData,
+      eventType: eventType,
+      entityType: entityType,
+      entityId: entityId,
+      eventData: eventData,
       signature: signature,
-      ip_address: ipAddress,
-      created_at: new Date(),
+      ipAddress: ipAddress,
+      createdAt: new Date(),
       processed: false
     }).returning({ id: guestyWebhookEvents.id });
 
@@ -58,7 +59,7 @@ export async function processWebhookEvent(eventId: number): Promise<{ success: b
     // Get the event from the database
     const events = await db.select()
       .from(guestyWebhookEvents)
-      .where(event => event.id.equals(eventId))
+      .where(eq(guestyWebhookEvents.id, eventId))
       .limit(1);
 
     if (events.length === 0) {
@@ -66,10 +67,10 @@ export async function processWebhookEvent(eventId: number): Promise<{ success: b
     }
 
     const event = events[0];
-    const entityType = event.entity_type;
-    const eventType = event.event_type;
-    const entityId = event.entity_id;
-    const eventData = event.event_data;
+    const entityType = event.entityType;
+    const eventType = event.eventType;
+    const entityId = event.entityId;
+    const eventData = event.eventData;
 
     let processingResult: { success: boolean; message: string };
 
@@ -99,10 +100,10 @@ export async function processWebhookEvent(eventId: number): Promise<{ success: b
     await db.update(guestyWebhookEvents)
       .set({
         processed: true,
-        processed_at: new Date(),
-        processing_errors: !processingResult.success ? processingResult.message : null
+        processedAt: new Date(),
+        processingErrors: !processingResult.success ? processingResult.message : null
       })
-      .where(event => event.id.equals(eventId));
+      .where(eq(guestyWebhookEvents.id, eventId));
 
     return processingResult;
   } catch (error) {
@@ -112,10 +113,10 @@ export async function processWebhookEvent(eventId: number): Promise<{ success: b
     await db.update(guestyWebhookEvents)
       .set({
         processed: true,
-        processed_at: new Date(),
-        processing_errors: error instanceof Error ? error.message : 'Unknown error'
+        processedAt: new Date(),
+        processingErrors: error instanceof Error ? error.message : 'Unknown error'
       })
-      .where(event => event.id.equals(eventId));
+      .where(eq(guestyWebhookEvents.id, eventId));
 
     return { 
       success: false, 
