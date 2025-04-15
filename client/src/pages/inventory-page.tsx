@@ -53,13 +53,50 @@ import { z } from "zod";
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("unit-inventory");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const { toast } = useToast();
 
+  // Enhanced form schema
+  const inventoryFormSchema = insertInventorySchema.extend({
+    unitId: z.union([z.number(), z.literal(null)]).optional(),
+    category: z.string().min(1, "Category is required"),
+    reorderThreshold: z.number().min(0),
+    parLevel: z.number().min(1, "Par level must be at least 1"),
+    currentStock: z.number().min(0, "Current stock cannot be negative"),
+  });
+
+  // Form setup
+  const form = useForm<z.infer<typeof inventoryFormSchema>>({
+    resolver: zodResolver(inventoryFormSchema),
+    defaultValues: {
+      itemName: "",
+      unitId: null,
+      category: "",
+      parLevel: 1,
+      currentStock: 0,
+      reorderThreshold: 0,
+      notes: "",
+      sku: "",
+      upc: "",
+      cost: 0,
+      supplier: "",
+      location: "",
+      minOrderQuantity: 1,
+      isConsumable: true,
+    },
+  });
+  
   // Fetch inventory items
   const {
-    data: inventory,
+    data: inventoryItems,
     isLoading,
     error,
+    refetch: refetchInventory
   } = useQuery({
     queryKey: ["/api/inventory"],
     queryFn: undefined,
@@ -70,6 +107,52 @@ export default function InventoryPage() {
     queryKey: ["/api/units"],
     queryFn: undefined,
   });
+  
+  // Create inventory mutation
+  const createInventoryMutation = useMutation({
+    mutationFn: async (data: InsertInventory) => {
+      const response = await apiRequest('POST', '/api/inventory', data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Inventory Added",
+        description: "New inventory item has been added successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+      form.reset();
+      setAddDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to add inventory",
+        description: error.message || "An error occurred while adding inventory.",
+      });
+    }
+  });
+  
+  // Update inventory mutation
+  const updateInventoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: Partial<Inventory> }) => {
+      const response = await apiRequest('PATCH', `/api/inventory/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Inventory Updated",
+        description: "Inventory item has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update inventory",
+        description: error.message || "An error occurred while updating inventory.",
+      });
+    }
+  });
 
   // Helper function to get unit name
   const getUnitName = (unitId: number | null) => {
@@ -79,18 +162,125 @@ export default function InventoryPage() {
     return unit ? unit.name : `Unit #${unitId}`;
   };
 
-  // Filter inventory based on search and active tab
-  const filteredInventory = inventory
-    ? inventory.filter(
-        (item) =>
-          item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          (activeTab === "unit-inventory"
-            ? item.unitId !== null
-            : activeTab === "garage-inventory"
-            ? item.unitId === null
-            : true)
-      )
-    : [];
+  // Mock inventory data for now (replace with real API data later)
+  const mockInventoryItems = [
+    {
+      id: 1,
+      itemName: "Towels (Bath)",
+      unitId: 1,
+      parLevel: 8,
+      currentStock: 6,
+      lastUpdated: new Date(2023, 3, 15),
+      category: "Linens",
+      reorderThreshold: 4,
+      notes: "White cotton bath towels",
+      sku: "TOW-BAT-01",
+      upc: "123456789012",
+      cost: 1500, // $15.00
+      supplier: "Synergy Linen Supply",
+      location: "Bathroom closet",
+      minOrderQuantity: 4,
+      isConsumable: false,
+      imageUrl: null
+    },
+    {
+      id: 2,
+      itemName: "Shampoo (Travel)",
+      unitId: 1,
+      parLevel: 10,
+      currentStock: 2,
+      lastUpdated: new Date(2023, 3, 20),
+      category: "Toiletries",
+      reorderThreshold: 5,
+      notes: "2oz bottles",
+      sku: "TOI-SHA-01",
+      upc: "123456789013",
+      cost: 250, // $2.50
+      supplier: "Synergy Amenities",
+      location: "Bathroom cabinet",
+      minOrderQuantity: 20,
+      isConsumable: true,
+      imageUrl: null
+    },
+    {
+      id: 3,
+      itemName: "Coffee Pods",
+      unitId: 1,
+      parLevel: 15,
+      currentStock: 0,
+      lastUpdated: new Date(2023, 3, 22),
+      category: "Kitchen",
+      reorderThreshold: 6,
+      notes: "Dark roast",
+      sku: "KIT-COF-01",
+      upc: "123456789014",
+      cost: 120, // $1.20
+      supplier: "Synergy Foods",
+      location: "Kitchen drawer",
+      minOrderQuantity: 30,
+      isConsumable: true,
+      imageUrl: null
+    },
+    {
+      id: 4,
+      itemName: "All-Purpose Cleaner",
+      unitId: null,
+      parLevel: 6,
+      currentStock: 3,
+      lastUpdated: new Date(2023, 3, 18),
+      category: "Cleaning",
+      reorderThreshold: 3,
+      notes: "Multi-surface spray",
+      sku: "CLN-APC-01",
+      upc: "123456789015",
+      cost: 550, // $5.50
+      supplier: "Synergy Cleaning",
+      location: "Garage shelf B1",
+      minOrderQuantity: 6,
+      isConsumable: true,
+      imageUrl: null
+    },
+    {
+      id: 5,
+      itemName: "Toilet Paper",
+      unitId: null,
+      parLevel: 20,
+      currentStock: 8,
+      lastUpdated: new Date(2023, 3, 21),
+      category: "Toiletries",
+      reorderThreshold: 10,
+      notes: "Double roll, 12-pack",
+      sku: "TOI-TP-01",
+      upc: "123456789016",
+      cost: 1200, // $12.00
+      supplier: "Synergy Supplies",
+      location: "Garage shelf A3",
+      minOrderQuantity: 5,
+      isConsumable: true,
+      imageUrl: null
+    }
+  ];
+
+  // Use real or mock data depending on availability
+  const inventoryData = inventoryItems || mockInventoryItems;
+
+  // Filter inventory based on search, active tab, and status
+  const filteredInventory = inventoryData.filter(
+    (item) =>
+      item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (activeTab === "unit-inventory"
+        ? item.unitId !== null
+        : activeTab === "garage-inventory"
+        ? item.unitId === null
+        : true) &&
+      (filterStatus === "all" 
+        ? true 
+        : filterStatus === "low-stock" 
+        ? (item.reorderThreshold && item.currentStock < item.reorderThreshold)
+        : filterStatus === "out-of-stock"
+        ? item.currentStock <= 0
+        : true)
+  );
 
   // Get stock status
   const getStockStatus = (item: any) => {
