@@ -58,8 +58,7 @@ import {
   SelectTrigger,
   SelectValue, 
 } from "@/components/ui/select";
-import { insertMaintenanceSchema } from "@shared/schema";
-import { Maintenance } from "@shared/schema";
+import { insertMaintenanceSchema, aiPromptSchema, Maintenance, AiPromptFormValues } from "@shared/schema";
 
 // Extended maintenance schema with validation rules for form
 const createMaintenanceSchema = insertMaintenanceSchema.extend({
@@ -77,12 +76,7 @@ const createMaintenanceSchema = insertMaintenanceSchema.extend({
 // Type for the form values
 type CreateMaintenanceFormValues = z.infer<typeof createMaintenanceSchema>;
 
-// AI prompt schema for maintenance ticket generation
-const aiPromptSchema = z.object({
-  prompt: z.string().min(10, "Prompt must be at least 10 characters")
-});
-
-type AiPromptFormValues = z.infer<typeof aiPromptSchema>;
+// Using aiPromptSchema and AiPromptFormValues imported from shared schema
 
 export default function MaintenancePage() {
   const [searchTerm, setSearchTerm] = useState("");
