@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import GuestForm from "@/components/guests/GuestForm";
 
 export default function GuestsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -144,46 +145,19 @@ export default function GuestsPage() {
                 </DialogHeader>
                 <div className="py-4">
                   <p className="text-[#9EA2B1] mb-4">Enter the guest details below</p>
-                  {/* Form fields for new guest would go here */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Name</label>
-                        <Input placeholder="Guest full name" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Email</label>
-                        <Input type="email" placeholder="Email address" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Phone</label>
-                        <Input placeholder="Phone number" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Unit</label>
-                        <select className="w-full p-2 border border-gray-300 rounded">
-                          <option value="">Select a unit</option>
-                          {units && Array.isArray(units) && units.map((unit: any) => (
-                            <option key={unit.id} value={unit.id}>{unit.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Check-in</label>
-                          <Input type="date" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Check-out</label>
-                          <Input type="date" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <Button variant="outline">Cancel</Button>
-                      <Button>Save Guest</Button>
-                    </div>
-                  </div>
+                  {/* Import and use the GuestForm component */}
+                  {units && (
+                    <GuestForm 
+                      units={units} 
+                      onSuccess={() => {
+                        // Find closest DialogClose button and click it
+                        const closeButton = document.querySelector('[data-dialog-close]');
+                        if (closeButton && closeButton instanceof HTMLElement) {
+                          closeButton.click();
+                        }
+                      }} 
+                    />
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -270,12 +244,84 @@ export default function GuestsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="icon">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-red-500">
-                            <Delete className="h-4 w-4" />
-                          </Button>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>Edit Guest</DialogTitle>
+                              </DialogHeader>
+                              <div className="py-4">
+                                <p className="text-[#9EA2B1] mb-4">Update guest information</p>
+                                {units && (
+                                  <GuestForm 
+                                    units={units} 
+                                    initialData={guest}
+                                    onSuccess={() => {
+                                      // Find closest DialogClose button and click it
+                                      const closeButton = document.querySelector('[data-dialog-close]');
+                                      if (closeButton && closeButton instanceof HTMLElement) {
+                                        closeButton.click();
+                                      }
+                                    }} 
+                                  />
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-red-500">
+                                <Delete className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Delete Guest</DialogTitle>
+                              </DialogHeader>
+                              <p>Are you sure you want to remove {guest.name} from the system? This action cannot be undone.</p>
+                              <div className="flex justify-end space-x-2 mt-4">
+                                <Button variant="outline" onClick={() => {
+                                  const closeButton = document.querySelector('[data-dialog-close]');
+                                  if (closeButton && closeButton instanceof HTMLElement) {
+                                    closeButton.click();
+                                  }
+                                }}>
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    try {
+                                      await fetch(`/api/guests/${guest.id}`, {
+                                        method: 'DELETE',
+                                      });
+                                      
+                                      // Invalidate and refetch
+                                      const queryClient = window.queryClient;
+                                      if (queryClient) {
+                                        queryClient.invalidateQueries({ queryKey: ["/api/guests"] });
+                                      }
+                                      
+                                      // Close dialog
+                                      const closeButton = document.querySelector('[data-dialog-close]');
+                                      if (closeButton && closeButton instanceof HTMLElement) {
+                                        closeButton.click();
+                                      }
+                                    } catch (error) {
+                                      console.error('Failed to delete guest:', error);
+                                    }
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </TableCell>
                     </TableRow>
