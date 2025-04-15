@@ -26,7 +26,7 @@ let tokenCache: TokenData | null = null;
  * Get a valid OAuth2 access token, retrieving a new one if necessary
  * @returns A valid access token
  */
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
     throw new Error("Guesty OAuth credentials are not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.");
   }
@@ -142,7 +142,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
  * @param data - Optional data for POST/PUT requests
  * @returns API response JSON
  */
-async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
+export async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
   // Get a valid access token
   const accessToken = await getAccessToken();
   
