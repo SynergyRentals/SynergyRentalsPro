@@ -1,0 +1,29 @@
+Our Guesty API integration is currently blocked by an extremely low daily rate limit (5 requests/day), which we are investigating with Guesty. While waiting for the limit to reset (~18 hours), we need to prevent our automated Health Check and Connection Test endpoints from immediately consuming the quota. We also need a way to manually test the core GuestyAPIClient functionality once the limit resets.
+
+Goal:
+
+Temporarily disable the Guesty API calls within the Health Check and Connection Test endpoints.
+Create a new, simple Express route that can be manually triggered to make a single test call to the Guesty API via the guestyClient.
+Instructions:
+
+Locate Check Endpoints: Find the route handlers or functions for the Health Check and Connection Test.
+
+Disable Guesty Calls in Checks: Modify the code within these handlers to prevent them from making calls to guestyClient methods for now.
+
+Suggestion: Find the line(s) making the guestyClient call and either:
+Comment them out (// await guestyClient.getListings...).
+Wrap them in a false condition (if (false) { await guestyClient.getListings... }).
+Return a default "Skipped" or "OK (Pending Rate Limit Reset)" status before the call is made.
+Add a log message like console.log('[Timestamp] HealthCheck: Guesty API call disabled due to rate limit investigation.');
+Create Manual Test Route:
+
+Add a new GET route to your Express application, for example, at /api/test-guesty-manual.
+Inside this route handler:
+Add logging: console.log('[Timestamp] Manual Guesty test route triggered.');
+Use a try/catch block.
+Inside the try, make a single call using the existing client: const data = await guestyClient.getListings({ limit: 1 });
+Log success: console.log('[Timestamp] Manual Guesty test successful:', data);
+Return a success response: res.status(200).json({ success: true, data });
+Inside the catch, log the error: console.error('[Timestamp] Manual Guesty test failed:', error);
+Return an error response: res.status(500).json({ success: false, message: 'Guesty API call failed.', error: error.message || error });
+Instructions for Agent: "Please modify the Health Check and Connection Test handlers to temporarily disable their Guesty API calls, adding a log message indicating they are skipped. Then, create a new GET route at /api/test-guesty-manual that uses the existing guestyClient to call getListings({ limit: 1 }), includes logging, and returns the result or error in the HTTP response."

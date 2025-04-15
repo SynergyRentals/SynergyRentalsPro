@@ -1261,9 +1261,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // No valid token and no recent cache: we need to make an actual API call
-      console.log("Health check: No valid token or cache, making API call");
-      const result = await guestyClient.healthCheck();
+      // TEMPORARILY DISABLED: No valid token and no recent cache: we would normally make an actual API call
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] HealthCheck: Guesty API call disabled due to rate limit investigation`);
+      
+      // Create a simulated result instead of making a real API call
+      const result = { 
+        success: true, 
+        message: 'Guesty API health check temporarily disabled due to rate limit investigation' 
+      };
       
       // Update the cache
       healthCheckCache.lastCheckedAt = now;
