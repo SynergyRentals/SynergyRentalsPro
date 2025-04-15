@@ -238,6 +238,90 @@ export const insertLogSchema = createInsertSchema(logs).omit({
   timestamp: true,
 });
 
+// Cleaning
+export const cleaningTasks = pgTable("cleaning_tasks", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").notNull(),
+  status: text("status").notNull().default("scheduled"), // scheduled, in-progress, completed, verified
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  assignedTo: integer("assigned_to"), // user_id of cleaner
+  assignedBy: integer("assigned_by"), // user_id of manager
+  completedAt: timestamp("completed_at"),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: integer("verified_by"), // user_id of verifier
+  cleaningType: text("cleaning_type").notNull().default("turnover"), // turnover, deep-clean, maintenance
+  estimatedDuration: integer("estimated_duration"), // in minutes
+  actualDuration: integer("actual_duration"), // in minutes
+  notes: text("notes"),
+  photos: text("photos").array(),
+  checklistTemplateId: integer("checklist_template_id"), // reference to the template if used
+  score: integer("score"), // cleanliness score (1-100)
+  isInspection: boolean("is_inspection").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCleaningTaskSchema = createInsertSchema(cleaningTasks).omit({
+  id: true,
+  status: true,
+  completedAt: true,
+  verifiedAt: true,
+  actualDuration: true,
+  createdAt: true,
+});
+
+// Cleaning Checklists (templates)
+export const cleaningChecklists = pgTable("cleaning_checklists", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  propertyType: text("property_type"), // apartment, house, condo etc., or null for all
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: integer("created_by").notNull(), // user_id
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCleaningChecklistSchema = createInsertSchema(cleaningChecklists).omit({
+  id: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Cleaning Checklist Items
+export const cleaningChecklistItems = pgTable("cleaning_checklist_items", {
+  id: serial("id").primaryKey(),
+  checklistId: integer("checklist_id").notNull(), // reference to checklist template
+  description: text("description").notNull(),
+  room: text("room").notNull(), // bathroom, kitchen, bedroom, etc.
+  order: integer("order").notNull(),
+  requiresPhoto: boolean("requires_photo").default(false),
+  isRequired: boolean("is_required").default(true),
+  notes: text("notes"),
+});
+
+export const insertCleaningChecklistItemSchema = createInsertSchema(cleaningChecklistItems).omit({
+  id: true,
+});
+
+// Cleaning Checklist Completion (instances of checklist items for specific cleaning tasks)
+export const cleaningChecklistCompletions = pgTable("cleaning_checklist_completions", {
+  id: serial("id").primaryKey(),
+  cleaningTaskId: integer("cleaning_task_id").notNull(),
+  checklistItemId: integer("checklist_item_id").notNull(),
+  completed: boolean("completed").default(false),
+  completedAt: timestamp("completed_at"),
+  completedBy: integer("completed_by"), // user_id
+  photoUrl: text("photo_url"),
+  notes: text("notes"),
+});
+
+export const insertCleaningChecklistCompletionSchema = createInsertSchema(cleaningChecklistCompletions).omit({
+  id: true,
+  completed: true,
+  completedAt: true,
+});
+
 // AI Prompt Schema
 export const aiPromptSchema = z.object({
   prompt: z.string().min(10, "Please provide a detailed description of at least 10 characters"),
@@ -281,3 +365,15 @@ export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 
 export type Log = typeof logs.$inferSelect;
 export type InsertLog = z.infer<typeof insertLogSchema>;
+
+export type CleaningTask = typeof cleaningTasks.$inferSelect;
+export type InsertCleaningTask = z.infer<typeof insertCleaningTaskSchema>;
+
+export type CleaningChecklist = typeof cleaningChecklists.$inferSelect;
+export type InsertCleaningChecklist = z.infer<typeof insertCleaningChecklistSchema>;
+
+export type CleaningChecklistItem = typeof cleaningChecklistItems.$inferSelect;
+export type InsertCleaningChecklistItem = z.infer<typeof insertCleaningChecklistItemSchema>;
+
+export type CleaningChecklistCompletion = typeof cleaningChecklistCompletions.$inferSelect;
+export type InsertCleaningChecklistCompletion = z.infer<typeof insertCleaningChecklistCompletionSchema>;

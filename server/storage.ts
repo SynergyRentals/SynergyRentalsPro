@@ -3,7 +3,11 @@ import {
   Task, InsertTask, Maintenance, InsertMaintenance, 
   Inventory, InsertInventory, Vendor, InsertVendor, 
   Project, InsertProject, Document, InsertDocument, 
-  Log, InsertLog 
+  Log, InsertLog,
+  CleaningTask, InsertCleaningTask,
+  CleaningChecklist, InsertCleaningChecklist,
+  CleaningChecklistItem, InsertCleaningChecklistItem,
+  CleaningChecklistCompletion, InsertCleaningChecklistCompletion
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -84,6 +88,33 @@ export interface IStorage {
   createLog(log: InsertLog): Promise<Log>;
   getAllLogs(): Promise<Log[]>;
   
+  // Cleaning Tasks
+  getCleaningTask(id: number): Promise<CleaningTask | undefined>;
+  createCleaningTask(task: InsertCleaningTask): Promise<CleaningTask>;
+  updateCleaningTask(id: number, task: Partial<CleaningTask>): Promise<CleaningTask | undefined>;
+  getAllCleaningTasks(): Promise<CleaningTask[]>;
+  getCleaningTasksByUnit(unitId: number): Promise<CleaningTask[]>;
+  getCleaningTasksByAssignee(userId: number): Promise<CleaningTask[]>;
+  getCleaningTasksByStatus(status: string): Promise<CleaningTask[]>;
+  
+  // Cleaning Checklists
+  getCleaningChecklist(id: number): Promise<CleaningChecklist | undefined>;
+  createCleaningChecklist(checklist: InsertCleaningChecklist): Promise<CleaningChecklist>;
+  updateCleaningChecklist(id: number, checklist: Partial<CleaningChecklist>): Promise<CleaningChecklist | undefined>;
+  getAllCleaningChecklists(): Promise<CleaningChecklist[]>;
+  
+  // Cleaning Checklist Items
+  getCleaningChecklistItem(id: number): Promise<CleaningChecklistItem | undefined>;
+  createCleaningChecklistItem(item: InsertCleaningChecklistItem): Promise<CleaningChecklistItem>;
+  updateCleaningChecklistItem(id: number, item: Partial<CleaningChecklistItem>): Promise<CleaningChecklistItem | undefined>;
+  getCleaningChecklistItemsByChecklist(checklistId: number): Promise<CleaningChecklistItem[]>;
+  
+  // Cleaning Checklist Completions
+  getCleaningChecklistCompletion(id: number): Promise<CleaningChecklistCompletion | undefined>;
+  createCleaningChecklistCompletion(completion: InsertCleaningChecklistCompletion): Promise<CleaningChecklistCompletion>;
+  updateCleaningChecklistCompletion(id: number, completion: Partial<CleaningChecklistCompletion>): Promise<CleaningChecklistCompletion | undefined>;
+  getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]>;
+  
   // Session store
   sessionStore: session.Store;
 }
@@ -99,6 +130,10 @@ export class MemStorage implements IStorage {
   private projects: Map<number, Project>;
   private documents: Map<number, Document>;
   private logs: Map<number, Log>;
+  private cleaningTasks: Map<number, CleaningTask>;
+  private cleaningChecklists: Map<number, CleaningChecklist>;
+  private cleaningChecklistItems: Map<number, CleaningChecklistItem>;
+  private cleaningChecklistCompletions: Map<number, CleaningChecklistCompletion>;
   
   sessionStore: session.Store;
   
