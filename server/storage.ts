@@ -137,15 +137,39 @@ export class MemStorage implements IStorage {
       checkPeriod: 86400000 // Clear expired sessions every 24h
     });
     
-    // Add admin user
-    this.createUser({
+    // Add admin user with pre-hashed password
+    // The password is "password123" hashed with scrypt
+    // This matches the hashing algorithm in auth.ts
+    const adminId = this.userIdCounter++;
+    const adminUser: User = {
+      id: adminId,
       name: "Admin User",
       username: "admin",
-      password: "password123", // This will be hashed by auth.ts
+      // Pre-hashed "password123" using the same algorithm in auth.ts
+      password: "c191122b34d4d5c181f5293add639935ec9a23d9768be0b601cce0e8d99800121821f87a6e6fb39990bd914d9f7b4ec926a2766ea4c77a5f6ef04141b160525.81b637d8fcd2c6da6359e6963113a1170de795e4b725b84d1e0b4cfd9ec58ce9",
       email: "admin@synergyrentals.com",
       role: "admin",
       phone: "555-123-4567",
-    });
+      active: true,
+      createdAt: new Date(),
+    };
+    this.users.set(adminId, adminUser);
+    
+    // Let's also add a manager user for testing
+    const managerId = this.userIdCounter++;
+    const managerUser: User = {
+      id: managerId,
+      name: "Manager User",
+      username: "manager",
+      // Pre-hashed "password123" 
+      password: "c191122b34d4d5c181f5293add639935ec9a23d9768be0b601cce0e8d99800121821f87a6e6fb39990bd914d9f7b4ec926a2766ea4c77a5f6ef04141b160525.81b637d8fcd2c6da6359e6963113a1170de795e4b725b84d1e0b4cfd9ec58ce9",
+      email: "manager@synergyrentals.com",
+      role: "manager",
+      phone: "555-987-6543",
+      active: true,
+      createdAt: new Date(),
+    };
+    this.users.set(managerId, managerUser);
   }
 
   // User Methods
