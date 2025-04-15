@@ -49,7 +49,7 @@ export default function CleaningPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["/api/tasks"],
+    queryKey: ["/api/cleaning-tasks"],
     queryFn: undefined,
   });
 
@@ -63,8 +63,8 @@ export default function CleaningPage() {
     : [];
 
   // Group by status
-  const scheduledTasks = cleaningTasks.filter((task) => !task.completed);
-  const completedTasks = cleaningTasks.filter((task) => task.completed);
+  const scheduledTasks = cleaningTasks.filter((task) => task.status !== "completed");
+  const completedTasks = cleaningTasks.filter((task) => task.status === "completed");
 
   // Fetch units for reference
   const { data: units } = useQuery({
@@ -100,7 +100,7 @@ export default function CleaningPage() {
 
   // Get status badge
   const getStatusBadge = (task: any) => {
-    if (task.completed) {
+    if (task.status === "completed") {
       return (
         <Badge className="bg-green-100 text-green-800 border-0">
           <CheckCircle className="h-3 w-3 mr-1" />
@@ -109,7 +109,16 @@ export default function CleaningPage() {
       );
     }
     
-    if (!task.dueDate || new Date(task.dueDate) > new Date()) {
+    if (task.status === "in-progress") {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-0">
+          <Schedule className="h-3 w-3 mr-1" />
+          In Progress
+        </Badge>
+      );
+    }
+    
+    if (!task.scheduledFor || new Date(task.scheduledFor) > new Date()) {
       return (
         <Badge className="bg-blue-100 text-blue-800 border-0">
           <Schedule className="h-3 w-3 mr-1" />
@@ -324,7 +333,7 @@ export default function CleaningPage() {
                           <TableCell>
                             <div className="flex items-center">
                               <CalendarMonth className="h-4 w-4 mr-2 text-[#9EA2B1]" />
-                              <span>{formatDate(task.dueDate)}</span>
+                              <span>{formatDate(task.scheduledFor)}</span>
                             </div>
                           </TableCell>
                           <TableCell>{getStatusBadge(task)}</TableCell>
