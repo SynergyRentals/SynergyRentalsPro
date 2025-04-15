@@ -38,21 +38,17 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
       .on('data', (row) => {
         try {
           // Map CSV columns to property fields
+          // Generate a consistent property ID from the nickname
+          const propertyId = `csv-${row.NICKNAME.replace(/\s+/g, '-').toLowerCase()}`;
+          
           const property: InsertGuestyProperty = {
-            guestyId: `csv-${Date.now()}-${Math.floor(Math.random() * 10000)}`, // Generate a unique ID
-            nickname: row.NICKNAME || '',
-            title: row.TITLE || '',
-            propertyType: row.TYPE_OF_UNIT || row['TYPE OF UNIT'] || 'SINGLE',
+            propertyId: propertyId,
+            name: row.TITLE || row.NICKNAME || '',
             address: row.ADDRESS || '',
-            bedrooms: 1, // Default values
-            bathrooms: 1,
-            status: 'active',
-            lastSynced: new Date(),
-            tags: row.TAGS ? [row.TAGS] : [],
-            amenities: [],
-            pictures: [],
-            externalUrls: [],
-            rawData: JSON.stringify(row),
+            bedrooms: parseInt(row.BEDROOMS || '1', 10), 
+            bathrooms: parseFloat(row.BATHROOMS || '1.0'),
+            amenities: row.AMENITIES ? row.AMENITIES.split(',') : [],
+            listingUrl: row.LISTING_URL || '',
           };
 
           properties.push(property);
@@ -83,21 +79,18 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
           let insertedCount = 0;
           for (const property of properties) {
             try {
-              // Check if the property already exists by nickname
+              // Check if the property already exists by propertyId
               const existingProperties = await db
                 .select()
                 .from(guestyProperties)
-                .where(eq(guestyProperties.nickname, property.nickname));
+                .where(eq(guestyProperties.propertyId, property.propertyId));
 
               if (existingProperties.length > 0) {
                 // Update existing property
                 await db
                   .update(guestyProperties)
-                  .set({
-                    ...property,
-                    lastSynced: new Date(),
-                  })
-                  .where(eq(guestyProperties.nickname, property.nickname));
+                  .set(property)
+                  .where(eq(guestyProperties.propertyId, property.propertyId));
               } else {
                 // Insert new property
                 await db.insert(guestyProperties).values(property);
@@ -106,7 +99,7 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
               insertedCount++;
             } catch (dbError) {
               console.error('Error storing property in database:', dbError);
-              errors.push(`Error storing property ${property.nickname}: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+              errors.push(`Error storing property ${property.name}: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
             }
           }
 
