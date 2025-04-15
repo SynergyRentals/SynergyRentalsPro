@@ -12,7 +12,8 @@ import {
   insertProjectSchema, insertDocumentSchema, insertLogSchema,
   insertCleaningTaskSchema, insertCleaningChecklistSchema, 
   insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema,
-  guestyProperties, guestyReservations, guestySyncLogs,
+  guestyProperties, guestyReservations, guestySyncLogs, guestyWebhookEvents,
+  InsertGuestyWebhookEvent,
   insights as insightsTable, unitHealthScores, insightLogs
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
@@ -27,6 +28,13 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
+import {
+  verifyGuestySignature,
+  processPropertyWebhook,
+  processReservationWebhook,
+  processPropertyDeletionWebhook,
+  processReservationDeletionWebhook
+} from "./lib/guestyWebhookHandler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
