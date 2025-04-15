@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Calendar, 
   Clock,
+  ExternalLink,
   Home, 
   Users, 
   ClipboardList, 
