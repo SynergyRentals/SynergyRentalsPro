@@ -142,9 +142,15 @@ export default function MaintenancePage() {
   });
   
   // AI generated maintenance ticket mutation
-  const generateTicketMutation = useMutation({
+  const generateTicketMutation = useMutation<
+    { description: string; priority: string; notes?: string; cost?: number },
+    Error,
+    AiPromptFormValues
+  >({
     mutationFn: async (data: AiPromptFormValues) => {
-      return apiRequest("POST", "/api/maintenance/generate", data);
+      const response = await apiRequest("POST", "/api/maintenance/generate", data);
+      const responseData = await response.json();
+      return responseData;
     },
     onSuccess: (data) => {
       toast({
@@ -154,6 +160,7 @@ export default function MaintenancePage() {
       });
       setIsAiPromptOpen(false);
       promptForm.reset();
+      setIsGeneratingTicket(false);
       
       // Fill the create form with the generated data
       createForm.setValue("description", data.description);
@@ -248,6 +255,20 @@ export default function MaintenancePage() {
     },
   });
 
+  // AI prompt form
+  const promptForm = useForm<AiPromptFormValues>({
+    resolver: zodResolver(aiPromptSchema),
+    defaultValues: {
+      prompt: "",
+    },
+  });
+  
+  // Handle submitting the AI prompt form
+  const onSubmitPrompt = (data: AiPromptFormValues) => {
+    setIsGeneratingTicket(true);
+    generateTicketMutation.mutate(data);
+  };
+  
   // Create form
   const createForm = useForm<CreateMaintenanceFormValues>({
     resolver: zodResolver(createMaintenanceSchema),
@@ -473,6 +494,55 @@ export default function MaintenancePage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Dialog open={isAiPromptOpen} onOpenChange={setIsAiPromptOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="mr-2">
+                  <Engineering className="h-4 w-4 mr-2" />
+                  <span>AI Generate</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Generate Maintenance Ticket with AI</DialogTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Describe the maintenance issue in plain language and let AI create a ticket for you.
+                  </p>
+                </DialogHeader>
+                
+                <Form {...promptForm}>
+                  <form onSubmit={promptForm.handleSubmit(onSubmitPrompt)} className="space-y-6">
+                    <FormField
+                      control={promptForm.control}
+                      name="prompt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Describe the issue</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="E.g. The kitchen faucet in unit 203 is leaking water at the base when turned on. It started yesterday and is getting worse."
+                              rows={5}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="flex justify-end space-x-2">
+                      <Button 
+                        type="submit" 
+                        disabled={isGeneratingTicket || !promptForm.formState.isValid}
+                      >
+                        {isGeneratingTicket && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Generate Ticket
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+            
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button>

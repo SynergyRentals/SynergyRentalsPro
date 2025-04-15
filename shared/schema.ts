@@ -190,10 +190,16 @@ export const insertLogSchema = createInsertSchema(logs).omit({
   timestamp: true,
 });
 
+// AI Prompt Schema
+export const aiPromptSchema = z.object({
+  prompt: z.string().min(10, "Please provide a detailed description of at least 10 characters"),
+});
+
 // Type Exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginUserSchema>;
+export type AiPromptFormValues = z.infer<typeof aiPromptSchema>;
 
 export type Unit = typeof units.$inferSelect;
 export type InsertUnit = z.infer<typeof insertUnitSchema>;
