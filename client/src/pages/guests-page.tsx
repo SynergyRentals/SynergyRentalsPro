@@ -38,6 +38,7 @@ import GuestForm from "@/components/guests/GuestForm";
 
 export default function GuestsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const queryClient = useQueryClient();
 
   // Fetch guests
   const {
@@ -302,10 +303,7 @@ export default function GuestsPage() {
                                       });
                                       
                                       // Invalidate and refetch
-                                      const queryClient = window.queryClient;
-                                      if (queryClient) {
-                                        queryClient.invalidateQueries({ queryKey: ["/api/guests"] });
-                                      }
+                                      queryClient.invalidateQueries({ queryKey: ["/api/guests"] });
                                       
                                       // Close dialog
                                       const closeButton = document.querySelector('[data-dialog-close]');
