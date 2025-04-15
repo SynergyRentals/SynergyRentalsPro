@@ -313,13 +313,11 @@ export async function syncReservations(): Promise<{
     console.error("Error syncing reservations:", error);
     
     const syncResult: InsertGuestySyncLog = {
-      type: "reservations",
-      startTime: new Date(),
-      endTime: new Date(),
-      recordsSynced: 0,
+      syncType: "reservations",
       status: "failed",
-      errors: [error instanceof Error ? error.message : "Unknown error"],
-      details: null
+      propertiesCount: null,
+      reservationsCount: 0,
+      errorMessage: error instanceof Error ? error.message : "Unknown error"
     };
     
     await db.insert(guestySyncLogs).values(syncResult);
@@ -392,16 +390,18 @@ export async function getLatestSyncLog(): Promise<any> {
     }
     
     // Calculate overall status
-    const latestPropertiesSync = logs.find(log => log.type === "properties");
-    const latestReservationsSync = logs.find(log => log.type === "reservations");
+    const latestPropertiesSync = logs.find(log => log.syncType === "properties");
+    const latestReservationsSync = logs.find(log => log.syncType === "reservations");
     
     const now = new Date();
     const oneDayAgo = new Date(now);
     oneDayAgo.setDate(now.getDate() - 1);
     
     // Check if syncs are recent (within last 24 hours)
-    const propertiesRecent = latestPropertiesSync && new Date(latestPropertiesSync.endTime) > oneDayAgo;
-    const reservationsRecent = latestReservationsSync && new Date(latestReservationsSync.endTime) > oneDayAgo;
+    const propertiesRecent = latestPropertiesSync && latestPropertiesSync.syncDate 
+      && new Date(latestPropertiesSync.syncDate) > oneDayAgo;
+    const reservationsRecent = latestReservationsSync && latestReservationsSync.syncDate 
+      && new Date(latestReservationsSync.syncDate) > oneDayAgo;
     
     // Check if syncs were successful
     const propertiesSuccess = latestPropertiesSync && latestPropertiesSync.status !== "failed";
@@ -428,7 +428,7 @@ export async function getLatestSyncLog(): Promise<any> {
       properties_sync: latestPropertiesSync,
       reservations_sync: latestReservationsSync,
       status: overallStatus,
-      last_sync: logs[0].endTime
+      last_sync: logs[0].syncDate
     };
   } catch (error) {
     console.error("Error fetching sync logs:", error);
