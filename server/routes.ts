@@ -28,13 +28,8 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
-import {
-  verifyGuestySignature,
-  processPropertyWebhook,
-  processReservationWebhook,
-  processPropertyDeletionWebhook,
-  processReservationDeletionWebhook
-} from "./lib/guestyWebhookHandler";
+import { verifyGuestySignature } from "./lib/guestyWebhookHandler";
+import { processWebhook, processWebhookAsync } from "./lib/webhookProcessor";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
@@ -2419,6 +2414,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         message: "Error generating forecast", 
         error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Guesty Webhooks - these receive real-time updates from Guesty
+  // No authentication required as they're called by Guesty's servers
+  
+  // Main webhook endpoint for Guesty events
+  app.post("/api/webhooks/guesty", async (req: Request, res: Response) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Guesty webhook received`);
+    
+    try {
+      // Verify the Guesty signature
+      if (!verifyGuestySignature(req)) {
+        console.error('Invalid webhook signature');
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid signature'
+        });
+      }
+      
+      // Get the event type from the payload
+      const webhook = req.body;
+      if (!webhook || !webhook.event || !webhook.data || !webhook.id) {
+        console.error('Invalid webhook payload structure');
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid webhook payload structure'
+        });
+      }
+      
+      // Extract important fields
+      const eventType = webhook.event;      // e.g., 'property.created', 'reservation.updated'
+      const entityType = eventType.split('.')[0]; // e.g., 'property', 'reservation'
+      const action = eventType.split('.')[1];     // e.g., 'created', 'updated', 'deleted'
+      const entityId = webhook.data.id || webhook.id;
+      
+      // Log the webhook event in the database
+      const webhookEvent: InsertGuestyWebhookEvent = {
+        eventType: eventType,
+        entityType: entityType,
+        entityId: entityId,
+        eventData: webhook,
+        signature: req.header('X-Guesty-Signature-V2') || '',
+        ipAddress: req.ip
+      };
+      
+      // Insert the webhook event
+      const [insertedEvent] = await db.insert(guestyWebhookEvents)
+        .values(webhookEvent)
+        .returning();
+      
+      // Log the webhook receipt
+      await storage.createLog({
+        action: "GUESTY_WEBHOOK_RECEIVED",
+        targetTable: entityType,
+        notes: `Event type: ${eventType}, Entity ID: ${entityId}`,
+        ipAddress: req.ip
+      });
+      
+      // Process the webhook asynchronously (don't wait for completion)
+      processWebhookAsync(insertedEvent.id, entityType, action, webhook.data);
+      
+      // Respond to Guesty immediately to acknowledge receipt
+      res.status(202).json({
+        success: true,
+        message: 'Webhook received and queued for processing',
+        webhookId: insertedEvent.id
+      });
+      
+    } catch (error) {
+      console.error('Error processing Guesty webhook:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Webhook test endpoint - for manually testing webhook processing
+  app.post("/api/webhooks/guesty/test", checkRole(["admin"]), async (req: Request, res: Response) => {
+    try {
+      const { eventType, entityType, entityId, eventData } = req.body;
+      
+      if (!eventType || !entityType || !entityId || !eventData) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required fields (eventType, entityType, entityId, eventData)'
+        });
+      }
+      
+      // Create a test webhook event
+      const webhookEvent: InsertGuestyWebhookEvent = {
+        eventType: eventType,
+        entityType: entityType,
+        entityId: entityId,
+        eventData: eventData,
+        signature: 'test-signature',
+        ipAddress: req.ip
+      };
+      
+      // Insert the webhook event
+      const [insertedEvent] = await db.insert(guestyWebhookEvents)
+        .values(webhookEvent)
+        .returning();
+      
+      // Process the webhook synchronously for testing
+      const action = eventType.split('.')[1] || 'unknown';
+      const result = await processWebhook(insertedEvent.id, entityType, action, eventData);
+      
+      res.json({
+        success: true,
+        message: 'Test webhook processed',
+        webhookId: insertedEvent.id,
+        result
+      });
+      
+    } catch (error) {
+      console.error('Error processing test webhook:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Get webhook events endpoint
+  app.get("/api/webhooks/guesty/events", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      // Get limit and offset from query params
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      // Get webhook events, ordered by most recent first
+      const events = await db.select()
+        .from(guestyWebhookEvents)
+        .orderBy(guestyWebhookEvents.createdAt)
+        .limit(limit)
+        .offset(offset);
+      
+      res.json(events);
+    } catch (error) {
+      console.error('Error retrieving webhook events:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Reprocess webhook event endpoint
+  app.post("/api/webhooks/guesty/reprocess/:id", checkRole(["admin"]), async (req: Request, res: Response) => {
+    try {
+      const webhookId = parseInt(req.params.id);
+      
+      // Get the webhook event
+      const [event] = await db.select()
+        .from(guestyWebhookEvents)
+        .where(eq(guestyWebhookEvents.id, webhookId));
+      
+      if (!event) {
+        return res.status(404).json({
+          success: false,
+          message: 'Webhook event not found'
+        });
+      }
+      
+      // Process the webhook
+      const action = event.eventType.split('.')[1] || 'unknown';
+      const result = await processWebhook(event.id, event.entityType, action, event.eventData);
+      
+      res.json({
+        success: true,
+        message: 'Webhook event reprocessed',
+        result
+      });
+      
+    } catch (error) {
+      console.error('Error reprocessing webhook event:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     }
   });

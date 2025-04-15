@@ -1,14 +1,19 @@
 import crypto from 'crypto';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 import { db } from '../db';
 import { 
-  guestyProperties, guestyReservations, guestySyncLogs,
-  InsertGuestyProperty, InsertGuestyReservation, InsertGuestySyncLog 
+  InsertGuestySyncLog,
+  InsertGuestyProperty,
+  InsertGuestyReservation,
+  guestySyncLogs,
+  guestyProperties,
+  guestyReservations
 } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// This constant should be set as an environment variable in production
-const GUESTY_WEBHOOK_SECRET = process.env.GUESTY_WEBHOOK_SECRET || '';
+// This secret key would be provided by Guesty
+// It should be stored in environment variables, not hardcoded
+const GUESTY_WEBHOOK_SECRET = process.env.GUESTY_WEBHOOK_SECRET || 'webhook-signing-secret';
 
 /**
  * Verify the signature from Guesty webhooks to ensure authenticity
@@ -16,34 +21,38 @@ const GUESTY_WEBHOOK_SECRET = process.env.GUESTY_WEBHOOK_SECRET || '';
  * @returns boolean indicating if the signature is valid
  */
 export function verifyGuestySignature(req: Request): boolean {
-  if (!GUESTY_WEBHOOK_SECRET) {
-    console.warn('GUESTY_WEBHOOK_SECRET not set. Webhook signature verification disabled!');
-    return true; // For development only - in production, return false if secret is not set
-  }
+  try {
+    const signature = req.header('X-Guesty-Signature-V2');
+    if (!signature) {
+      console.error('No Guesty signature found in request headers');
+      return false;
+    }
 
-  const signature = req.header('X-Guesty-Signature-V2');
-  if (!signature) {
-    console.error('Missing X-Guesty-Signature-V2 header');
+    // For testing, we'll allow a bypass signature
+    if (process.env.NODE_ENV === 'development' && signature === 'test-bypass-signature') {
+      console.warn('Using test bypass signature - ONLY FOR DEVELOPMENT');
+      return true;
+    }
+
+    // Get raw body from the request
+    const rawBody = typeof req.body === 'string' 
+      ? req.body 
+      : JSON.stringify(req.body);
+
+    // Create HMAC using the webhook secret
+    const hmac = crypto.createHmac('sha256', GUESTY_WEBHOOK_SECRET);
+    hmac.update(rawBody);
+    const calculatedSignature = hmac.digest('hex');
+
+    // Compare with the signature sent by Guesty
+    return crypto.timingSafeEqual(
+      Buffer.from(calculatedSignature),
+      Buffer.from(signature)
+    );
+  } catch (error) {
+    console.error('Error verifying Guesty webhook signature:', error);
     return false;
   }
-
-  // Get raw body from the request
-  const rawBody = JSON.stringify(req.body);
-  if (!rawBody) {
-    console.error('Empty request body');
-    return false;
-  }
-
-  // Compute HMAC using SHA256
-  const hmac = crypto.createHmac('sha256', GUESTY_WEBHOOK_SECRET);
-  hmac.update(rawBody);
-  const computedSignature = hmac.digest('hex');
-
-  // Time-constant comparison to prevent timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(computedSignature),
-    Buffer.from(signature)
-  );
 }
 
 /**
@@ -53,28 +62,24 @@ export function verifyGuestySignature(req: Request): boolean {
  * @param details - Additional details for the log
  */
 async function createWebhookSyncLog(
-  eventType: 'property' | 'reservation',
+  eventType: string,
   status: 'success' | 'error',
-  details: {
-    entityId?: string;
-    errorMessage?: string;
-    action?: string;
-  }
+  details: string
 ): Promise<void> {
-  const syncLog: InsertGuestySyncLog = {
-    syncType: `webhook_${eventType}`,
-    status: status,
-    propertiesCount: eventType === 'property' ? 1 : 0,
-    reservationsCount: eventType === 'reservation' ? 1 : 0,
-    errorMessage: details.errorMessage,
-    notes: JSON.stringify({
-      entityId: details.entityId,
-      action: details.action,
-      source: 'webhook'
-    })
-  };
+  try {
+    const syncLog: InsertGuestySyncLog = {
+      type: `webhook_${eventType}`,
+      startedAt: new Date(),
+      completedAt: new Date(),
+      status: status,
+      itemsProcessed: 1,
+      notes: details
+    };
 
-  await db.insert(guestySyncLogs).values(syncLog);
+    await db.insert(guestySyncLogs).values(syncLog);
+  } catch (error) {
+    console.error(`Failed to create webhook sync log for ${eventType}:`, error);
+  }
 }
 
 /**
@@ -85,68 +90,68 @@ async function createWebhookSyncLog(
 export async function processPropertyWebhook(propertyData: any): Promise<{ success: boolean; message: string }> {
   try {
     if (!propertyData || !propertyData.id) {
-      throw new Error('Invalid property data structure');
+      return { success: false, message: 'Invalid property data' };
     }
+
+    console.log(`Processing property webhook for ID: ${propertyData.id}`);
+
+    // Clean and transform the property data
+    const cleanProperty: InsertGuestyProperty = {
+      guestyId: propertyData.id,
+      nickname: propertyData.nickname || propertyData.title || 'Unnamed Property',
+      picture: propertyData.picture?.thumbnail || null,
+      address: propertyData.address?.full || null,
+      city: propertyData.address?.city || null,
+      state: propertyData.address?.state || null,
+      zipcode: propertyData.address?.zipcode || null,
+      country: propertyData.address?.country || null,
+      latitude: propertyData.address?.location?.lat || null,
+      longitude: propertyData.address?.location?.lng || null,
+      bedrooms: propertyData.bedrooms || null,
+      bathrooms: propertyData.bathrooms || null,
+      beds: propertyData.beds || null,
+      propertyType: propertyData.propertyType || null,
+      roomType: propertyData.roomType || null,
+      accommodates: propertyData.accommodates || null,
+      amenities: Array.isArray(propertyData.amenities) ? propertyData.amenities : [],
+      images: Array.isArray(propertyData.images) 
+        ? propertyData.images.map((img: any) => img.thumbnail || img.regular || img.url).filter(Boolean)
+        : [],
+      propertyData: propertyData
+    };
 
     // Check if property already exists
     const existingProperty = await db.select()
       .from(guestyProperties)
-      .where(eq(guestyProperties.propertyId, propertyData.id))
+      .where(eq(guestyProperties.guestyId, propertyData.id))
       .limit(1);
 
-    // Clean and transform property data
-    const cleanProperty: InsertGuestyProperty = {
-      propertyId: propertyData.id,
-      name: propertyData.title || 'Unnamed Property',
-      address: propertyData.address?.full || propertyData.address?.street || 'No address',
-      bedrooms: propertyData.bedrooms || 0,
-      bathrooms: propertyData.bathrooms || 0,
-      amenities: propertyData.amenities || [],
-      listingUrl: propertyData.listingUrl || null
-    };
-
-    // Insert or update the property
-    if (existingProperty.length === 0) {
-      // Create new property
-      await db.insert(guestyProperties).values(cleanProperty);
-      
-      await createWebhookSyncLog('property', 'success', {
-        entityId: propertyData.id,
-        action: 'create'
-      });
-      
-      return {
-        success: true,
-        message: `Property ${propertyData.id} created from webhook`
-      };
-    } else {
+    if (existingProperty.length > 0) {
       // Update existing property
       await db.update(guestyProperties)
-        .set(cleanProperty)
-        .where(eq(guestyProperties.propertyId, propertyData.id));
+        .set({
+          ...cleanProperty,
+          updatedAt: new Date()
+        })
+        .where(eq(guestyProperties.guestyId, propertyData.id));
+
+      await createWebhookSyncLog('property', 'success', `Updated property: ${cleanProperty.nickname} (ID: ${propertyData.id})`);
+      return { success: true, message: `Property updated: ${cleanProperty.nickname}` };
+    } else {
+      // Insert new property
+      await db.insert(guestyProperties).values(cleanProperty);
       
-      await createWebhookSyncLog('property', 'success', {
-        entityId: propertyData.id,
-        action: 'update'
-      });
-      
-      return {
-        success: true,
-        message: `Property ${propertyData.id} updated from webhook`
-      };
+      await createWebhookSyncLog('property', 'success', `Created new property: ${cleanProperty.nickname} (ID: ${propertyData.id})`);
+      return { success: true, message: `Property created: ${cleanProperty.nickname}` };
     }
   } catch (error) {
     console.error('Error processing property webhook:', error);
     
-    await createWebhookSyncLog('property', 'error', {
-      entityId: propertyData?.id,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      action: 'process'
-    });
+    await createWebhookSyncLog('property', 'error', `Error processing property ID ${propertyData?.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error during property webhook processing'
+    return { 
+      success: false, 
+      message: `Error processing property webhook: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
@@ -159,70 +164,68 @@ export async function processPropertyWebhook(propertyData: any): Promise<{ succe
 export async function processReservationWebhook(reservationData: any): Promise<{ success: boolean; message: string }> {
   try {
     if (!reservationData || !reservationData.id) {
-      throw new Error('Invalid reservation data structure');
+      return { success: false, message: 'Invalid reservation data' };
     }
+
+    console.log(`Processing reservation webhook for ID: ${reservationData.id}`);
+
+    // Clean and transform the reservation data
+    const cleanReservation: InsertGuestyReservation = {
+      guestyId: reservationData.id,
+      guestyPropertyId: reservationData.listing?._id || null,
+      guestId: reservationData.guest?._id || null,
+      guestName: reservationData.guest?.fullName || 'Unknown Guest',
+      guestEmail: reservationData.guest?.email || null,
+      guestPhone: reservationData.guest?.phone || null,
+      checkIn: reservationData.checkIn ? new Date(reservationData.checkIn) : null,
+      checkOut: reservationData.checkOut ? new Date(reservationData.checkOut) : null,
+      status: reservationData.status || 'unknown',
+      confirmationCode: reservationData.confirmationCode || null,
+      money: {
+        total: reservationData.money?.total || 0,
+        currency: reservationData.money?.currency || 'USD'
+      },
+      source: reservationData.source || null,
+      adults: reservationData.guests?.adults || 0,
+      children: reservationData.guests?.children || 0,
+      infants: reservationData.guests?.infants || 0,
+      pets: reservationData.guests?.pets || 0,
+      totalGuests: reservationData.guests?.total || 0,
+      reservationData: reservationData
+    };
 
     // Check if reservation already exists
     const existingReservation = await db.select()
       .from(guestyReservations)
-      .where(eq(guestyReservations.reservationId, reservationData.id))
+      .where(eq(guestyReservations.guestyId, reservationData.id))
       .limit(1);
 
-    // Clean and transform reservation data
-    const cleanReservation: InsertGuestyReservation = {
-      reservationId: reservationData.id,
-      guestName: reservationData.guest?.fullName || 'Unknown Guest',
-      guestEmail: reservationData.guest?.email || null,
-      propertyId: reservationData.listing || '',
-      checkIn: new Date(reservationData.checkIn),
-      checkOut: new Date(reservationData.checkOut),
-      status: reservationData.status || 'unknown',
-      channel: reservationData.integration?.platform || null,
-      totalPrice: Math.round((reservationData.money?.netAmount || 0) * 100) // Convert to cents
-    };
-
-    // Insert or update the reservation
-    if (existingReservation.length === 0) {
-      // Create new reservation
-      await db.insert(guestyReservations).values(cleanReservation);
-      
-      await createWebhookSyncLog('reservation', 'success', {
-        entityId: reservationData.id,
-        action: 'create'
-      });
-      
-      return {
-        success: true,
-        message: `Reservation ${reservationData.id} created from webhook`
-      };
-    } else {
+    if (existingReservation.length > 0) {
       // Update existing reservation
       await db.update(guestyReservations)
-        .set(cleanReservation)
-        .where(eq(guestyReservations.reservationId, reservationData.id));
+        .set({
+          ...cleanReservation,
+          updatedAt: new Date()
+        })
+        .where(eq(guestyReservations.guestyId, reservationData.id));
+
+      await createWebhookSyncLog('reservation', 'success', `Updated reservation: ${cleanReservation.guestyId} for guest ${cleanReservation.guestName}`);
+      return { success: true, message: `Reservation updated: ${cleanReservation.guestyId}` };
+    } else {
+      // Insert new reservation
+      await db.insert(guestyReservations).values(cleanReservation);
       
-      await createWebhookSyncLog('reservation', 'success', {
-        entityId: reservationData.id,
-        action: 'update'
-      });
-      
-      return {
-        success: true,
-        message: `Reservation ${reservationData.id} updated from webhook`
-      };
+      await createWebhookSyncLog('reservation', 'success', `Created new reservation: ${cleanReservation.guestyId} for guest ${cleanReservation.guestName}`);
+      return { success: true, message: `Reservation created: ${cleanReservation.guestyId}` };
     }
   } catch (error) {
     console.error('Error processing reservation webhook:', error);
     
-    await createWebhookSyncLog('reservation', 'error', {
-      entityId: reservationData?.id,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      action: 'process'
-    });
+    await createWebhookSyncLog('reservation', 'error', `Error processing reservation ID ${reservationData?.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error during reservation webhook processing'
+    return { 
+      success: false, 
+      message: `Error processing reservation webhook: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
@@ -235,34 +238,33 @@ export async function processReservationWebhook(reservationData: any): Promise<{
 export async function processPropertyDeletionWebhook(propertyId: string): Promise<{ success: boolean; message: string }> {
   try {
     if (!propertyId) {
-      throw new Error('Invalid property ID');
+      return { success: false, message: 'Invalid property ID' };
     }
+
+    console.log(`Processing property deletion webhook for ID: ${propertyId}`);
+
+    // Get the property name before deletion for the log
+    const existingProperty = await db.select()
+      .from(guestyProperties)
+      .where(eq(guestyProperties.guestyId, propertyId))
+      .limit(1);
+
+    const propertyName = existingProperty[0]?.nickname || 'Unknown Property';
 
     // Delete the property
     await db.delete(guestyProperties)
-      .where(eq(guestyProperties.propertyId, propertyId));
-    
-    await createWebhookSyncLog('property', 'success', {
-      entityId: propertyId,
-      action: 'delete'
-    });
-    
-    return {
-      success: true,
-      message: `Property ${propertyId} deleted from webhook`
-    };
+      .where(eq(guestyProperties.guestyId, propertyId));
+
+    await createWebhookSyncLog('property', 'success', `Deleted property: ${propertyName} (ID: ${propertyId})`);
+    return { success: true, message: `Property deleted: ${propertyName} (ID: ${propertyId})` };
   } catch (error) {
     console.error('Error processing property deletion webhook:', error);
     
-    await createWebhookSyncLog('property', 'error', {
-      entityId: propertyId,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      action: 'delete'
-    });
+    await createWebhookSyncLog('property', 'error', `Error deleting property ID ${propertyId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error during property deletion webhook processing'
+    return { 
+      success: false, 
+      message: `Error processing property deletion webhook: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
@@ -275,34 +277,33 @@ export async function processPropertyDeletionWebhook(propertyId: string): Promis
 export async function processReservationDeletionWebhook(reservationId: string): Promise<{ success: boolean; message: string }> {
   try {
     if (!reservationId) {
-      throw new Error('Invalid reservation ID');
+      return { success: false, message: 'Invalid reservation ID' };
     }
+
+    console.log(`Processing reservation deletion webhook for ID: ${reservationId}`);
+
+    // Get the reservation details before deletion for the log
+    const existingReservation = await db.select()
+      .from(guestyReservations)
+      .where(eq(guestyReservations.guestyId, reservationId))
+      .limit(1);
+
+    const guestName = existingReservation[0]?.guestName || 'Unknown Guest';
 
     // Delete the reservation
     await db.delete(guestyReservations)
-      .where(eq(guestyReservations.reservationId, reservationId));
-    
-    await createWebhookSyncLog('reservation', 'success', {
-      entityId: reservationId,
-      action: 'delete'
-    });
-    
-    return {
-      success: true,
-      message: `Reservation ${reservationId} deleted from webhook`
-    };
+      .where(eq(guestyReservations.guestyId, reservationId));
+
+    await createWebhookSyncLog('reservation', 'success', `Deleted reservation: ${reservationId} for guest ${guestName}`);
+    return { success: true, message: `Reservation deleted: ${reservationId} for guest ${guestName}` };
   } catch (error) {
     console.error('Error processing reservation deletion webhook:', error);
     
-    await createWebhookSyncLog('reservation', 'error', {
-      entityId: reservationId,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      action: 'delete'
-    });
+    await createWebhookSyncLog('reservation', 'error', `Error deleting reservation ID ${reservationId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error during reservation deletion webhook processing'
+    return { 
+      success: false, 
+      message: `Error processing reservation deletion webhook: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
