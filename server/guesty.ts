@@ -146,7 +146,7 @@ export async function healthCheck(): Promise<{
 }> {
   try {
     // We're using the base domain without the API path
-    const healthCheckUrl = "https://open-api.guesty.com/health";
+    const healthCheckUrl = "https://open-api.guesty.com/api/v2/health";
     
     console.log(`Performing Guesty API health check to ${healthCheckUrl}...`);
     

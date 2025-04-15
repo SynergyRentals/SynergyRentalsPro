@@ -12,7 +12,7 @@ export class GuestyAPIClient {
     console.log(`[${new Date().toISOString()}] GuestyAPIClient: Initializing client`);
     this.clientId = process.env.GUESTY_CLIENT_ID || '';
     this.clientSecret = process.env.GUESTY_CLIENT_SECRET || '';
-    this.baseURL = 'https://api.guesty.com/api/v2';
+    this.baseURL = 'https://open-api.guesty.com/api/v2';
 
     this.axios = axios.create({
       baseURL: this.baseURL,
@@ -45,7 +45,7 @@ export class GuestyAPIClient {
     console.log(`[${timestamp}] GuestyClient: _getNewAccessToken called`);
 
     try {
-      const response = await axios.post('https://api.guesty.com/api/v2/oauth2/token', {
+      const response = await axios.post('https://open-api.guesty.com/api/v2/oauth2/token', {
         grant_type: 'client_credentials',
         client_id: this.clientId,
         client_secret: this.clientSecret,
