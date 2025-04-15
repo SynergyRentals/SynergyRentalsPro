@@ -5,6 +5,7 @@ import fileUpload from 'express-fileupload';
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { db } from "./db";
+import { eq } from 'drizzle-orm';
 import { 
   insertTaskSchema, insertUnitSchema, insertGuestSchema, 
   insertMaintenanceSchema, insertInventorySchema, insertVendorSchema,
