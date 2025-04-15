@@ -1213,13 +1213,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check if the request includes a file
       if (!req.files || !req.files.file) {
+        console.log("No file found in request:", req.files);
         return res.status(400).json({
           success: false,
           message: "No file was uploaded"
         });
       }
       
-      const uploadedFile = req.files.file;
+      const uploadedFile = req.files.file as fileUpload.UploadedFile;
       
       // Ensure it's a CSV file
       if (!uploadedFile.name.endsWith('.csv') && uploadedFile.mimetype !== 'text/csv') {
