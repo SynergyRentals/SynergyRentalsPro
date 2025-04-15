@@ -417,7 +417,7 @@ export default function CleaningPage() {
                                 : "Unknown"}
                             </TableCell>
                             <TableCell>
-                              {task.completedAt && task.dueDate
+                              {task.completedAt && task.scheduledFor
                                 ? "1h 45m"
                                 : "Unknown"}
                             </TableCell>
