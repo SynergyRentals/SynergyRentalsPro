@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
+import { GuestyCSVImport } from "@/components/guesty/GuestyCSVImport";
 
 function GuestyHealthCheck() {
   const { toast } = useToast();
@@ -461,6 +462,15 @@ export default function AdminPage() {
                           </div>
                           <p className="text-xs text-muted-foreground">
                             Test OAuth2 integration with Guesty API for property and reservation synchronization
+                          </p>
+                        </div>
+                        
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <GuestyCSVImport />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Import properties from CSV when Guesty API rate limits are reached
                           </p>
                         </div>
                       </div>
