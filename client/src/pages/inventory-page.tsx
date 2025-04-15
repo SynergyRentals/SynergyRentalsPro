@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,10 @@ import {
   ArrowForward,
   TrendingDown,
   TrendingUp,
+  CompareArrows,
+  QrCode2,
+  Notifications,
+  ReceiptLong,
 } from "@mui/icons-material";
 import {
   Dialog,
@@ -25,18 +29,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, BarChart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Inventory, InsertInventory, insertInventorySchema } from "@shared/schema";
+import { z } from "zod";
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");

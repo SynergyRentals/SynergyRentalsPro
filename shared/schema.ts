@@ -117,11 +117,59 @@ export const inventory = pgTable("inventory", {
   category: text("category"), // linens, toiletries, kitchen, etc.
   reorderThreshold: integer("reorder_threshold"),
   notes: text("notes"),
+  sku: text("sku"), // Stock Keeping Unit
+  upc: text("upc"), // Universal Product Code
+  cost: integer("cost"), // in cents
+  supplier: text("supplier"),
+  location: text("location"), // specific location within unit or garage
+  minOrderQuantity: integer("min_order_quantity"),
+  isConsumable: boolean("is_consumable").default(true),
+  imageUrl: text("image_url"),
 });
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({
   id: true,
   lastUpdated: true,
+});
+
+// Inventory Transfers
+export const inventoryTransfers = pgTable("inventory_transfers", {
+  id: serial("id").primaryKey(),
+  sourceUnitId: integer("source_unit_id"), // null for garage
+  destinationUnitId: integer("destination_unit_id"), // null for garage
+  inventoryId: integer("inventory_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  status: text("status").notNull().default("pending"), // pending, completed, cancelled
+  requestedBy: integer("requested_by").notNull(), // user_id
+  approvedBy: integer("approved_by"), // user_id
+  requestedAt: timestamp("requested_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+});
+
+export const insertInventoryTransferSchema = createInsertSchema(inventoryTransfers).omit({
+  id: true,
+  requestedAt: true,
+  completedAt: true,
+  status: true,
+});
+
+// Inventory Transactions
+export const inventoryTransactions = pgTable("inventory_transactions", {
+  id: serial("id").primaryKey(),
+  inventoryId: integer("inventory_id").notNull(),
+  quantity: integer("quantity").notNull(), // positive for additions, negative for removals
+  transactionType: text("transaction_type").notNull(), // purchase, consume, transfer, adjustment, etc.
+  unitId: integer("unit_id"), // null for garage
+  performedBy: integer("performed_by").notNull(), // user_id
+  transactionDate: timestamp("transaction_date").defaultNow(),
+  notes: text("notes"),
+  referenceId: integer("reference_id"), // could link to a transfer, order, etc.
+});
+
+export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({
+  id: true,
+  transactionDate: true,
 });
 
 // Vendors
@@ -215,6 +263,12 @@ export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
 
 export type Inventory = typeof inventory.$inferSelect;
 export type InsertInventory = z.infer<typeof insertInventorySchema>;
+
+export type InventoryTransfer = typeof inventoryTransfers.$inferSelect;
+export type InsertInventoryTransfer = z.infer<typeof insertInventoryTransferSchema>;
+
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
 
 export type Vendor = typeof vendors.$inferSelect;
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
