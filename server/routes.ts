@@ -18,6 +18,7 @@ import {
   syncProperties, syncReservations, syncAll, getLatestSyncLog,
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
+import { guestyClient } from "./lib/guestyApiClient";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
@@ -1265,26 +1266,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Next test token retrieval
-      const token = await getAccessToken();
-      
-      if (!token) {
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to retrieve OAuth token',
-          domainReachable: true,
-          tokenReceived: false,
-          apiCallSuccess: false
-        });
-      }
-      
-      console.log("Successfully retrieved Guesty OAuth token, now testing API access...");
-      
-      // Then test a simple API call
+      // Test API access through our client - this will handle token retrieval internally
       try {
-        const testResponse = await makeGuestyRequest('/users/me');
+        console.log("Testing Guesty API access through client...");
+        const userInfo = await guestyClient.getUserInfo();
         
-        console.log("Successfully made test API call to Guesty API");
+        if (!userInfo) {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve user information',
+            domainReachable: true,
+            tokenReceived: false,
+            apiCallSuccess: false
+          });
+        }
+        
+        console.log("Successfully retrieved user info from Guesty API");
         
         // Log the successful connection test
         await storage.createLog({
@@ -1301,7 +1298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           domainReachable: true,
           tokenReceived: true,
           apiCallSuccess: true,
-          userData: testResponse
+          userData: userInfo
         });
       } catch (apiError) {
         console.error("API call failed despite successful token retrieval:", apiError);
