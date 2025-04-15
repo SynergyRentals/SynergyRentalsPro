@@ -68,7 +68,7 @@ async function createWebhookSyncLog(
 ): Promise<void> {
   try {
     const syncLog: InsertGuestySyncLog = {
-      type: `webhook_${eventType}`,
+      syncType: `webhook_${eventType}`,
       startedAt: new Date(),
       completedAt: new Date(),
       status: status,
@@ -95,29 +95,33 @@ export async function processPropertyWebhook(propertyData: any): Promise<{ succe
 
     console.log(`Processing property webhook for ID: ${propertyData.id}`);
 
-    // Clean and transform the property data
-    const cleanProperty: InsertGuestyProperty = {
-      guestyId: propertyData.id,
-      nickname: propertyData.nickname || propertyData.title || 'Unnamed Property',
-      picture: propertyData.picture?.thumbnail || null,
+    // Clean and transform the property data based on existing schema
+    const cleanProperty = {
+      guesty_id: propertyData.id,
+      name: propertyData.nickname || propertyData.title || 'Unnamed Property',
       address: propertyData.address?.full || null,
+      property_id: propertyData.id,
+      bedrooms: propertyData.bedrooms || null,
+      bathrooms: propertyData.bathrooms || null,
+      amenities: Array.isArray(propertyData.amenities) ? propertyData.amenities : [],
+      listing_url: propertyData.listingUrl || null,
+      
+      // Additional fields we added
+      picture: propertyData.picture?.thumbnail || null,
       city: propertyData.address?.city || null,
       state: propertyData.address?.state || null,
       zipcode: propertyData.address?.zipcode || null,
       country: propertyData.address?.country || null,
       latitude: propertyData.address?.location?.lat || null,
       longitude: propertyData.address?.location?.lng || null,
-      bedrooms: propertyData.bedrooms || null,
-      bathrooms: propertyData.bathrooms || null,
       beds: propertyData.beds || null,
-      propertyType: propertyData.propertyType || null,
-      roomType: propertyData.roomType || null,
+      property_type: propertyData.propertyType || null,
+      room_type: propertyData.roomType || null,
       accommodates: propertyData.accommodates || null,
-      amenities: Array.isArray(propertyData.amenities) ? propertyData.amenities : [],
       images: Array.isArray(propertyData.images) 
         ? propertyData.images.map((img: any) => img.thumbnail || img.regular || img.url).filter(Boolean)
         : [],
-      propertyData: propertyData
+      property_data: propertyData
     };
 
     // Check if property already exists
