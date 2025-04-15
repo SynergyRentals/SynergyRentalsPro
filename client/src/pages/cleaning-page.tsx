@@ -53,14 +53,8 @@ export default function CleaningPage() {
     queryFn: undefined,
   });
 
-  // Filter only cleaning tasks
-  const cleaningTasks = tasks
-    ? tasks.filter(
-        (task) =>
-          task.type === "cleaning" &&
-          task.title?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : [];
+  // Use all cleaning tasks from API endpoint (they're already filtered)
+  const cleaningTasks = tasks || [];
 
   // Group by status
   const scheduledTasks = cleaningTasks.filter((task) => task.status !== "completed");
