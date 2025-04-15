@@ -120,7 +120,7 @@ export class GuestyAPIClient {
     console.log(`[${timestamp}] GuestyClient: Performing health check`);
 
     try {
-      await this.makeRequest('GET', '/me');
+      await this.makeRequest('GET', '/v1/listings', { params: { limit: 1 } });
       console.log(`[${timestamp}] GuestyClient: Health check successful`);
       return { success: true, message: 'Guesty API is healthy' };
     } catch (error) {

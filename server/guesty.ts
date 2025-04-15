@@ -145,8 +145,8 @@ export async function healthCheck(): Promise<{
   rateLimit?: boolean;
 }> {
   try {
-    // We're using the base domain without the API path
-    const healthCheckUrl = "https://open-api.guesty.com/api/v2/health";
+    // We're using the listings endpoint with a limit of 1 for lightweight check
+    const healthCheckUrl = "https://open-api.guesty.com/api/v1/listings?limit=1";
     
     console.log(`Performing Guesty API health check to ${healthCheckUrl}...`);
     
