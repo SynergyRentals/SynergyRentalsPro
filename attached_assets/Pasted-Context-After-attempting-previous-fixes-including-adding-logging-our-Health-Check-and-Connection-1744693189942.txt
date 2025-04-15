@@ -1,0 +1,19 @@
+Context:
+After attempting previous fixes (including adding logging), our Health Check and Connection Test endpoints are no longer showing 429 errors, but are now failing with errors related to the legacy Guesty domain api.guesty.com (e.g., getaddrinfo ENOTFOUND api.guesty.com or messages explicitly mentioning api.guesty.com). This indicates these specific checks are still referencing the wrong domain somewhere in their code or configuration. The correct domain should be open-api.guesty.com.
+
+Goal:
+Find all references to the incorrect legacy domain api.guesty.com within the codebase, particularly in files related to the Health Check and Connection Test logic, and update them to use the correct Open API domain open-api.guesty.com.
+
+Instructions:
+
+Search Project Files: Perform a project-wide search for the exact string api.guesty.com.
+Focus on Check Endpoints: Pay close attention to files associated with the Health Check and Connection Test routes, handlers, or any utility functions they might be calling.
+Identify Incorrect Usage: Find where api.guesty.com is being used to construct URLs or make direct connection attempts (e.g., in axios calls, Workspace calls, or other network libraries) within these specific check functions, separate from the main GuestyAPIClient.
+Replace with Correct Domain:
+If the incorrect domain is hardcoded, replace api.guesty.com with open-api.guesty.com.
+Ideally, refactor the code to use the GUESTY_BASE_URL constant already defined within the GuestyAPIClient module (src/server/lib/guestyApiClient.ts), if appropriate and accessible, to avoid hardcoding the URL string in multiple places.
+If the incorrect domain is coming from an environment variable or configuration setting specific to these checks, update that configuration source.
+Verify GuestyAPIClient: Briefly double-check that the GUESTY_BASE_URL constant within src/server/lib/guestyApiClient.ts is indeed correctly set to https://open-api.guesty.com.
+Remove Conflicting Calls: Ensure that the Health Check and Connection Test logic are not making their own separate, incorrect calls to Guesty endpoints and are instead relying on the properly configured guestyClient instance where necessary (and using the call reduction strategies like caching or isTokenPotentiallyValid previously discussed).
+Instructions for Agent:
+"Please search the entire backend codebase for any occurrences of the legacy Guesty domain api.guesty.com. Focus particularly on the code implementing the Health Check and Connection Test endpoints. Replace any found instances of api.guesty.com with the correct Open API domain open-api.guesty.com, preferably by referencing the existing GUESTY_BASE_URL constant from our GuestyAPIClient module if possible. Ensure these checks use the correct domain for any network requests they make."
