@@ -92,26 +92,24 @@ export default function InventoryPage() {
     },
   });
   
-  // Skip API calls for now and use mock data
+  // Fetch inventory data from the API
   const {
     data: inventoryItems,
     isLoading: inventoryLoading,
     error: inventoryError,
-  } = { 
-    data: undefined, 
-    isLoading: false, 
-    error: null 
-  };
+  } = useQuery({ 
+    queryKey: ['/api/inventory'],
+    retry: 1,
+  });
 
-  // Mock units data
-  const mockUnits = [
-    { id: 1, name: "Beachside Villa" },
-    { id: 2, name: "Mountain Cabin" },
-    { id: 3, name: "Downtown Loft" }
-  ];
-  
-  // Use mock units
-  const { data: units } = { data: mockUnits };
+  // Fetch units data from the API
+  const {
+    data: units,
+    isLoading: unitsLoading,
+  } = useQuery({
+    queryKey: ['/api/units'],
+    retry: 1,
+  });
   
   // Create inventory mutation
   const createInventoryMutation = useMutation({
