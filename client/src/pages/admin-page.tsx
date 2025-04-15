@@ -7,9 +7,102 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
+import { apiRequest } from "@/lib/queryClient";
+
+function GuestyConnectionTest() {
+  const { toast } = useToast();
+  const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [details, setDetails] = useState<any>(null);
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('GET', '/api/guesty/test-connection');
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      setTestStatus(data.success ? 'success' : 'error');
+      setDetails(data);
+      toast({
+        title: data.success ? 'Connection Successful' : 'Connection Failed',
+        description: data.message,
+        variant: data.success ? 'default' : 'destructive',
+      });
+    },
+    onError: (error) => {
+      setTestStatus('error');
+      toast({
+        title: 'Connection Test Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
+      });
+    }
+  });
+
+  const handleTestConnection = () => {
+    setTestStatus('loading');
+    testConnectionMutation.mutate();
+  };
+
+  const getStatusDisplay = () => {
+    if (testStatus === 'idle') return null;
+    
+    if (testStatus === 'loading') {
+      return <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700">Testing...</Badge>;
+    }
+    
+    if (testStatus === 'success') {
+      return <Badge variant="outline" className="ml-2 bg-green-50 text-green-700">Connected</Badge>;
+    }
+    
+    if (testStatus === 'error') {
+      return <Badge variant="outline" className="ml-2 bg-red-50 text-red-700">Connection Failed</Badge>;
+    }
+  };
+
+  return (
+    <div className="flex flex-col space-y-2">
+      <div className="flex items-center">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleTestConnection}
+          disabled={testStatus === 'loading'}
+          className="flex items-center"
+        >
+          {testStatus === 'loading' ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Testing...
+            </>
+          ) : testStatus === 'success' ? (
+            <>
+              <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+              Test Connection
+            </>
+          ) : testStatus === 'error' ? (
+            <>
+              <XCircle className="mr-2 h-4 w-4 text-red-500" />
+              Test Connection
+            </>
+          ) : (
+            <>Test Connection</>
+          )}
+        </Button>
+        {getStatusDisplay()}
+      </div>
+      {testStatus === 'success' && details && (
+        <div className="text-xs text-muted-foreground">
+          <p>Connected as: {details.userData?.firstName} {details.userData?.lastName}</p>
+          <p>Account ID: {details.userData?.accountId}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const { toast } = useToast();
@@ -257,6 +350,18 @@ export default function AdminPage() {
                       <p className="text-xs text-muted-foreground mt-1">
                         Required for sending notifications to Slack
                       </p>
+                    </div>
+
+                    <div>
+                      <Label>Guesty API Integration</Label>
+                      <div className="flex flex-col space-y-2 mt-2">
+                        <div className="flex items-center space-x-2">
+                          <GuestyConnectionTest />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          OAuth2 integration with Guesty API for property and reservation synchronization
+                        </p>
+                      </div>
                     </div>
                     
                     <Button onClick={updateAPIKeys} disabled={isUpdatingKeys}>
