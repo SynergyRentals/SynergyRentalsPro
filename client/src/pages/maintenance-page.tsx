@@ -77,6 +77,13 @@ const createMaintenanceSchema = insertMaintenanceSchema.extend({
 // Type for the form values
 type CreateMaintenanceFormValues = z.infer<typeof createMaintenanceSchema>;
 
+// AI prompt schema for maintenance ticket generation
+const aiPromptSchema = z.object({
+  prompt: z.string().min(10, "Prompt must be at least 10 characters")
+});
+
+type AiPromptFormValues = z.infer<typeof aiPromptSchema>;
+
 export default function MaintenancePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("tickets");
@@ -84,7 +91,9 @@ export default function MaintenancePage() {
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState<Maintenance | null>(null);
+  const [isGeneratingTicket, setIsGeneratingTicket] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -129,6 +138,39 @@ export default function MaintenancePage() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+  
+  // AI generated maintenance ticket mutation
+  const generateTicketMutation = useMutation({
+    mutationFn: async (data: AiPromptFormValues) => {
+      return apiRequest("POST", "/api/maintenance/generate", data);
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Ticket generated",
+        description: "AI has generated ticket details based on your prompt",
+        variant: "default",
+      });
+      setIsAiPromptOpen(false);
+      promptForm.reset();
+      
+      // Fill the create form with the generated data
+      createForm.setValue("description", data.description);
+      createForm.setValue("priority", data.priority);
+      if (data.notes) createForm.setValue("notes", data.notes);
+      if (data.cost) createForm.setValue("cost", data.cost / 100); // Convert cents to dollars
+      
+      // Open create dialog with pre-filled data
+      setIsCreateDialogOpen(true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to generate ticket",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsGeneratingTicket(false);
     },
   });
 
