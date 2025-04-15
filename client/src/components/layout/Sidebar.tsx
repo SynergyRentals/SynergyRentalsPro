@@ -1,4 +1,4 @@
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user } = useAuth();
 
   const navigation = [
@@ -39,6 +39,11 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
   const filteredNavigation = user
     ? navigation.filter(item => !item.roles || item.roles.includes(user.role))
     : navigation;
+
+  const handleNavClick = (href: string) => {
+    navigate(href);
+    if (isMobileOpen) onClose();
+  };
 
   return (
     <>
@@ -76,24 +81,20 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
                 
                 return (
                   <li key={item.name}>
-                    <Link href={item.href}>
-                      <a
-                        className={`flex items-center px-4 py-3 hover:bg-white hover:bg-opacity-10 transition-colors ${
-                          isActive
-                            ? "bg-[#FFCF45] bg-opacity-20 border-l-4 border-[#FFCF45]"
-                            : ""
-                        }`}
-                        onClick={() => {
-                          if (isMobileOpen) onClose();
-                        }}
-                      >
-                        <IconComponent
-                          className={`mr-3 ${isActive ? "text-[#FFCF45]" : "text-[#9EA2B1]"}`}
-                          fontSize="small"
-                        />
-                        <span>{item.name}</span>
-                      </a>
-                    </Link>
+                    <button
+                      onClick={() => handleNavClick(item.href)}
+                      className={`w-full text-left flex items-center px-4 py-3 hover:bg-white hover:bg-opacity-10 transition-colors ${
+                        isActive
+                          ? "bg-[#FFCF45] bg-opacity-20 border-l-4 border-[#FFCF45]"
+                          : ""
+                      }`}
+                    >
+                      <IconComponent
+                        className={`mr-3 ${isActive ? "text-[#FFCF45]" : "text-[#9EA2B1]"}`}
+                        fontSize="small"
+                      />
+                      <span>{item.name}</span>
+                    </button>
                   </li>
                 );
               })}
