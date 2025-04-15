@@ -7,7 +7,13 @@ import {
   CleaningTask, InsertCleaningTask,
   CleaningChecklist, InsertCleaningChecklist,
   CleaningChecklistItem, InsertCleaningChecklistItem,
-  CleaningChecklistCompletion, InsertCleaningChecklistCompletion
+  CleaningChecklistCompletion, InsertCleaningChecklistCompletion,
+  // New Project & Task module types
+  ProjectMilestone, InsertProjectMilestone,
+  ProjectTask, InsertProjectTask,
+  TaskComment, InsertTaskComment,
+  ProjectFile, InsertProjectFile,
+  AiGeneratedPlan, InsertAiGeneratedPlan
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -77,6 +83,38 @@ export interface IStorage {
   getAllProjects(): Promise<Project[]>;
   getProjectsByUnit(unitId: number): Promise<Project[]>;
   
+  // Project Milestones
+  getProjectMilestone(id: number): Promise<ProjectMilestone | undefined>;
+  createProjectMilestone(milestone: InsertProjectMilestone): Promise<ProjectMilestone>;
+  updateProjectMilestone(id: number, milestone: Partial<ProjectMilestone>): Promise<ProjectMilestone | undefined>;
+  getProjectMilestonesByProject(projectId: number): Promise<ProjectMilestone[]>;
+  
+  // Project Tasks
+  getProjectTask(id: number): Promise<ProjectTask | undefined>;
+  createProjectTask(task: InsertProjectTask): Promise<ProjectTask>;
+  updateProjectTask(id: number, task: Partial<ProjectTask>): Promise<ProjectTask | undefined>;
+  getAllProjectTasks(): Promise<ProjectTask[]>;
+  getProjectTasksByProject(projectId: number): Promise<ProjectTask[]>;
+  getProjectTasksByUnit(unitId: number): Promise<ProjectTask[]>;
+  getProjectTasksByAssignee(userId: number): Promise<ProjectTask[]>;
+  getProjectTasksByStatus(status: string): Promise<ProjectTask[]>;
+  
+  // Task Comments
+  getTaskComment(id: number): Promise<TaskComment | undefined>;
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  getTaskCommentsByTask(taskId: number): Promise<TaskComment[]>;
+  
+  // Project Files
+  getProjectFile(id: number): Promise<ProjectFile | undefined>;
+  createProjectFile(file: InsertProjectFile): Promise<ProjectFile>;
+  getProjectFilesByProject(projectId: number): Promise<ProjectFile[]>;
+  
+  // AI Generated Plans
+  getAiGeneratedPlan(id: number): Promise<AiGeneratedPlan | undefined>;
+  createAiGeneratedPlan(plan: InsertAiGeneratedPlan): Promise<AiGeneratedPlan>;
+  updateAiGeneratedPlan(id: number, plan: Partial<AiGeneratedPlan>): Promise<AiGeneratedPlan | undefined>;
+  getAiGeneratedPlansByProject(projectId: number): Promise<AiGeneratedPlan[]>;
+  
   // Documents
   getDocument(id: number): Promise<Document | undefined>;
   createDocument(document: InsertDocument): Promise<Document>;
@@ -135,6 +173,12 @@ export class MemStorage implements IStorage {
   private cleaningChecklists: Map<number, CleaningChecklist>;
   private cleaningChecklistItems: Map<number, CleaningChecklistItem>;
   private cleaningChecklistCompletions: Map<number, CleaningChecklistCompletion>;
+  // New Project Task module maps
+  private projectMilestones: Map<number, ProjectMilestone>;
+  private projectTasks: Map<number, ProjectTask>;
+  private taskComments: Map<number, TaskComment>;
+  private projectFiles: Map<number, ProjectFile>;
+  private aiGeneratedPlans: Map<number, AiGeneratedPlan>;
   
   sessionStore: session.Store;
   
@@ -152,6 +196,12 @@ export class MemStorage implements IStorage {
   private cleaningChecklistIdCounter: number;
   private cleaningChecklistItemIdCounter: number;
   private cleaningChecklistCompletionIdCounter: number;
+  // New Project Task module counters
+  private projectMilestoneIdCounter: number;
+  private projectTaskIdCounter: number;
+  private taskCommentIdCounter: number;
+  private projectFileIdCounter: number;
+  private aiGeneratedPlanIdCounter: number;
 
   constructor() {
     this.users = new Map();

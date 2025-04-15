@@ -190,18 +190,114 @@ export const insertVendorSchema = createInsertSchema(vendors).omit({
 // Projects
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  title: text("title").notNull(),
   description: text("description"),
   unitId: integer("unit_id"),
   startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
-  budget: integer("budget"), // in cents
-  status: text("status").default("planned"), // planned, in-progress, completed
+  dueDate: timestamp("due_date"),
+  budgetEstimate: real("budget_estimate"),
+  actualSpend: real("actual_spend").default(0),
+  category: text("category"),
+  status: text("status").default("planning").notNull(), // planning, in-progress, completed, on-hold, cancelled
   notes: text("notes"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
+  actualSpend: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Project Milestones
+export const projectMilestones = pgTable("project_milestones", {
+  id: serial("id").primaryKey(), 
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  dueDate: timestamp("due_date"),
+  complete: boolean("complete").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProjectMilestoneSchema = createInsertSchema(projectMilestones).omit({
+  id: true,
+  createdAt: true,
+  complete: true,
+});
+
+// Project Tasks (distinct from the existing tasks table)
+export const projectTasks = pgTable("project_tasks", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: 'set null' }),
+  unitId: integer("unit_id").references(() => units.id, { onDelete: 'set null' }),
+  taskType: text("task_type").notNull(), // Cleaning, Maintenance, Inventory, VA, Admin
+  description: text("description").notNull(),
+  assignedTo: integer("assigned_to").references(() => users.id, { onDelete: 'set null' }),
+  dueDate: timestamp("due_date"),
+  status: text("status").default("open").notNull(), // open, in-progress, blocked, completed
+  priority: text("priority").default("normal"), // low, normal, high, urgent
+  notes: text("notes"),
+  images: text("images").array(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+// Task Comments
+export const taskComments = pgTable("task_comments", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => projectTasks.id, { onDelete: 'cascade' }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  message: text("message").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
+  id: true,
+  timestamp: true,
+});
+
+// Project Files
+export const projectFiles = pgTable("project_files", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type"),
+  uploadedBy: integer("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertProjectFileSchema = createInsertSchema(projectFiles).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+// AI Generated Plans
+export const aiGeneratedPlans = pgTable("ai_generated_plans", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => projects.id),
+  input: jsonb("input").notNull(),
+  output: jsonb("output").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  usedInProject: boolean("used_in_project").default(false),
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+});
+
+export const insertAiGeneratedPlanSchema = createInsertSchema(aiGeneratedPlans).omit({
+  id: true,
+  createdAt: true,
+  usedInProject: true,
 });
 
 // Documents
@@ -422,6 +518,21 @@ export type InsertVendor = z.infer<typeof insertVendorSchema>;
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
+
+export type ProjectMilestone = typeof projectMilestones.$inferSelect;
+export type InsertProjectMilestone = z.infer<typeof insertProjectMilestoneSchema>;
+
+export type ProjectTask = typeof projectTasks.$inferSelect;
+export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
+
+export type TaskComment = typeof taskComments.$inferSelect;
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+
+export type ProjectFile = typeof projectFiles.$inferSelect;
+export type InsertProjectFile = z.infer<typeof insertProjectFileSchema>;
+
+export type AiGeneratedPlan = typeof aiGeneratedPlans.$inferSelect;
+export type InsertAiGeneratedPlan = z.infer<typeof insertAiGeneratedPlanSchema>;
 
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
