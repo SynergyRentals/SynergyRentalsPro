@@ -2728,6 +2728,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary authenticated API route to get the Guesty webhook signing key
+  // This is a convenience endpoint for retrieving the webhook secret during setup
+  app.get("/api/guesty-management/get-webhook-secret", checkRole(["admin"]), async (req: Request, res: Response) => {
+    try {
+      console.log('[Webhook Secret] Getting webhook secret from Guesty API');
+      
+      // Make the request to Guesty API to get the webhook secret
+      const response = await guestyClient.makeRequest('GET', '/svix/secret');
+      
+      // Log the success (without the actual secret for security)
+      console.log('[Webhook Secret] Successfully retrieved webhook secret from Guesty API');
+      
+      // Return the response from Guesty API
+      res.json({
+        success: true,
+        message: 'Successfully retrieved webhook secret',
+        data: response
+      });
+      
+      // Log the API call
+      await storage.createLog({
+        action: "GUESTY_GET_WEBHOOK_SECRET",
+        userId: req.user?.id,
+        targetTable: "guesty",
+        notes: "Retrieved webhook secret from Guesty API",
+        ipAddress: req.ip
+      });
+    } catch (error) {
+      console.error('[Webhook Secret] Error getting webhook secret:', error);
+      
+      // Log the error
+      await storage.createLog({
+        action: "GUESTY_GET_WEBHOOK_SECRET_ERROR",
+        userId: req.user?.id,
+        targetTable: "guesty",
+        notes: `Error getting webhook secret: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ipAddress: req.ip
+      });
+      
+      // Return error response
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving webhook secret from Guesty API',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Create HTTP server
   const httpServer = createServer(app);
 

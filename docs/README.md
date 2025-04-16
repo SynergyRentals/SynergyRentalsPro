@@ -33,6 +33,15 @@ Our Guesty integration follows a dual-approach strategy:
 - `GUESTY_CLIENT_SECRET`: OAuth client secret for the Guesty API
 - `GUESTY_WEBHOOK_SECRET`: Signing key for webhook verification
 
+### Retrieving the Webhook Secret
+
+The webhook secret can be obtained through the following methods:
+
+1. **From Guesty Dashboard**: When setting up webhooks in Guesty, copy the provided Signing Key (secret)
+2. **From Our API**: Access the temporary endpoint `/api/guesty-management/get-webhook-secret` (admin access required)
+
+These methods are documented in more detail in the [Guesty Webhook Guide](./guesty-webhook-guide.md).
+
 ### Implementation Details
 
 - `server/lib/guestyApiClient.ts`: Client for making API requests to Guesty

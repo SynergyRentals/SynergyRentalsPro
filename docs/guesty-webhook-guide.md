@@ -37,6 +37,13 @@ Our webhook implementation follows Guesty's specifications:
 7. Copy the Signing Key (secret) provided by Guesty
 8. Set this value as the `GUESTY_WEBHOOK_SECRET` environment variable in your application
 
+If Guesty does not provide the webhook secret directly, you can retrieve it through the application:
+
+1. Login to the Synergy Rentals application with an admin account
+2. Navigate to: `/api/guesty-management/get-webhook-secret`
+3. The response will contain a JSON object with the secret in the `data.secret.key` field
+4. Copy this value and set it as the `GUESTY_WEBHOOK_SECRET` environment variable
+
 ## Testing Webhooks
 
 For development and testing purposes, we provide several methods to test webhook functionality:
