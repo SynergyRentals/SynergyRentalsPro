@@ -113,9 +113,7 @@ export default function GuestyPropertiesTab({ searchQuery = "" }: GuestyProperti
                 property.address.toLowerCase().includes(query) ||
                 (property.amenities && property.amenities.some(amenity => 
                   amenity.toLowerCase().includes(query)
-                )) ||
-                (property.city && property.city.toLowerCase().includes(query)) ||
-                (property.state && property.state.toLowerCase().includes(query))
+                ))
               );
             })
             .map((property) => (
