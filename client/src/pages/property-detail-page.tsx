@@ -33,13 +33,13 @@ export default function PropertyDetailPage() {
   const [showIcalInput, setShowIcalInput] = useState(false);
   const [newIcalUrl, setNewIcalUrl] = useState("");
   
-  // Get property details
+  // Get property details from unified endpoint
   const { 
     data: property, 
     isLoading: isLoadingProperty, 
     error: propertyError 
   } = useQuery<GuestyProperty>({
-    queryKey: ['/api/guesty/properties', propertyId],
+    queryKey: ['/api/properties', propertyId],
     enabled: !!propertyId,
   });
   
@@ -98,14 +98,14 @@ export default function PropertyDetailPage() {
     enabled: !!propertyId,
   });
   
-  // Get calendar events for this property
+  // Get calendar events for this property using unified endpoint
   const {
     data: calendarEvents,
     isLoading: isLoadingCalendar,
     error: calendarError,
     refetch: refetchCalendar
   } = useQuery({
-    queryKey: ['/api/guesty/properties', propertyId, 'calendar'],
+    queryKey: ['/api/properties', propertyId, 'calendar'],
     queryFn: async () => {
       console.log('Attempting to fetch calendar events for property:', propertyId);
       
@@ -122,7 +122,7 @@ export default function PropertyDetailPage() {
       
       console.log('Fetching calendar data from API endpoint...');
       try {
-        const response = await fetch(`/api/guesty/properties/${propertyId}/calendar`);
+        const response = await fetch(`/api/properties/${propertyId}/calendar`);
         console.log('Calendar API response status:', response.status);
         
         if (response.status === 404) {
@@ -303,10 +303,10 @@ export default function PropertyDetailPage() {
     return events;
   };
   
-  // Mutation for updating property
+  // Mutation for updating property using unified endpoint
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: Partial<GuestyProperty>) => {
-      return apiRequest('PATCH', `/api/guesty/properties/${propertyId}`, data);
+      return apiRequest('PATCH', `/api/properties/${propertyId}`, data);
     },
     onSuccess: async (_, variables) => {
       toast({
@@ -316,6 +316,8 @@ export default function PropertyDetailPage() {
       
       // Invalidate and refetch queries
       await queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/properties', propertyId] });
+      // Also invalidate legacy endpoints for backwards compatibility
       await queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties', propertyId] });
       
@@ -328,9 +330,11 @@ export default function PropertyDetailPage() {
           tabsElement.click();
         }
         
+        // Invalidate calendar data in both unified and legacy endpoints
+        await queryClient.invalidateQueries({ queryKey: ['/api/properties', propertyId, 'calendar'] });
         await queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties', propertyId, 'calendar'] });
         // Force a refetch of the property to ensure it has the latest icalUrl
-        await queryClient.refetchQueries({ queryKey: ['/api/guesty/properties', propertyId] });
+        await queryClient.refetchQueries({ queryKey: ['/api/properties', propertyId] });
         // Force a refetch of calendar events
         setTimeout(() => refetchCalendar(), 500);
       }
