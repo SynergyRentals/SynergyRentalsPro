@@ -276,11 +276,13 @@ export default function PropertyDetailPage() {
     // Add maintenance tasks
     if (maintenanceItems && maintenanceItems.length > 0) {
       maintenanceItems.forEach(item => {
-        events.push({
-          date: new Date(item.createdAt),
-          type: "maintenance",
-          label: `Maintenance: ${item.description.substring(0, 20)}${item.description.length > 20 ? '...' : ''}`
-        });
+        if (item.createdAt) {
+          events.push({
+            date: new Date(item.createdAt),
+            type: "maintenance",
+            label: `Maintenance: ${item.description.substring(0, 20)}${item.description.length > 20 ? '...' : ''}`
+          });
+        }
       });
     }
     
@@ -558,6 +560,123 @@ export default function PropertyDetailPage() {
             <FileText className="h-4 w-4 mr-2" /> Documents
           </TabsTrigger>
         </TabsList>
+        
+        {/* Calendar Tab */}
+        <TabsContent value="calendar">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div>
+                  <CardTitle className="text-lg">Property Calendar</CardTitle>
+                  <CardDescription>Manage and view property availability</CardDescription>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {property.icalUrl ? (
+                    <>
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-medium text-primary">iCal Sync Active</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowIcalInput(true)}
+                          className="text-blue-500 hover:text-blue-700 ml-2 text-xs"
+                        >
+                          Update
+                        </button>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => refetchCalendar()}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+                      </Button>
+                    </>
+                  ) : (
+                    <Button onClick={() => setShowIcalInput(true)}>
+                      <CalendarPlus className="h-4 w-4 mr-1" /> Connect iCal
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {showIcalInput && (
+                <div className="mb-4 p-4 border rounded-md bg-muted/50">
+                  <h3 className="text-sm font-medium mb-2">iCal URL</h3>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      placeholder="Enter iCal URL (e.g. from Airbnb, VRBO, etc.)" 
+                      value={newIcalUrl}
+                      onChange={(e) => setNewIcalUrl(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={() => {
+                        updatePropertyMutation.mutate({ icalUrl: newIcalUrl });
+                      }}
+                      disabled={updatePropertyMutation.isPending}
+                    >
+                      {updatePropertyMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <div className="flex items-center">
+                          <Check className="h-4 w-4 mr-1" /> Save
+                        </div>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowIcalInput(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Paste the iCal URL from your booking platform to sync reservations
+                  </p>
+                </div>
+              )}
+              
+              {isLoadingCalendar ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : calendarError ? (
+                <div className="text-center py-8 space-y-4">
+                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto" />
+                  <h3 className="text-lg font-semibold">Calendar Error</h3>
+                  <p className="text-muted-foreground mb-4">
+                    We couldn't load the calendar data. Please try again later.
+                  </p>
+                  {calendarError.message && (
+                    <p className="text-sm text-red-500 max-w-md mx-auto">{calendarError.message}</p>
+                  )}
+                  <Button onClick={() => refetchCalendar()}>
+                    <RefreshCw className="h-4 w-4 mr-1" /> Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <CalendarView events={getCalendarEvents()} />
+                  
+                  {!property.icalUrl && !showIcalInput && calendarData?.length === 0 && (
+                    <div className="text-center py-6 mt-6 border rounded-md">
+                      <CalendarDays className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold">No Calendar Data</h3>
+                      <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                        Connect an iCal feed from your booking platform to see reservations and availability
+                      </p>
+                      <Button onClick={() => setShowIcalInput(true)}>
+                        <CalendarPlus className="h-4 w-4 mr-1" /> Connect iCal
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
         
         {/* Guests Tab */}
         <TabsContent value="guests">
