@@ -2527,24 +2527,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NOTE: Authentication disabled for testing purposes, re-enable with checkRole(["admin"]) in production
   app.post("/api/webhooks/guesty/test", async (req: Request, res: Response) => {
     try {
-      const { eventType, entityType, entityId, eventData } = req.body;
+      // Allow for different test modes:
+      // 1. Direct mode: provide eventType, entityType, entityId, eventData directly
+      // 2. Guesty simulation mode: provide a complete Guesty-like webhook payload
+      // 3. Sample mode: use a predefined sample webhook
       
-      if (!eventType || !entityType || !entityId || !eventData) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required fields (eventType, entityType, entityId, eventData)'
-        });
+      let webhookEvent: InsertGuestyWebhookEvent;
+      
+      // Check if we should use a sample webhook
+      if (req.body.sampleType) {
+        console.log(`Loading sample webhook: ${req.body.sampleType}`);
+        
+        // Import sample webhooks
+        const { 
+          samplePropertyCreatedWebhook,
+          samplePropertyUpdatedWebhook,
+          samplePropertyDeletedWebhook,
+          sampleReservationCreatedWebhook,
+          sampleReservationUpdatedWebhook,
+          sampleReservationCancelledWebhook,
+          sampleReservationDeletedWebhook
+        } = await import('./lib/sampleWebhooks');
+        
+        let samplePayload;
+        
+        // Select the appropriate sample based on type
+        switch (req.body.sampleType) {
+          case 'property.created':
+            samplePayload = samplePropertyCreatedWebhook;
+            break;
+          case 'property.updated':
+            samplePayload = samplePropertyUpdatedWebhook;
+            break;
+          case 'property.deleted':
+            samplePayload = samplePropertyDeletedWebhook;
+            break;
+          case 'reservation.created':
+            samplePayload = sampleReservationCreatedWebhook;
+            break;
+          case 'reservation.updated':
+            samplePayload = sampleReservationUpdatedWebhook;
+            break;
+          case 'reservation.cancelled':
+            samplePayload = sampleReservationCancelledWebhook;
+            break;
+          case 'reservation.deleted':
+            samplePayload = sampleReservationDeletedWebhook;
+            break;
+          default:
+            return res.status(400).json({
+              success: false,
+              message: `Unknown sample type: ${req.body.sampleType}`
+            });
+        }
+        
+        // Extract details from the sample payload
+        const { eventType, entityType, entityId, data } = extractWebhookDetails(samplePayload);
+        
+        webhookEvent = {
+          eventType,
+          entityType,
+          entityId,
+          eventData: samplePayload,
+          signature: 'test-signature-sample',
+          ipAddress: req.ip
+        };
+        
+        console.log(`Using sample webhook: ${samplePayload.event}, ID: ${entityId}`);
+      }
+      // Check if this is a simulated Guesty payload
+      else if (req.body.event && req.body.data) {
+        console.log('Processing simulated Guesty webhook payload');
+        
+        // Extract details from the Guesty-like webhook payload
+        const { eventType, entityType, entityId, data } = extractWebhookDetails(req.body);
+        
+        webhookEvent = {
+          eventType,
+          entityType,
+          entityId,
+          eventData: req.body,
+          signature: 'test-signature-simulation',
+          ipAddress: req.ip
+        };
+        
+        console.log(`Extracted webhook details: type=${eventType}, entity=${entityType}, id=${entityId}`);
+      } 
+      // Otherwise use direct mode
+      else {
+        const { eventType, entityType, entityId, eventData } = req.body;
+        
+        if (!eventType || !entityType || !entityId || !eventData) {
+          return res.status(400).json({
+            success: false,
+            message: 'Missing required fields (eventType, entityType, entityId, eventData) or invalid Guesty webhook format'
+          });
+        }
+        
+        webhookEvent = {
+          eventType,
+          entityType,
+          entityId,
+          eventData,
+          signature: 'test-signature-direct',
+          ipAddress: req.ip
+        };
       }
       
-      // Create a test webhook event
-      const webhookEvent: InsertGuestyWebhookEvent = {
-        eventType: eventType,
-        entityType: entityType,
-        entityId: entityId,
-        eventData: eventData,
-        signature: 'test-signature',
+      // Log that we're using the test endpoint
+      await storage.createLog({
+        action: "GUESTY_TEST_WEBHOOK",
+        targetTable: webhookEvent.entityType,
+        notes: `Test webhook for ${webhookEvent.entityType}.${webhookEvent.eventType} with ID ${webhookEvent.entityId}`,
         ipAddress: req.ip
-      };
+      });
       
       // Insert the webhook event
       const [insertedEvent] = await db.insert(guestyWebhookEvents)
@@ -2558,7 +2654,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: 'Test webhook processed',
         webhookId: insertedEvent.id,
-        result
+        entityType: webhookEvent.entityType,
+        eventType: webhookEvent.eventType,
+        entityId: webhookEvent.entityId,
+        processingResult: result
       });
       
     } catch (error) {
