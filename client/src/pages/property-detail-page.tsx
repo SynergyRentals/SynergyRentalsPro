@@ -4,7 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, useRoute, Link } from "wouter";
 import { 
   Loader2, ChevronLeft, Building2, MapPin, Wifi, FileText, Tag, User, Calendar, ClipboardCheck,
-  Wrench, Package, ReceiptText, MessageSquare, Upload, Download, ArrowUpDown, Clipboard, Users
+  Wrench, Package, ReceiptText, MessageSquare, Upload, Download, ArrowUpDown, Clipboard, Users,
+  CalendarDays, Clock, AlertCircle, ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { queryClient } from "@/lib/queryClient";
 import { Unit, Guest, Maintenance, Inventory, Task, Document } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function PropertyDetailPage() {
   const { toast } = useToast();
@@ -292,6 +294,9 @@ export default function PropertyDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="documents">
             <FileText className="h-4 w-4 mr-2" /> Documents
+          </TabsTrigger>
+          <TabsTrigger value="calendar">
+            <CalendarDays className="h-4 w-4 mr-2" /> Calendar
           </TabsTrigger>
         </TabsList>
         
