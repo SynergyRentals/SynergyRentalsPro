@@ -957,6 +957,49 @@ export class MemStorage implements IStorage {
     this.logs.set(id, log);
     return log;
   }
+  
+  // HostAI Task Methods
+  async getHostAiTask(id: number): Promise<HostAiTask | undefined> {
+    return this.hostAiTasks.get(id);
+  }
+  
+  async createHostAiTask(insertTask: InsertHostAiTask): Promise<HostAiTask> {
+    const id = this.hostAiTaskIdCounter++;
+    const createdAt = new Date();
+    const task: HostAiTask = { 
+      ...insertTask, 
+      id, 
+      createdAt,
+      updatedAt: createdAt,
+      status: insertTask.status || "new"
+    };
+    this.hostAiTasks.set(id, task);
+    return task;
+  }
+  
+  async updateHostAiTask(id: number, taskData: Partial<HostAiTask>): Promise<HostAiTask | undefined> {
+    const task = this.hostAiTasks.get(id);
+    if (!task) return undefined;
+    
+    // Update the updatedAt timestamp
+    taskData.updatedAt = new Date();
+    
+    const updatedTask = { ...task, ...taskData };
+    this.hostAiTasks.set(id, updatedTask);
+    return updatedTask;
+  }
+  
+  async getAllHostAiTasks(): Promise<HostAiTask[]> {
+    return Array.from(this.hostAiTasks.values());
+  }
+  
+  async getHostAiTasksByStatus(status: string): Promise<HostAiTask[]> {
+    return Array.from(this.hostAiTasks.values()).filter(task => task.status === status);
+  }
+  
+  async getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]> {
+    return Array.from(this.hostAiTasks.values()).filter(task => task.assignedToUserId === userId);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1553,6 +1596,46 @@ export class DatabaseStorage implements IStorage {
   
   async getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]> {
     return await db.select().from(schema.cleaningChecklistCompletions).where(eq(schema.cleaningChecklistCompletions.cleaningTaskId, taskId));
+  }
+  
+  // HostAI Task Methods
+  async getHostAiTask(id: number): Promise<HostAiTask | undefined> {
+    const [task] = await db.select().from(schema.hostAiTasks).where(eq(schema.hostAiTasks.id, id));
+    return task;
+  }
+  
+  async createHostAiTask(insertTask: InsertHostAiTask): Promise<HostAiTask> {
+    const now = new Date();
+    const [task] = await db.insert(schema.hostAiTasks).values({
+      ...insertTask,
+      createdAt: now,
+      updatedAt: now,
+      status: insertTask.status || "new"
+    }).returning();
+    return task;
+  }
+  
+  async updateHostAiTask(id: number, taskData: Partial<HostAiTask>): Promise<HostAiTask | undefined> {
+    // Update the updatedAt timestamp
+    taskData.updatedAt = new Date();
+    
+    const [updatedTask] = await db.update(schema.hostAiTasks)
+      .set(taskData)
+      .where(eq(schema.hostAiTasks.id, id))
+      .returning();
+    return updatedTask;
+  }
+  
+  async getAllHostAiTasks(): Promise<HostAiTask[]> {
+    return await db.select().from(schema.hostAiTasks);
+  }
+  
+  async getHostAiTasksByStatus(status: string): Promise<HostAiTask[]> {
+    return await db.select().from(schema.hostAiTasks).where(eq(schema.hostAiTasks.status, status));
+  }
+  
+  async getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]> {
+    return await db.select().from(schema.hostAiTasks).where(eq(schema.hostAiTasks.assignedToUserId, userId));
   }
 }
 
