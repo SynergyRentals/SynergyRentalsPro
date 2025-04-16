@@ -93,40 +93,29 @@ export function CalendarView({ events }: CalendarViewProps) {
       }
       dateData.events.push(event);
       
-      // Handle reservation status if this is a reservation event
-      if (event.startDate && event.endDate && event.reservationId) {
-        // Check if this day is a check-in date (start of reservation)
-        if (isSameDay(event.date, event.startDate)) {
-          dateData.isCheckIn = true;
-          dateData.reservationId = event.reservationId;
-        }
-        
-        // Check if this day is a check-out date (end of reservation)
-        if (isSameDay(event.date, event.endDate)) {
-          dateData.isCheckOut = true;
-          dateData.reservationId = event.reservationId;
-        }
-        
-        // Check if this is an occupied date (between check-in and check-out)
-        if (isWithinInterval(event.date, { start: event.startDate, end: event.endDate })) {
-          dateData.isOccupied = true;
-          dateData.reservationId = event.reservationId;
-        }
-      }
-      
+      // We'll process reservation indicators separately later
       dateMap.set(dateKey, dateData);
     });
     
-    // Process reservations to mark occupied dates
+    // Process reservations to mark occupied dates with correct check-out logic
     events.forEach(event => {
       // Process only events with reservation data
       if (event.startDate && event.endDate && event.reservationId) {
-        // Get all dates between start and end (occupied period)
-        let currentDate = new Date(event.startDate);
-        const endDate = new Date(event.endDate);
+        // Get start date (check-in)
+        const startDate = new Date(event.startDate);
+        
+        // End date is the actual check-out date in the data
+        const actualEndDate = new Date(event.endDate);
+        
+        // For display purposes, check-out dot should appear the day AFTER the actual check-out
+        // since guests typically check out at 11 AM but the unit is occupied until then
+        const displayCheckOutDate = addDays(actualEndDate, 1);
+        
+        // Get all dates between start and actual end (occupied period)
+        let currentDate = new Date(startDate);
         
         // Loop through all dates in the reservation period
-        while (currentDate <= endDate) {
+        while (currentDate <= actualEndDate) {
           const dateKey = format(currentDate, 'yyyy-MM-dd');
           const dateData = dateMap.get(dateKey);
           
@@ -135,13 +124,9 @@ export function CalendarView({ events }: CalendarViewProps) {
             dateData.isOccupied = true;
             dateData.reservationId = event.reservationId;
             
-            // Special markings for check-in and check-out days
-            if (isSameDay(currentDate, event.startDate)) {
+            // Special markings for check-in day (actual start date)
+            if (isSameDay(currentDate, startDate)) {
               dateData.isCheckIn = true;
-            }
-            
-            if (isSameDay(currentDate, event.endDate)) {
-              dateData.isCheckOut = true;
             }
             
             dateMap.set(dateKey, dateData);
@@ -149,6 +134,31 @@ export function CalendarView({ events }: CalendarViewProps) {
           
           // Move to next day
           currentDate = addDays(currentDate, 1);
+        }
+        
+        // Now handle the check-out indicator which appears on the day AFTER the actual end date
+        const checkOutDateKey = format(displayCheckOutDate, 'yyyy-MM-dd');
+        const checkOutDateData = dateMap.get(checkOutDateKey);
+        
+        if (checkOutDateData) {
+          checkOutDateData.isCheckOut = true;
+          checkOutDateData.reservationId = event.reservationId;
+          
+          // Add the event to this date if it's not already there
+          if (!checkOutDateData.events.some(e => e.reservationId === event.reservationId)) {
+            checkOutDateData.events.push({
+              ...event,
+              date: displayCheckOutDate,
+              type: "maintenance", // Using maintenance type for check-out events
+              label: `Check-out: ${event.label}`
+            });
+            checkOutDateData.hasEvents = true;
+            if (!checkOutDateData.eventTypes.includes("maintenance")) {
+              checkOutDateData.eventTypes.push("maintenance");
+            }
+          }
+          
+          dateMap.set(checkOutDateKey, checkOutDateData);
         }
       }
     });
