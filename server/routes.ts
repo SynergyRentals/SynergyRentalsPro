@@ -2896,6 +2896,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // HostAI webhook endpoints
+  
+  // Test endpoint for HostAI webhook
+  app.post("/api/webhooks/hostai/test", async (req: Request, res: Response) => {
+    try {
+      // Use a predefined test payload
+      const testPayload = {
+        task: {
+          id: "test-task-123",
+          description: "Test task for HostAI integration",
+          action: "clean",
+          assignee: {
+            firstName: "Test",
+            lastName: "User"
+          }
+        },
+        source: {
+          sourceType: "test",
+          link: "https://test.hostai.com/task/test-task-123"
+        },
+        attachments: [
+          {
+            type: "image",
+            url: "https://test.hostai.com/images/sample.jpg"
+          }
+        ],
+        guest: {
+          guestName: "John Doe",
+          guestEmail: "john.doe@example.com",
+          guestPhone: "+1234567890"
+        },
+        listing: {
+          listingName: "Test Property",
+          listingId: "property-abc-123"
+        },
+        _creationDate: new Date().toISOString()
+      };
+      
+      // Process the test payload
+      const result = await processHostAiWebhook(testPayload);
+      
+      res.json({
+        success: true,
+        message: "Test webhook processed successfully",
+        testPayload,
+        processingResult: result
+      });
+    } catch (error) {
+      console.error('Error processing test HostAI webhook:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Main HostAI webhook endpoint for receiving task events
+  // Note: Unlike Guesty, HostAI does not provide security mechanisms like signature verification,
+  // so we don't need a verification middleware
+  app.post("/api/webhooks/hostai", express.json(), async (req: Request, res: Response) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] HostAI webhook received`);
+    
+    try {
+      const webhookData = req.body;
+      
+      // Validate webhook format
+      if (!webhookData || !webhookData.task) {
+        console.error('Invalid HostAI webhook payload structure');
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid webhook payload structure'
+        });
+      }
+      
+      // Log the webhook receipt
+      await storage.createLog({
+        action: "HOSTAI_WEBHOOK_RECEIVED",
+        targetTable: "host_ai_tasks",
+        notes: `Task description: ${webhookData.task.description || 'No description'}`,
+        ipAddress: req.ip
+      });
+      
+      // Process the webhook immediately (no intermediate storage like Guesty)
+      const result = await processHostAiWebhook(webhookData);
+      
+      // Respond with the result
+      if (result.success) {
+        return res.status(201).json({
+          success: true,
+          message: result.message,
+          taskId: result.taskId
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: result.message
+        });
+      }
+    } catch (error) {
+      console.error('Error processing HostAI webhook:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  // HostAI tasks API endpoints
+  
+  // Get all HostAI tasks
+  app.get("/api/hostai/tasks", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const tasks = await storage.getAllHostAiTasks();
+      res.json(tasks);
+    } catch (error) {
+      console.error('Error retrieving HostAI tasks:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Get a specific HostAI task
+  app.get("/api/hostai/tasks/:id", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, message: 'Invalid task ID' });
+      }
+      
+      const task = await storage.getHostAiTask(taskId);
+      if (!task) {
+        return res.status(404).json({ success: false, message: 'Task not found' });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      console.error('Error retrieving HostAI task:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Update a HostAI task
+  app.patch("/api/hostai/tasks/:id", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, message: 'Invalid task ID' });
+      }
+      
+      const task = await storage.getHostAiTask(taskId);
+      if (!task) {
+        return res.status(404).json({ success: false, message: 'Task not found' });
+      }
+      
+      const updatedTask = await storage.updateHostAiTask(taskId, req.body);
+      
+      // Log the task update
+      await storage.createLog({
+        action: "HOSTAI_TASK_UPDATED",
+        targetTable: "host_ai_tasks",
+        targetId: taskId,
+        userId: req.user?.id,
+        notes: `Task status changed to: ${updatedTask?.status || 'unknown'}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(updatedTask);
+    } catch (error) {
+      console.error('Error updating HostAI task:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Get HostAI tasks by status
+  app.get("/api/hostai/tasks/status/:status", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const { status } = req.params;
+      const tasks = await storage.getHostAiTasksByStatus(status);
+      res.json(tasks);
+    } catch (error) {
+      console.error('Error retrieving HostAI tasks by status:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
   // Create HTTP server
   const httpServer = createServer(app);
 
