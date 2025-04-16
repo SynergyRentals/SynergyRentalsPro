@@ -1,0 +1,115 @@
+Create a toggle feature labeled Autopilot Mode within the HostAI Task Inbox. When enabled, the AI should be allowed to automatically assign urgency, routing, and scheduling for incoming tasks without user interaction—but only if it has sufficient historical data and confidence from past manual decisions.
+
+This feature is designed to reduce the number of tasks that require human review and streamline the flow of repeatable and predictable task assignments.
+
+Functional Requirements
+1. Toggle Component
+Label: Autopilot Mode
+
+Location: Top-right of the HostAI Inbox page
+
+Toggle state: ON / OFF
+
+Persist toggle status per user (use local storage or backend flag)
+
+2. Autopilot Behavior (When ON)
+When a new task is received from HostAI:
+
+AI checks if the task matches a known task pattern based on past manual entries (by unit, guest message, type, and language)
+
+If confidence is above the threshold:
+
+Autopilot selects:
+
+Urgency level
+
+Routing destination (team)
+
+Scheduling time
+
+Task is automatically assigned and scheduled
+
+A log entry is saved with decision metadata (who/what/why)
+
+If confidence is below the threshold:
+
+Task is held in the regular inbox for manual review
+
+Guidelines for Autopilot AI Decision Rules
+Confidence Requirements:
+Minimum threshold of 85% confidence based on:
+
+Matching title/description patterns
+
+Unit-specific history
+
+Guest message keywords
+
+Manual override logs
+
+Restrictions:
+AI must not auto-assign or auto-schedule:
+
+Tasks with incomplete reservation or unit data
+
+Tasks marked as “uncategorized” by the model
+
+Tasks at new properties with no history
+
+Must provide a reason for its decision if auto-assigned (stored in task record)
+
+AI Training Sources:
+Past manual task routing decisions
+
+Unit maintenance or cleaning history
+
+Labels previously assigned by operations staff
+
+Audit Log Requirements
+Create a basic audit log (in memory or persisted) showing:
+
+Autopilot decision timestamp
+
+Task ID
+
+Assigned urgency, team, and schedule
+
+Model confidence score
+
+Notes (why it chose the assignment)
+
+Backend/API Integration
+Toggle Control:
+
+GET /settings/hostai-autopilot
+
+PATCH /settings/hostai-autopilot
+Payload: { enabled: true | false }
+
+Decision Endpoint (when enabled):
+
+POST /hostai/tasks/:id/autopilot-process
+Automatically:
+
+Assigns task
+
+Schedules task
+
+Logs routing
+
+Audit Log:
+
+GET /hostai/autopilot-log
+
+POST /hostai/autopilot-log
+
+UI Behavior Summary
+When Autopilot is off: All tasks follow manual review flow
+
+When Autopilot is on:
+
+Qualified tasks skip manual inbox
+
+Show confirmation toast: Task auto-assigned to Maintenance Team for Unit 53A – Scheduled Tomorrow at 2:00 PM
+
+Unqualified tasks still appear in the manual inbox as normal

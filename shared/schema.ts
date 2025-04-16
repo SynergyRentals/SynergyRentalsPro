@@ -532,6 +532,40 @@ export const insertHostAiTaskSchema = createInsertSchema(hostAiTasks).omit({
   updatedAt: true,
 });
 
+// Host AI Autopilot Settings
+export const hostAiAutopilotSettings = pgTable("host_ai_autopilot_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  enabled: boolean("enabled").notNull().default(false),
+  confidenceThreshold: real("confidence_threshold").notNull().default(0.85), // Minimum confidence required to auto-process
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Host AI Autopilot Log for auditing
+export const hostAiAutopilotLog = pgTable("host_ai_autopilot_log", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => hostAiTasks.id),
+  decision: text("decision").notNull(), // auto-assigned, manual-review
+  urgency: text("urgency"), // high, medium, low
+  team: text("team"), // cleaning, maintenance, internal, vendor
+  confidence: real("confidence").notNull(),
+  scheduledFor: timestamp("scheduled_for"),
+  notes: text("notes"), // Reason for decision
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHostAiAutopilotSettingsSchema = createInsertSchema(hostAiAutopilotSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertHostAiAutopilotLogSchema = createInsertSchema(hostAiAutopilotLog).omit({
+  id: true,
+  createdAt: true,
+});
+
 // AI Prompt Schema
 export const aiPromptSchema = z.object({
   prompt: z.string().min(10, "Please provide a detailed description of at least 10 characters"),

@@ -14,7 +14,7 @@ import MaintenanceStatusChart from '@/components/dashboard/MaintenanceStatusChar
 import GuestAnalytics from '@/components/dashboard/GuestAnalytics';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { 
   Today, 
@@ -246,7 +246,7 @@ export default function DashboardPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar
+                <CalendarPicker
                   mode="single"
                   onSelect={handleDateSelect}
                   disabled={(date) => date > new Date() || date < new Date('2020-01-01')}
