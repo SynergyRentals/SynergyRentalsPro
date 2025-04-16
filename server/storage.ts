@@ -1727,6 +1727,11 @@ export class DatabaseStorage implements IStorage {
   }
   
   // HostAI Autopilot Settings Methods
+  async getHostAiAutopilotSettings(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
+    const [settings] = await db.select().from(schema.hostAiAutopilotSettings).where(eq(schema.hostAiAutopilotSettings.userId, userId));
+    return settings;
+  }
+  
   async getHostAiAutopilotSettingsByUser(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
     const [settings] = await db.select().from(schema.hostAiAutopilotSettings).where(eq(schema.hostAiAutopilotSettings.userId, userId));
     return settings;
@@ -1763,6 +1768,11 @@ export class DatabaseStorage implements IStorage {
 
   async getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]> {
     return await db.select().from(schema.hostAiAutopilotLog).where(eq(schema.hostAiAutopilotLog.taskId, taskId));
+  }
+  
+  async getAllHostAiAutopilotLogs(): Promise<typeof hostAiAutopilotLog.$inferSelect[]> {
+    return await db.select().from(schema.hostAiAutopilotLog)
+      .orderBy(desc(schema.hostAiAutopilotLog.createdAt));
   }
 }
 
