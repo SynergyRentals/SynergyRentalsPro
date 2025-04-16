@@ -508,8 +508,17 @@ export default function UnitDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Unit details card */}
                 <Card className="md:col-span-1">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Unit Details</CardTitle>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleOpenIcalDialog}
+                      className="flex items-center"
+                    >
+                      <CalendarDays className="h-4 w-4 mr-2" />
+                      {unit.icalUrl ? "Edit Calendar" : "Add Calendar"}
+                    </Button>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
