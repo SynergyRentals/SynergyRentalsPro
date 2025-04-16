@@ -54,16 +54,6 @@ export default function AuthPage() {
     }
   };
 
-  const handleRegister = async (data: z.infer<typeof extendedRegisterSchema>) => {
-    try {
-      const { confirmPassword, ...userData } = data;
-      await registerMutation.mutateAsync(userData);
-    } catch (error) {
-      console.error("Registration error:", error);
-      // Error will be handled by the useEffect above
-    }
-  };
-
   // Register form with extended validation
   const extendedRegisterSchema = insertUserSchema.extend({
     password: z.string().min(6, "Password must be at least 6 characters"),
@@ -86,10 +76,14 @@ export default function AuthPage() {
     },
   });
 
-  const handleRegister = (data: z.infer<typeof extendedRegisterSchema>) => {
-    // Remove confirmPassword before sending to API
-    const { confirmPassword, ...userData } = data;
-    registerMutation.mutate(userData);
+  const handleRegister = async (data: z.infer<typeof extendedRegisterSchema>) => {
+    try {
+      const { confirmPassword, ...userData } = data;
+      await registerMutation.mutateAsync(userData);
+    } catch (error) {
+      console.error("Registration error:", error);
+      // Error will be handled by the useEffect above
+    }
   };
   
   // If redirecting, don't render the form
