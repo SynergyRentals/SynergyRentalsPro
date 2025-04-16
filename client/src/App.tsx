@@ -15,8 +15,11 @@ import TeamPage from "@/pages/team-page-new";
 import CompanyPage from "@/pages/company-page";
 import AiToolsPage from "@/pages/ai-tools-page";
 import AdminPage from "@/pages/admin-page";
-import PropertiesPage from "@/pages/properties-page";
-import PropertyDetailPage from "@/pages/property-detail-page";
+// New properties pages
+import PropertiesNewPage from "@/pages/properties-new-page";
+import PropertyDetailNewPage from "@/pages/property-detail-new-page";
+import PropertyEditNewPage from "@/pages/property-edit-new-page";
+import PropertyNewPage from "@/pages/property-new-page";
 import UnitDetailPage from "@/pages/unit-detail-page";
 import ProjectsPage from "@/pages/projects-page";
 import ProjectDetailPage from "@/pages/project-detail-page";
@@ -40,8 +43,11 @@ function Router() {
       <ProtectedRoute path="/company" component={CompanyPage} />
       <ProtectedRoute path="/ai-tools" component={AiToolsPage} />
       <ProtectedRoute path="/admin" component={AdminPage} />
-      <ProtectedRoute path="/properties" component={PropertiesPage} />
-      <ProtectedRoute path="/properties/:id" component={PropertyDetailPage} />
+      {/* New properties routes */}
+      <ProtectedRoute path="/properties" component={PropertiesNewPage} />
+      <ProtectedRoute path="/properties/new" component={PropertyNewPage} />
+      <ProtectedRoute path="/properties/:id/edit" component={PropertyEditNewPage} />
+      <ProtectedRoute path="/properties/:id" component={PropertyDetailNewPage} />
       <ProtectedRoute path="/unit/:id" component={UnitDetailPage} />
       <ProtectedRoute path="/projects" component={ProjectsPage} />
       <ProtectedRoute path="/projects/:id" component={ProjectDetailPage} />
