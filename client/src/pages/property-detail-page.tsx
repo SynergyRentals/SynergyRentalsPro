@@ -117,10 +117,7 @@ export default function PropertyDetailPage() {
   // Mutation for updating property
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: Partial<Unit>) => {
-      return apiRequest(`/api/units/${propertyId}`, {
-        method: 'PATCH',
-        data
-      });
+      return apiRequest('PATCH', `/api/units/${propertyId}`, data);
     },
     onSuccess: () => {
       toast({
