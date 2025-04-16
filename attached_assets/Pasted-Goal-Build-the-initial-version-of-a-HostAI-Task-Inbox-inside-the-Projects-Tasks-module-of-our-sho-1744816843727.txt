@@ -1,0 +1,153 @@
+Goal:
+Build the initial version of a HostAI Task Inbox inside the Projects & Tasks module of our short-term rental operations software. This inbox will receive incoming tasks from HostAI (via webhook or queue), display them as actionable cards, and allow users to assign urgency and route the task to the correct team. This system will be AI-powered to learn and suggest routing based on historical decisions.
+
+1. Clarity and Specificity
+Component Name: HostAITaskInbox
+Location: /projects-tasks/hostai-inbox
+Purpose: Provide a structured workflow for processing guest-related tasks escalated by HostAI (e.g., maintenance issues, supply requests, cleaning notes, urgent problems).
+
+2. UI Layout – Card-Based Interface
+Each task should be displayed as a card with the following structure:
+
+Task Card Contents:
+
+Location: Unit name or address (e.g., “Soulard 3A”)
+
+Guest Info: Guest name and reservation dates (e.g., “John Smith, April 12–14”)
+
+Task Title: HostAI-generated title (e.g., “No Hot Water”)
+
+Task Description: Guest complaint or HostAI summary
+
+Two Button Rows Below the Description:
+
+Row 1 – Urgency Level (Single Select):
+
+High
+
+Medium
+
+Low
+
+Row 2 – Route To (Single Select):
+
+Cleaning Team
+
+Maintenance Team
+
+Internal Team
+
+Vendor / Landlord
+
+Visual: Use toggle buttons with Tailwind classes that update selected states.
+
+3. Routing & Submission Logic
+Once both urgency and routing team are selected:
+
+Display a Submit Task button
+
+Upon submission:
+
+Send the task to /tasks endpoint with all metadata
+
+Mark the original HostAI task as “processed” via PATCH /hostai/tasks/:id
+
+Remove task from the inbox display
+
+4. Backend Integration
+API Endpoints:
+
+GET /hostai/tasks
+Returns all unprocessed HostAI tasks
+
+POST /tasks
+Creates a new routed task in the task system
+
+PATCH /hostai/tasks/:id
+Marks HostAI task as processed
+
+Expected HostAI Task Format (API response):
+
+ts
+Copy
+Edit
+{
+  id: "task_001",
+  unitName: "Compton 2B",
+  guestName: "Maria Gonzalez",
+  checkIn: "2024-06-21",
+  checkOut: "2024-06-24",
+  title: "No Hot Water",
+  description: "Guest reported no hot water in the shower.",
+  createdAt: "2024-06-20T12:44:00Z"
+}
+5. React Component Requirements
+Use useEffect to fetch tasks on component mount
+
+Use useState to manage selections per card
+
+Handle loading, success, and error states
+
+Use Tailwind CSS for styling with responsive design in mind
+
+Each card should be memoized for performance if list is long
+
+6. AI-Enabled Routing (Phase 2)
+Prepare for AI enhancement:
+
+Add a placeholder text below buttons like: "Suggested: Medium • Maintenance Team"
+
+Later allow this to auto-fill urgency/team selections
+
+Create a field in the database or state to log routing decisions for training
+
+7. AI Task Inbox Settings Page
+Create /projects-tasks/hostai-inbox/settings with a simple layout.
+
+Settings may include:
+
+Enable/disable auto-suggestion
+
+AI training feedback toggle
+
+Suggested routing accuracy display
+
+Logs of past decisions
+
+8. Testing Guidance
+Test for the following use cases:
+
+Task renders with required fields
+
+User selects urgency and routing → enables submission
+
+On submit:
+
+New task is created
+
+HostAI task is marked as processed
+
+Handle errors in API calls (retry logic or error message)
+
+Remove processed task from inbox view
+
+9. Performance Considerations
+Use memoized components for large task sets
+
+Paginate or virtualize task lists if needed
+
+Add loading skeletons to reduce perceived delay
+
+10. Usage in Dashboard
+Component should be imported and used as:
+
+tsx
+Copy
+Edit
+import { HostAITaskInbox } from "@/components/tasks/HostAITaskInbox";
+Mounted at:
+
+tsx
+Copy
+Edit
+<Route path="/projects-tasks/hostai-inbox" element={<HostAITaskInbox />} />
