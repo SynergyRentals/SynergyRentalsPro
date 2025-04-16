@@ -168,6 +168,7 @@ export interface IStorage {
   getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]>;
   
   // HostAI Autopilot Settings
+  getHostAiAutopilotSettings(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined>;
   getHostAiAutopilotSettingsByUser(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined>;
   createHostAiAutopilotSettings(settings: InsertHostAiAutopilotSettings): Promise<typeof hostAiAutopilotSettings.$inferSelect>;
   updateHostAiAutopilotSettings(id: number, settings: Partial<typeof hostAiAutopilotSettings.$inferSelect>): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined>;
@@ -175,6 +176,7 @@ export interface IStorage {
   // HostAI Autopilot Log
   createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<typeof hostAiAutopilotLog.$inferSelect>;
   getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]>;
+  getAllHostAiAutopilotLogs(): Promise<typeof hostAiAutopilotLog.$inferSelect[]>;
   
   // Session store
   sessionStore: session.Store;
@@ -1027,6 +1029,10 @@ export class MemStorage implements IStorage {
   }
 
   // HostAI Autopilot Settings Methods
+  async getHostAiAutopilotSettings(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
+    return Array.from(this.hostAiAutopilotSettings.values()).find(settings => settings.userId === userId);
+  }
+  
   async getHostAiAutopilotSettingsByUser(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
     return Array.from(this.hostAiAutopilotSettings.values()).find(settings => settings.userId === userId);
   }
@@ -1045,6 +1051,12 @@ export class MemStorage implements IStorage {
     };
     this.hostAiAutopilotSettings.set(id, newSettings);
     return newSettings;
+  }
+  
+  async getAllHostAiAutopilotLogs(): Promise<typeof hostAiAutopilotLog.$inferSelect[]> {
+    return Array.from(this.hostAiAutopilotLogs.values()).sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
   }
 
   async updateHostAiAutopilotSettings(id: number, settingsData: Partial<typeof hostAiAutopilotSettings.$inferSelect>): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {

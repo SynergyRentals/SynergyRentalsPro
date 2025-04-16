@@ -197,6 +197,57 @@ export default function HostAIInboxSettingsPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Autopilot Mode Configuration</CardTitle>
+                <CardDescription>
+                  Enable AI to automatically process tasks with high confidence scores
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="autopilot-mode" className="text-base">Enable Autopilot Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      When enabled, high-confidence tasks will be processed automatically
+                    </p>
+                  </div>
+                  <Switch
+                    id="autopilot-mode"
+                    checked={autopilotEnabled}
+                    onCheckedChange={setAutopilotEnabled}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <Label htmlFor="confidence-threshold" className="text-base">Confidence Threshold: {confidenceThreshold}%</Label>
+                  </div>
+                  <Slider
+                    id="confidence-threshold"
+                    min={50}
+                    max={99}
+                    step={1}
+                    value={[confidenceThreshold]}
+                    onValueChange={(values) => setConfidenceThreshold(values[0])}
+                    disabled={!autopilotEnabled}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Only tasks with confidence scores above this threshold will be automatically processed.
+                    Higher values are safer but reduce automation.
+                  </p>
+                </div>
+
+                <Button 
+                  onClick={saveSettings} 
+                  className="mt-4 w-full"
+                  disabled={updateSettingsMutation.isPending}
+                >
+                  {updateSettingsMutation.isPending ? "Saving..." : "Save Autopilot Settings"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Suggestion Accuracy</CardTitle>
                 <CardDescription>
                   How well the AI has been performing on suggestions
@@ -227,44 +278,103 @@ export default function HostAIInboxSettingsPage() {
           <TabsContent value="history" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Routing Decisions</CardTitle>
+                <CardTitle>Autopilot Activity Log</CardTitle>
                 <CardDescription>
-                  History of task routings and AI suggestion accuracy
+                  History of automatic task decisions made by the AI
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Suggested</TableHead>
-                      <TableHead>Actual</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentDecisions.map((decision) => (
-                      <TableRow key={decision.id}>
-                        <TableCell>{decision.taskTitle}</TableCell>
-                        <TableCell>{decision.unitName}</TableCell>
-                        <TableCell>
-                          {decision.suggestedUrgency} • {decision.suggestedTeam}
-                        </TableCell>
-                        <TableCell>
-                          <span className={decision.suggestedUrgency === decision.actualUrgency ? "text-green-600" : "text-amber-600"}>
-                            {decision.actualUrgency}
-                          </span>
-                          {" • "}
-                          <span className={decision.suggestedTeam === decision.actualTeam ? "text-green-600" : "text-amber-600"}>
-                            {decision.actualTeam}
-                          </span>
-                        </TableCell>
-                        <TableCell>{decision.date}</TableCell>
+                {logsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">Loading activity logs...</p>
+                  </div>
+                ) : !autopilotLogs || autopilotLogs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BotIcon className="mx-auto h-12 w-12 text-muted-foreground/60" />
+                    <h3 className="mt-4 text-lg font-medium">No autopilot activity yet</h3>
+                    <p className="text-muted-foreground mt-2 mb-4">
+                      Enable Autopilot Mode to start automatically processing tasks with high confidence.
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Task ID</TableHead>
+                        <TableHead>Decision</TableHead>
+                        <TableHead>Confidence</TableHead>
+                        <TableHead>Assignment</TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {autopilotLogs.map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell>#{log.taskId}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {log.decision === "auto-processed" ? (
+                                <Badge variant="success" className="bg-green-100 text-green-800 hover:bg-green-200">
+                                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                  Auto-processed
+                                </Badge>
+                              ) : log.decision === "skipped" ? (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-800 hover:bg-amber-100">
+                                  <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                                  Skipped
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">
+                                  {log.decision}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <span className="mr-2">{Math.round(log.confidence * 100)}%</span>
+                              <div className="w-16 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full ${
+                                    log.confidence >= 0.9 ? "bg-green-500" : 
+                                    log.confidence >= 0.8 ? "bg-blue-500" : 
+                                    log.confidence >= 0.7 ? "bg-amber-500" : "bg-red-500"
+                                  }`} 
+                                  style={{ width: `${log.confidence * 100}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {log.urgency && log.team ? (
+                              <>
+                                <span className={`font-medium ${
+                                  log.urgency === "high" ? "text-red-600" : 
+                                  log.urgency === "medium" ? "text-amber-600" : 
+                                  "text-green-600"
+                                }`}>{log.urgency}</span>
+                                {" • "}
+                                <span>{log.team}</span>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">N/A</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {log.createdAt ? (
+                              <div className="whitespace-nowrap">
+                                {format(new Date(log.createdAt), "MMM d, yyyy")}
+                                <div className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                                </div>
+                              </div>
+                            ) : <span>Unknown</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
