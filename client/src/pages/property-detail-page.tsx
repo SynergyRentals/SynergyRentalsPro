@@ -22,6 +22,8 @@ export default function PropertyDetailPage() {
   const [_, params] = useRoute("/properties/:id");
   const [, setLocation] = useLocation();
   const propertyId = params ? parseInt(params.id) : null;
+  const [showIcalInput, setShowIcalInput] = useState(false);
+  const [newIcalUrl, setNewIcalUrl] = useState("");
   
   // Get property details
   const { 
@@ -92,7 +94,8 @@ export default function PropertyDetailPage() {
   const {
     data: calendarEvents,
     isLoading: isLoadingCalendar,
-    error: calendarError
+    error: calendarError,
+    refetch: refetchCalendar
   } = useQuery({
     queryKey: ['/api/units', propertyId, 'calendar'],
     queryFn: async () => {
@@ -106,6 +109,34 @@ export default function PropertyDetailPage() {
       return response.json();
     },
     enabled: !!propertyId && !!property?.icalUrl,
+  });
+  
+  // Mutation for updating property
+  const updatePropertyMutation = useMutation({
+    mutationFn: async (data: Partial<Unit>) => {
+      return apiRequest(`/api/units/${propertyId}`, {
+        method: 'PATCH',
+        data
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Property updated",
+        description: "The property details have been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/units'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId, 'calendar'] });
+      setShowIcalInput(false);
+      setNewIcalUrl("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Error updating property",
+        description: `Failed to update property: ${error}`,
+        variant: "destructive"
+      });
+    }
   });
   
   // Handle navigation back to properties list
@@ -655,7 +686,11 @@ export default function PropertyDetailPage() {
                   <p className="text-gray-500 text-sm mb-4 max-w-md">
                     This property doesn't have an iCal URL configured. Add an iCal URL to see reservations and availability from external booking platforms.
                   </p>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowIcalInput(true)}
+                  >
                     <Plus className="h-4 w-4 mr-2" /> Add iCal URL
                   </Button>
                 </div>
