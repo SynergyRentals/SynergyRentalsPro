@@ -1,0 +1,61 @@
+We need to integrate with a service called "HostAI" which sends webhooks containing task information via POST requests with a JSON payload. HostAI does not provide a security mechanism like signature verification, so we will accept incoming data directly (with the associated risks). Our application backend is built with Node.js/Express/TypeScript and uses Drizzle ORM for the database. The goal is to receive, parse, and store these tasks to eventually display/manage them in a frontend UI.
+
+Provided HostAI Webhook Payload Structure:
+
+JSON
+
+{
+  "task": {
+    "action": "string",
+    "description": "string",
+    "assignee": { "firstName": "string", "lastName": "string" }
+  },
+  "source": { "sourceType": "TaskSource", "link": "string" },
+  "attachments": [{ "name"?: "string", "extension"?: "string", "url": "string" }],
+  "guest": { "guestName": "string", "guestEmail": "string", "guestPhone": "string" },
+  "listing": { "listingName": "string", "listingId": "string" },
+  "_creationDate": "string" // ISO 8601 format
+}
+Goal:
+Implement the backend functionality to receive HostAI task webhooks: create a dedicated endpoint, parse the payload, define a corresponding Drizzle schema, and store the incoming task data in our database.
+
+Instructions:
+
+Define Drizzle Schema (src/server/db/schema.ts or similar):
+
+Create a new Drizzle table schema named tasks.
+Include columns based on the webhook payload, storing the relevant information. Suggested columns:
+id (auto-incrementing primary key or UUID)
+hostAiAction (string, nullable, from task.action)
+description (text, from task.description)
+hostAiAssigneeFirstName (string, nullable, from task.assignee.firstName)
+hostAiAssigneeLastName (string, nullable, from task.assignee.lastName)
+sourceType (string, nullable, from source.sourceType)
+sourceLink (string, nullable, from source.link)
+attachmentsJson (json, nullable, store the attachments array as JSON)
+guestName (string, nullable)
+guestEmail (string, nullable)
+guestPhone (string, nullable)
+listingName (string, nullable)
+listingId (string, nullable, potentially foreign key to a listings table if you have one)
+status (string, e.g., 'new', 'assigned', 'in_progress', 'completed', default 'new')
+assignedToUserId (string/int, nullable, foreign key to your internal users or teamMembers table - agent might need schema context for this relationship)
+hostAiCreatedAt (timestamp, nullable, parsed from _creationDate)
+createdAt (timestamp, default now)
+updatedAt (timestamp, default now, updates on edit)
+Create Webhook Endpoint:
+
+Add a new POST route in your Express application at /api/webhooks/hostai-tasks.
+Apply standard JSON body parsing middleware: app.use('/api/webhooks/hostai-tasks', express.json({ limit: '5mb' })); (Ensure this middleware runs before your route handler for this path. Adjust limit if needed).
+Acknowledge Receipt:
+
+The first thing the route handler should do is send a 200 OK response back to HostAI to acknowledge receipt quickly.
+Asynchronous Processing & Data Storage:
+
+After sending the 200 OK, process the request body asynchronously (the handler function should be async).
+Use a try/catch block for robustness around the processing logic.
+Log the received payload (which Express should have parsed into req.body): console.log('[Timestamp] HostAI Task Webhook Received:', req.body);
+Extract the relevant fields from the req.body according to the structure provided.
+Use Drizzle ORM (db.insert(tasks).values(...)) to create a new record in the tasks table defined in Step 1. Map the payload fields to the corresponding schema columns. Convert _creationDate string to a Date object for hostAiCreatedAt. Set default status and assignedToUserId. Handle potential errors during parsing or insertion.
+Log success or failure of the database insertion.
+Instructions for Agent: "Please implement the backend handling for HostAI task webhooks, noting that no security verification is required. First, define a Drizzle schema for a tasks table based on the provided payload structure and suggested columns, including fields for status and internal assignment (assignedToUserId, nullable). Then, create an Express POST endpoint at /api/webhooks/hostai-tasks using express.json() middleware for body parsing. The endpoint should respond 200 OK immediately. After responding, asynchronously parse the req.body JSON payload and insert the data into the new tasks Drizzle table. Include logging for received webhooks and database operations.
