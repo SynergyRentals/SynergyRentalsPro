@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { queryClient } from "@/lib/queryClient";
-import { Unit, Guest, Maintenance, Inventory, Task, Document } from "@shared/schema";
+import { Unit, Guest, Maintenance, Inventory, Task, Document, GuestyProperty } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -305,7 +305,7 @@ export default function PropertyDetailPage() {
   
   // Mutation for updating property
   const updatePropertyMutation = useMutation({
-    mutationFn: async (data: Partial<Unit>) => {
+    mutationFn: async (data: Partial<GuestyProperty>) => {
       return apiRequest('PATCH', `/api/guesty/properties/${propertyId}`, data);
     },
     onSuccess: async (_, variables) => {
@@ -416,17 +416,13 @@ export default function PropertyDetailPage() {
                 </CardDescription>
               </div>
               <div>
-                {!property.active && (
-                  <Badge variant="outline" className="text-gray-500">
-                    Inactive
-                  </Badge>
-                )}
-                {property.tags && property.tags.length > 0 && (
+                {/* Display property amenities instead of tags */}
+                {property.amenities && property.amenities.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2 justify-end">
-                    {property.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
+                    {property.amenities.map((amenity, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
                         <Tag className="h-3 w-3 mr-1" />
-                        {tag}
+                        {amenity}
                       </Badge>
                     ))}
                   </div>
@@ -435,36 +431,34 @@ export default function PropertyDetailPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {property.notes && (
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Notes</h3>
-                <p className="text-gray-700">{property.notes}</p>
-              </div>
-            )}
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {property.wifiInfo && (
-                <div className="border p-3 rounded-md flex items-start">
-                  <Wifi className="h-5 w-5 mr-2 text-blue-500 mt-0.5" />
-                  <div>
-                    <h3 className="text-sm font-medium">WiFi Information</h3>
-                    <p className="text-sm text-gray-600">{property.wifiInfo}</p>
-                  </div>
+              {/* Property Details Box */}
+              <div className="border p-3 rounded-md flex items-start">
+                <Building2 className="h-5 w-5 mr-2 text-blue-500 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-medium">Property Details</h3>
+                  <p className="text-sm text-gray-600">
+                    {property.bedrooms || 0} bedroom(s), {property.bathrooms || 0} bathroom(s)
+                  </p>
+                  {property.propertyId && (
+                    <p className="text-xs text-gray-500 mt-1">ID: {property.propertyId}</p>
+                  )}
                 </div>
-              )}
-              
-              {property.leaseUrl && (
+              </div>
+
+              {/* Listing URL Box */}
+              {property.listingUrl && (
                 <div className="border p-3 rounded-md flex items-start">
-                  <FileText className="h-5 w-5 mr-2 text-gray-500 mt-0.5" />
+                  <ExternalLink className="h-5 w-5 mr-2 text-gray-500 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-medium">Lease Document</h3>
+                    <h3 className="text-sm font-medium">Listing URL</h3>
                     <a 
-                      href={property.leaseUrl} 
+                      href={property.listingUrl} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline flex items-center mt-1"
                     >
-                      <Download className="h-3 w-3 mr-1" /> View or Download Lease
+                      <ExternalLink className="h-3 w-3 mr-1" /> View External Listing
                     </a>
                   </div>
                 </div>
