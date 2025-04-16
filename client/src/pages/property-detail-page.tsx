@@ -103,6 +103,7 @@ export default function PropertyDetailPage() {
     queryKey: ['/api/units', propertyId, 'calendar'],
     queryFn: async () => {
       console.log('Attempting to fetch calendar events for property:', propertyId);
+      console.log('Property data:', property);
       console.log('Property iCal URL:', property?.icalUrl);
       
       if (!property?.icalUrl) {
@@ -129,7 +130,7 @@ export default function PropertyDetailPage() {
         throw error;
       }
     },
-    enabled: !!propertyId && !!property?.icalUrl,
+    enabled: !!propertyId && !!property,
   });
   
   // Auto-refresh calendar if we have an icalUrl but no events
