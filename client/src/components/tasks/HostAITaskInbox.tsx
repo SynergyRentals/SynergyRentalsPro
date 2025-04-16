@@ -37,7 +37,11 @@ type TaskSelection = {
   team: string | null;
 };
 
-export function HostAITaskInbox() {
+type HostAITaskInboxProps = {
+  autopilotEnabled?: boolean;
+};
+
+export function HostAITaskInbox({ autopilotEnabled = false }: HostAITaskInboxProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -361,7 +365,9 @@ export function HostAITaskInbox() {
           <div className="mx-auto max-w-md">
             <h3 className="text-lg font-medium">No unprocessed tasks</h3>
             <p className="text-muted-foreground mt-2">
-              There are no new HostAI tasks that need processing at this time. Check back later or refresh to see new tasks.
+              {autopilotEnabled 
+                ? "Autopilot Mode is active. Tasks with high confidence scores are being processed automatically. Check the logs in Settings to review automated decisions."
+                : "There are no new HostAI tasks that need processing at this time. Check back later or refresh to see new tasks."}
             </p>
             <Button 
               onClick={() => refetch()} 
@@ -370,6 +376,15 @@ export function HostAITaskInbox() {
             >
               Refresh
             </Button>
+            {autopilotEnabled && (
+              <Button 
+                onClick={() => window.location.href = "/projects-tasks/hostai-inbox/settings"}
+                variant="link" 
+                className="mt-4 ml-2"
+              >
+                View Autopilot Logs
+              </Button>
+            )}
           </div>
         </div>
       ) : (
