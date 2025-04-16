@@ -38,7 +38,7 @@ export default function PropertyDetailPage() {
     data: property, 
     isLoading: isLoadingProperty, 
     error: propertyError 
-  } = useQuery({
+  } = useQuery<GuestyProperty>({
     queryKey: ['/api/guesty/properties', propertyId],
     enabled: !!propertyId,
   });
