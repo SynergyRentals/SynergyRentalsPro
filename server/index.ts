@@ -2,10 +2,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import path from "path";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use('/public', express.static(path.join(process.cwd(), 'public')));
 app.use(fileUpload({
   createParentPath: true,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit

@@ -3080,6 +3080,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // HostAI test page
+  app.get("/hostai-test", (req: Request, res: Response) => {
+    res.sendFile('hostai-webhook-test.html', { root: './public' });
+  });
+  
   // HostAI tasks API endpoints
   
   // Get all HostAI tasks

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HostAI Webhook Test</title>
+    <script>
+        async function submitTestWebhook() {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = 'Sending request...';
+            
+            try {
+                const response = await fetch('/api/webhooks/hostai/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                resultElement.textContent = JSON.stringify(data, null, 2);
+                
+                // Show tasks list if successful
+                if (data.success) {
+                    fetchTasks();
+                }
+            } catch (error) {
+                resultElement.textContent = `Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+        
+        async function submitActualWebhook() {
+            const payload = document.getElementById('webhookPayload').value;
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = 'Sending request...';
+            
+            try {
+                let parsedPayload;
+                try {
+                    parsedPayload = JSON.parse(payload);
+                } catch (parseError) {
+                    resultElement.textContent = `Error parsing JSON: ${parseError.message}`;
+                    return;
+                }
+                
+                const response = await fetch('/api/webhooks/hostai', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: payload
+                });
+                
+                const data = await response.json();
+                resultElement.textContent = JSON.stringify(data, null, 2);
+                
+                // Show tasks list if successful
+                if (data.success) {
+                    fetchTasks();
+                }
+            } catch (error) {
+                resultElement.textContent = `Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+        
+        async function fetchTasks() {
+            const tasksElement = document.getElementById('tasks');
+            tasksElement.textContent = 'Loading tasks...';
+            
+            try {
+                const response = await fetch('/api/hostai/tasks');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const tasks = await response.json();
+                
+                if (tasks && tasks.length > 0) {
+                    const tasksList = document.createElement('ul');
+                    tasks.forEach(task => {
+                        const li = document.createElement('li');
+                        li.textContent = `ID: ${task.id} - Status: ${task.status} - ${task.description}`;
+                        tasksList.appendChild(li);
+                    });
+                    
+                    tasksElement.innerHTML = '';
+                    tasksElement.appendChild(tasksList);
+                } else {
+                    tasksElement.textContent = 'No tasks found';
+                }
+            } catch (error) {
+                tasksElement.textContent = `Error loading tasks: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+        
+        // Load sample payload when page loads
+        window.onload = function() {
+            const samplePayload = {
+                task: {
+                    action: "clean",
+                    description: "Test task from web form",
+                    assignee: {
+                        firstName: "Test",
+                        lastName: "User"
+                    }
+                },
+                source: {
+                    sourceType: "TaskSource",
+                    link: "https://example.com/task"
+                },
+                attachments: [
+                    {
+                        name: "Report",
+                        extension: "pdf",
+                        url: "https://example.com/report.pdf"
+                    }
+                ],
+                guest: {
+                    guestName: "John Smith",
+                    guestEmail: "john@example.com",
+                    guestPhone: "+1234567890"
+                },
+                listing: {
+                    listingName: "Beach House",
+                    listingId: "prop123"
+                },
+                _creationDate: new Date().toISOString()
+            };
+            
+            document.getElementById('webhookPayload').value = JSON.stringify(samplePayload, null, 2);
+        };
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>HostAI Webhook Test Tool</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Test Options</h2>
+            <button onclick="submitTestWebhook()">Run Test Webhook</button>
+            <p>This sends a test request to the /api/webhooks/hostai/test endpoint which will create a task using a random test format.</p>
+            
+            <h2>Custom Payload Test</h2>
+            <textarea id="webhookPayload" placeholder="Enter JSON payload here"></textarea>
+            <button onclick="submitActualWebhook()">Send Custom Webhook</button>
+            <p>This sends your custom payload to the actual /api/webhooks/hostai endpoint.</p>
+        </div>
+        
+        <div class="panel">
+            <h2>Response</h2>
+            <pre id="result">Response will appear here</pre>
+            
+            <h2>Tasks List</h2>
+            <button onclick="fetchTasks()">Load Tasks</button>
+            <div id="tasks">Click "Load Tasks" to view tasks</div>
+        </div>
+    </div>
+</body>
+</html>
