@@ -2901,45 +2901,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test endpoint for HostAI webhook
   app.post("/api/webhooks/hostai/test", async (req: Request, res: Response) => {
     try {
-      // Use a predefined test payload that matches HostAI's exact format
-      const testPayload = {
-        task: {
+      // Create several different test webhook formats to show we can handle various formats
+      const testFormats = [
+        // Format 1: Our ideal structure with nested task object
+        {
+          task: {
+            description: "Test task from HostAI - Format 1 (nested structure)",
+            action: "clean",
+            assignee: {
+              firstName: "Test",
+              lastName: "User"
+            }
+          },
+          source: {
+            sourceType: "TaskSource",
+            link: "https://hostai.example.com/tasks/123"
+          },
+          attachments: [
+            {
+              name: "Task Photo",
+              extension: "jpg",
+              url: "https://hostai.example.com/attachments/123.jpg"
+            }
+          ],
+          guest: {
+            guestName: "John Doe",
+            guestEmail: "john.doe@example.com",
+            guestPhone: "+1234567890"
+          },
+          listing: {
+            listingName: "Test Property",
+            listingId: "property-abc-123"
+          },
+          _creationDate: new Date().toISOString()
+        },
+        
+        // Format 2: Flat structure with fields at root level
+        {
+          description: "Test task from HostAI - Format 2 (flat structure)",
           action: "clean",
-          description: "Test task for HostAI integration",
-          assignee: {
-            firstName: "Test",
-            lastName: "User"
-          }
-        },
-        source: {
+          assigneeFirstName: "Test",
+          assigneeLastName: "User",
           sourceType: "TaskSource",
-          link: "https://hostai.example.com/tasks/123"
-        },
-        attachments: [
-          {
-            name: "Task Photo",
-            extension: "jpg",
-            url: "https://hostai.example.com/attachments/123.jpg"
-          }
-        ],
-        guest: {
+          sourceLink: "https://hostai.example.com/tasks/123",
+          attachments: ["https://hostai.example.com/attachments/123.jpg"],
           guestName: "John Doe",
           guestEmail: "john.doe@example.com",
-          guestPhone: "+1234567890"
-        },
-        listing: {
+          guestPhone: "+1234567890",
           listingName: "Test Property",
-          listingId: "property-abc-123"
+          listingId: "property-abc-123",
+          createdAt: new Date().toISOString()
         },
-        _creationDate: new Date().toISOString()
-      };
+        
+        // Format 3: Minimal structure with just a description
+        {
+          description: "Test task from HostAI - Format 3 (minimal structure)"
+        }
+      ];
+      
+      // Randomly select one of the test formats to simulate different HostAI payloads
+      const randomIndex = Math.floor(Math.random() * testFormats.length);
+      const testPayload = testFormats[randomIndex];
+      
+      console.log(`Using test webhook format ${randomIndex + 1}:`, JSON.stringify(testPayload, null, 2));
       
       // Process the test payload
       const result = await processHostAiWebhook(testPayload);
       
+      // Log the test
+      await storage.createLog({
+        action: "HOSTAI_TEST_WEBHOOK",
+        targetTable: "host_ai_tasks",
+        notes: `Test webhook processed: ${result.success ? 'successfully' : 'with errors'}. Format: ${randomIndex + 1}`,
+        ipAddress: req.ip
+      });
+      
       res.json({
         success: true,
         message: "Test webhook processed successfully",
+        testFormat: randomIndex + 1,
         testPayload,
         processingResult: result
       });
@@ -2955,39 +2995,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Main HostAI webhook endpoint for receiving task events
   // Note: Unlike Guesty, HostAI does not provide security mechanisms like signature verification,
   // so we don't need a verification middleware
-  app.post("/api/webhooks/hostai", express.json(), async (req: Request, res: Response) => {
+  app.post("/api/webhooks/hostai", express.raw({ type: '*/*' }), async (req: Request, res: Response) => {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] HostAI webhook received:`, JSON.stringify(req.body, null, 2));
+    console.log(`[${timestamp}] HostAI webhook received`);
     
     try {
-      const webhookData = req.body;
+      let webhookData: any;
       
-      // More flexible validation (matches the logic in hostAiWebhookHandler.ts)
-      const hasValidTask = webhookData && 
-        (webhookData.task || 
-        (typeof webhookData === 'object' && 'description' in webhookData));
+      // Log the raw request body for debugging
+      console.log('HostAI webhook received with raw body type:', typeof req.body);
       
-      if (!hasValidTask) {
-        console.error('Invalid HostAI webhook payload structure');
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid webhook payload structure. Required format expected per documentation.'
-        });
+      // Try to parse the request body as JSON, but handle other formats too
+      if (Buffer.isBuffer(req.body)) {
+        console.log('Request body is a buffer, trying to convert to string and parse');
+        try {
+          const bodyStr = req.body.toString('utf8');
+          console.log('Request body as string:', bodyStr);
+          
+          try {
+            webhookData = JSON.parse(bodyStr);
+          } catch (parseError) {
+            console.log('Failed to parse as JSON, using raw string');
+            webhookData = { description: bodyStr };
+          }
+        } catch (bufferError) {
+          console.log('Failed to process buffer, using empty object');
+          webhookData = {};
+        }
+      } else if (typeof req.body === 'string') {
+        console.log('Request body is a string, trying to parse as JSON');
+        try {
+          webhookData = JSON.parse(req.body);
+        } catch (parseError) {
+          console.log('Failed to parse string as JSON, using as description');
+          webhookData = { description: req.body };
+        }
+      } else if (typeof req.body === 'object') {
+        console.log('Request body is an object, using directly');
+        webhookData = req.body;
+      } else {
+        console.log('Unsupported request body type, creating empty object');
+        webhookData = {};
       }
       
-      // Log the webhook receipt
-      const taskDescription = webhookData.task ? 
-        webhookData.task.description || 'No description' : 
-        webhookData.description || 'No description';
-        
+      // Log the parsed webhook data
+      console.log('HostAI webhook data after parsing:', JSON.stringify(webhookData, null, 2));
+      
+      // Log the webhook receipt (even if empty, we'll at least record that we got something)
       await storage.createLog({
         action: "HOSTAI_WEBHOOK_RECEIVED",
         targetTable: "host_ai_tasks",
-        notes: `Task description: ${taskDescription}`,
+        notes: `HostAI webhook received at ${timestamp}`,
         ipAddress: req.ip
       });
       
-      // Process the webhook immediately (no intermediate storage like Guesty)
+      // Process the webhook data, regardless of format
       const result = await processHostAiWebhook(webhookData);
       
       // Respond with the result
@@ -2998,16 +3060,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           taskId: result.taskId
         });
       } else {
-        return res.status(400).json({
+        // Even if the processing failed, return a 200 status to HostAI 
+        // to acknowledge receipt (less likely to trigger retries)
+        return res.status(200).json({
           success: false,
           message: result.message
         });
       }
     } catch (error) {
       console.error('Error processing HostAI webhook:', error);
-      res.status(500).json({
+      
+      // Even if there was an error, return a 200 status to HostAI 
+      // to acknowledge receipt (less likely to trigger retries)
+      res.status(200).json({
         success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        info: 'The webhook was received but processing failed. We will investigate the issue.'
       });
     }
   });
