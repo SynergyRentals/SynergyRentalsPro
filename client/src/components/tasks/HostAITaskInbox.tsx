@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { AlertTriangle } from "lucide-react";
+import { motion } from "framer-motion";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Import the SchedulingCard component
+import { SchedulingCard } from "@/components/tasks/SchedulingCard";
 
 type HostAITask = {
   id: number;
@@ -39,6 +43,9 @@ export function HostAITaskInbox() {
   
   // Store the selection state for each task
   const [taskSelections, setTaskSelections] = useState<Record<number, TaskSelection>>({});
+  
+  // Track which tasks are flipped to the scheduling view
+  const [flippedTasks, setFlippedTasks] = useState<Record<number, boolean>>({});
   
   // Fetch HostAI tasks that are unprocessed (status === "new")
   const {
@@ -242,6 +249,37 @@ export function HostAITaskInbox() {
   const isTaskSelectionComplete = (taskId: number) => {
     const selection = taskSelections[taskId];
     return selection && selection.urgency && selection.team;
+  };
+  
+  // Handle the "Continue to Schedule" action which flips the card
+  const handleContinueToSchedule = (taskId: number) => {
+    if (isTaskSelectionComplete(taskId)) {
+      setFlippedTasks(prev => ({
+        ...prev,
+        [taskId]: true
+      }));
+    } else {
+      toast({
+        title: "Incomplete selection",
+        description: "Please select both urgency and team before continuing",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle canceling the scheduling and flipping back to task selection
+  const handleCancelScheduling = (taskId: number) => {
+    setFlippedTasks(prev => ({
+      ...prev,
+      [taskId]: false
+    }));
+  };
+  
+  // Handle completion of scheduling
+  const handleTaskScheduled = (taskId: number) => {
+    // This will be called by the SchedulingCard component when a task is successfully scheduled
+    // Refresh the tasks to remove the processed one
+    refetch();
   };
 
   // Get AI suggestion for a task

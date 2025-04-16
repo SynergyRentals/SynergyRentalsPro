@@ -1,0 +1,136 @@
+Feature: HostAI Task Card Scheduling Component
+Module: Projects & Tasks > HostAI Inbox
+
+Goal
+Extend the existing HostAI Task Inbox feature by adding a scheduling component to the back side of each task card. Once the user selects both urgency and routing team, the card should flip and present a scheduling interface that helps determine the best time to assign and complete the task.
+
+This component must:
+
+Display the unit’s availability calendar
+
+Offer AI-generated suggested scheduling times
+
+Enforce scheduling logic based on the urgency level
+
+Route the task to the appropriate team with a selected date/time
+
+Finalize the task creation in the system once scheduled
+
+UI Requirements
+Trigger:
+After the user selects both:
+
+Urgency: High, Medium, Low
+
+Routing Team: Cleaning Team, Maintenance Team, Internal Team, Vendor/Landlord
+The card flips to show the scheduling interface.
+
+Scheduling Card View Should Display:
+
+Unit Name
+
+Unit availability calendar (from internal booking/reservation system or iCal feed)
+
+Guest reservation dates visually marked
+
+Team availability (if available from future team scheduling module or hardcoded for now)
+
+Suggested time slots based on urgency and routing team
+
+Manual override option for date/time selection
+
+Action Buttons:
+
+Accept Suggested Time
+
+Choose Manually
+
+Confirm and Schedule Task
+
+Scheduling Logic (AI/Rules-Based)
+High Urgency
+
+Must be scheduled same day or next day
+
+AI should consider current time, team availability, and unit access
+
+Auto-suggestion required for next-available qualified time slot
+
+Medium Urgency
+
+Should be scheduled on the guest checkout day
+
+If routed to Cleaning Team, assign to that day's assigned cleaner
+
+If routed to Maintenance, assign to a maintenance team member available that day
+
+Low Urgency
+
+Can be scheduled based on:
+
+Team availability
+
+Unit’s vacancy/turn calendar
+
+Overall workload distribution
+
+AI should suggest the most operationally efficient time slot in the next 5–7 days
+
+Backend/API Needs
+Use Existing:
+
+/hostai/tasks for task metadata
+
+/units/:id/calendar (new or existing) for unit-level availability
+
+New Endpoint Suggestions:
+
+GET /units/:id/schedule-options?urgency=low&team=maintenance
+
+Returns suggested scheduling options
+
+POST /tasks/schedule
+
+Accepts: taskId, scheduledDate, assignedTeam/user, notes
+
+State/Component Requirements
+Flip card effect should use React animation (Tailwind or Framer Motion)
+
+On scheduling confirmation:
+
+Update task in database
+
+Mark HostAI task as processed
+
+Push to main task queue
+
+Use useEffect to fetch availability and suggestions once flip is triggered
+
+Use useState to manage selected date/time
+
+Testing Guidance
+Simulate task with each urgency level and routing type
+
+Validate that card only flips after both selections
+
+Confirm suggestions reflect proper scheduling logic
+
+Check UI works with overlapping guest stays and limited team availability
+
+Handle error states:
+
+Calendar not loading
+
+No time slots found
+
+Task scheduling fails
+
+Performance Notes
+Cache unit calendar data when possible
+
+Avoid loading full team schedules unless needed
+
+Prefetch next 7 days for relevant units
+
+Final Use
+This component will be the final step of processing HostAI-generated tasks. Once scheduled, the card is removed from the inbox and task data is passed to /tasks.
