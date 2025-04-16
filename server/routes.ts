@@ -108,6 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/properties/:id", checkAuth, async (req, res) => {
     try {
       const propertyId = parseInt(req.params.id);
+      console.log(`GET request for property ID: ${propertyId}`);
       
       // Try to find as a Guesty property first
       const [guestyProperty] = await db.select()
@@ -115,6 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(guestyProperties.id, propertyId));
         
       if (guestyProperty) {
+        console.log(`Found Guesty property ${propertyId}: ${guestyProperty.name}, iCal URL: ${guestyProperty.icalUrl || 'none'}`);
         // Return with source field to identify as Guesty
         return res.json({
           ...guestyProperty,
