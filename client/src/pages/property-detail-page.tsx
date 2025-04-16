@@ -207,6 +207,99 @@ export default function PropertyDetailPage() {
     }
   }, [property, isLoadingCalendar, refetchCalendar]);
   
+  // Prepare calendar events for the CalendarView component
+  const getCalendarEvents = () => {
+    const events = [];
+    
+    // Add events from external iCal source if available
+    if (calendarEvents && calendarEvents.length > 0) {
+      calendarEvents.forEach(event => {
+        // Generate a unique reservation ID for tracking connected events
+        const reservationId = event.uid || `reservation-${Math.random().toString(36).substring(2, 11)}`;
+        
+        // Add event start date as check-in
+        events.push({
+          date: event.start,
+          type: "checkin", // Use a specific type for check-in events
+          label: `Check-in: ${event.title || 'Reservation'}`,
+          // Important: Add these properties for the reservation visualization
+          startDate: event.start,
+          endDate: event.end,
+          reservationId: reservationId
+        });
+        
+        // Add event end date as check-out
+        events.push({
+          date: event.end,
+          type: "checkout", // Use a specific type for check-out events
+          label: `Check-out: ${event.title || 'Reservation'}`,
+          // Important: Add these properties for the reservation visualization
+          startDate: event.start,
+          endDate: event.end, 
+          reservationId: reservationId
+        });
+      });
+    }
+    
+    // Add guest check-ins and check-outs
+    if (guests && guests.length > 0) {
+      guests.forEach(guest => {
+        // Generate a unique ID for this guest stay
+        const guestStayId = `guest-${guest.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        
+        if (guest.checkIn) {
+          const checkInDate = new Date(guest.checkIn);
+          events.push({
+            date: checkInDate,
+            type: "checkin", // Use specific type for check-in
+            label: `Check-in: ${guest.name}`,
+            startDate: checkInDate,
+            endDate: guest.checkOut ? new Date(guest.checkOut) : new Date(checkInDate.getTime() + 86400000), // Next day if no checkout
+            reservationId: guestStayId
+          });
+        }
+        
+        if (guest.checkOut) {
+          const checkOutDate = new Date(guest.checkOut);
+          events.push({
+            date: checkOutDate,
+            type: "checkout", // Use specific type for check-out
+            label: `Check-out: ${guest.name}`,
+            startDate: guest.checkIn ? new Date(guest.checkIn) : new Date(checkOutDate.getTime() - 86400000), // Previous day if no checkin
+            endDate: checkOutDate,
+            reservationId: guestStayId
+          });
+        }
+      });
+    }
+    
+    // Add maintenance tasks
+    if (maintenanceItems && maintenanceItems.length > 0) {
+      maintenanceItems.forEach(item => {
+        events.push({
+          date: new Date(item.createdAt),
+          type: "maintenance",
+          label: `Maintenance: ${item.description.substring(0, 20)}${item.description.length > 20 ? '...' : ''}`
+        });
+      });
+    }
+    
+    // Add tasks (like cleaning)
+    if (tasks && tasks.length > 0) {
+      tasks.filter(task => task.type === "cleaning").forEach(task => {
+        if (task.dueDate) {
+          events.push({
+            date: new Date(task.dueDate),
+            type: "cleaning",
+            label: `Cleaning: ${task.type}`
+          });
+        }
+      });
+    }
+    
+    return events;
+  };
+  
   // Mutation for updating property
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: Partial<Unit>) => {
@@ -851,81 +944,25 @@ export default function PropertyDetailPage() {
                 </div>
               ) : calendarEvents && calendarEvents.length > 0 ? (
                 <div className="space-y-6">
-                  {/* Calendar view header with date filtering options could be added here */}
-                  <div className="grid grid-cols-1 gap-4">
-                    {calendarEvents.map((event: any, index: number) => {
-                      // Ensure dates are valid
-                      let startDate: Date;
-                      let endDate: Date;
-                      
-                      try {
-                        startDate = new Date(event.start);
-                        if (isNaN(startDate.getTime())) {
-                          console.warn(`Invalid start date in event:`, event);
-                          startDate = new Date(); // Fallback to current date
-                        }
-                      } catch (e) {
-                        console.error(`Error parsing start date:`, e);
-                        startDate = new Date();
-                      }
-                      
-                      try {
-                        endDate = new Date(event.end);
-                        if (isNaN(endDate.getTime())) {
-                          console.warn(`Invalid end date in event:`, event);
-                          endDate = new Date(startDate);
-                          endDate.setDate(endDate.getDate() + 1); // Fallback to start + 1 day
-                        }
-                      } catch (e) {
-                        console.error(`Error parsing end date:`, e);
-                        endDate = new Date(startDate);
-                        endDate.setDate(endDate.getDate() + 1);
-                      }
-                      
-                      // Calculate night count
-                      const nights = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                      
-                      return (
-                        <div key={event.uid || index} className="flex border rounded-md p-4 hover:bg-gray-50">
-                          <div className="mr-4 flex-shrink-0">
-                            <div className="h-12 w-12 flex items-center justify-center rounded-full bg-blue-100 text-blue-900">
-                              <CalendarDays className="h-6 w-6" />
-                            </div>
-                          </div>
-                          <div className="flex-grow">
-                            <h4 className="font-medium">{event.title || 'Reservation'}</h4>
-                            <div className="flex items-center text-sm text-gray-500 mb-1">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {formatDate(startDate)} - {formatDate(endDate)}
-                              <span className="ml-2 text-xs text-gray-400">({nights} {nights === 1 ? 'night' : 'nights'})</span>
-                            </div>
-                            {event.status && (
-                              <div className="text-xs text-gray-500">
-                                Status: {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="ml-4 flex-shrink-0">
-                            <Badge
-                              variant="outline"
-                              className={event.status === 'cancelled' 
-                                ? 'bg-red-50 text-red-700'
-                                : event.status === 'tentative'
-                                  ? 'bg-amber-50 text-amber-700'
-                                  : 'bg-blue-50 text-blue-700'
-                              }
-                            >
-                              {event.status === 'cancelled' 
-                                ? 'Cancelled' 
-                                : event.status === 'tentative' 
-                                  ? 'Tentative'
-                                  : 'Confirmed'
-                              }
-                            </Badge>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  {/* Use CalendarView component */}
+                  <CalendarView events={getCalendarEvents()} />
+                  
+                  <div className="flex justify-between items-center pt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => refetchCalendar()}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" /> Refresh Calendar
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowIcalInput(true)}
+                    >
+                      <LinkIcon className="h-4 w-4 mr-2" /> Update iCal URL
+                    </Button>
                   </div>
                 </div>
               ) : (
