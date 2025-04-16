@@ -47,9 +47,9 @@ export default function PropertiesPage() {
     tags: [],
   };
   
-  // Get all properties
-  const { data: units, isLoading, error } = useQuery<Unit[]>({
-    queryKey: ['/api/units'],
+  // Get all properties from unified endpoint
+  const { data: properties, isLoading, error } = useQuery({
+    queryKey: ['/api/properties'],
     retry: 1,
   });
   

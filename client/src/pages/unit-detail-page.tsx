@@ -50,32 +50,40 @@ export default function UnitDetailPage() {
   const [showIcalDialog, setShowIcalDialog] = useState(false);
   const [newIcalUrl, setNewIcalUrl] = useState("");
 
-  // Fetch unit details and identify source
+  // Fetch property details from a unified endpoint
   const { data: unit, isLoading: isLoadingUnit } = useQuery({
-    queryKey: ["/api/units", unitId],
+    queryKey: ["/api/properties", unitId],
     queryFn: async () => {
       try {
-        // Check if this is a Guesty property first by its ID structure
+        // First try the unified property endpoint
+        const propertyRes = await fetch(`/api/properties/${unitId}`);
+        if (propertyRes.ok) {
+          const propertyData = await propertyRes.json();
+          console.log(`Found property with ID ${unitId}:`, propertyData.name);
+          return propertyData;
+        }
+        
+        // Fallback to old endpoints for backward compatibility
+        // Check if this is a Guesty property
         const guestyRes = await fetch(`/api/guesty/properties/${unitId}`);
         if (guestyRes.ok) {
           const guestyProperty = await guestyRes.json();
-          console.log(`Found Guesty property with ID ${unitId}:`, guestyProperty.name);
-          // Add a source field to identify this as a Guesty property
+          console.log(`Found Guesty property with ID ${unitId} (legacy endpoint):`, guestyProperty.name);
           return { ...guestyProperty, source: 'guesty' };
         }
         
         // Try as a regular unit if not a Guesty property
         const unitRes = await fetch(`/api/units/${unitId}`);
         if (!unitRes.ok) {
-          throw new Error("Unit not found in either properties or Guesty properties");
+          throw new Error("Property not found");
         }
         
         const unitData = await unitRes.json();
-        console.log(`Found regular unit with ID ${unitId}:`, unitData.name);
+        console.log(`Found regular unit with ID ${unitId} (legacy endpoint):`, unitData.name);
         return { ...unitData, source: 'internal' };
       } catch (error) {
-        console.error("Failed to fetch unit details:", error);
-        throw new Error("Failed to fetch unit details");
+        console.error("Failed to fetch property details:", error);
+        throw new Error("Failed to fetch property details");
       }
     },
     enabled: !!unitId

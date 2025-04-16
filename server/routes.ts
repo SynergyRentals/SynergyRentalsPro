@@ -71,7 +71,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  // Units
+  // Unified Properties Endpoint
+  app.get("/api/properties", checkAuth, async (req, res) => {
+    try {
+      // Get all regular units 
+      const units = await storage.getAllUnits();
+      
+      // Convert units to standardized property format with source property
+      const standardizedUnits = units.map(unit => ({
+        ...unit,
+        source: 'internal',
+        bedrooms: null,
+        bathrooms: null,
+        amenities: []
+      }));
+      
+      // Get all Guesty properties
+      const guestyProps = await db.select().from(guestyProperties);
+      
+      // Convert Guesty properties to standardized format
+      const standardizedGuestyProps = guestyProps.map(prop => ({
+        ...prop,
+        source: 'guesty'
+      }));
+      
+      // Combine both property types
+      const allProperties = [...standardizedUnits, ...standardizedGuestyProps];
+      
+      res.json(allProperties);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+      res.status(500).json({ message: "Error fetching properties" });
+    }
+  });
+  
+  app.get("/api/properties/:id", checkAuth, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      
+      // Try to find as a Guesty property first
+      const [guestyProperty] = await db.select()
+        .from(guestyProperties)
+        .where(eq(guestyProperties.id, propertyId));
+        
+      if (guestyProperty) {
+        // Return with source field to identify as Guesty
+        return res.json({
+          ...guestyProperty,
+          source: 'guesty'
+        });
+      }
+      
+      // Try to find as a regular unit
+      const unit = await storage.getUnit(propertyId);
+      if (unit) {
+        // Return with source field to identify as internal
+        return res.json({
+          ...unit,
+          source: 'internal',
+          bedrooms: null,
+          bathrooms: null,
+          amenities: []
+        });
+      }
+      
+      // If not found in either place
+      return res.status(404).json({ message: "Property not found" });
+    } catch (error) {
+      console.error("Error fetching property:", error);
+      res.status(500).json({ message: "Error fetching property" });
+    }
+  });
+  
+  // Units (Legacy endpoints)
   app.get("/api/units", checkAuth, async (req, res) => {
     const units = await storage.getAllUnits();
     res.json(units);
