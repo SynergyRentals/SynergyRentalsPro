@@ -334,20 +334,25 @@ export function CalendarView({ events }: CalendarViewProps) {
                     )}
                   </div>
                   
-                  {/* Regular event indicators */}
+                  {/* Tooltips for all events - but visible indicators only for non-reservation events */}
                   {hasEvents && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="absolute bottom-0 flex justify-center w-full gap-0.5 pb-1">
-                            {dayEvents.slice(0, Math.min(3, dayEvents.length)).map((event, idx) => (
+                            {/* Only show event dots for non-reservation days */}
+                            {!isCheckIn && !isCheckOut && !isOccupied && dayEvents.slice(0, Math.min(3, dayEvents.length)).map((event, idx) => (
                               <div 
                                 key={idx}
                                 className={`h-1.5 w-1.5 rounded-full ${getEventColor(event.type)}`}
                               />
                             ))}
-                            {dayEvents.length > 3 && (
+                            {!isCheckIn && !isCheckOut && !isOccupied && dayEvents.length > 3 && (
                               <div className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                            )}
+                            {/* For reservation days, add an invisible trigger for the tooltip */}
+                            {(isCheckIn || isCheckOut || isOccupied) && (
+                              <div className="w-full h-4 cursor-pointer" />
                             )}
                           </div>
                         </TooltipTrigger>
