@@ -204,9 +204,9 @@ export class MemStorage implements IStorage {
   // HostAI Tasks
   private hostAiTasks: Map<number, HostAiTask>;
   // HostAI Autopilot Settings
-  private hostAiAutopilotSettings: Map<number, HostAiAutopilotSettings>;
+  private hostAiAutopilotSettings: Map<number, typeof hostAiAutopilotSettings.$inferSelect>;
   // HostAI Autopilot Logs
-  private hostAiAutopilotLogs: Map<number, HostAiAutopilotLog>;
+  private hostAiAutopilotLogs: Map<number, typeof hostAiAutopilotLog.$inferSelect>;
   
   sessionStore: session.Store;
   
@@ -232,6 +232,9 @@ export class MemStorage implements IStorage {
   private aiGeneratedPlanIdCounter: number;
   // HostAI Tasks counter
   private hostAiTaskIdCounter: number;
+  // HostAI Autopilot counter
+  private hostAiAutopilotSettingsIdCounter: number;
+  private hostAiAutopilotLogIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -256,6 +259,9 @@ export class MemStorage implements IStorage {
     this.aiGeneratedPlans = new Map();
     // Initialize HostAI Tasks
     this.hostAiTasks = new Map();
+    // Initialize HostAI Autopilot Settings and Logs
+    this.hostAiAutopilotSettings = new Map();
+    this.hostAiAutopilotLogs = new Map();
     
     this.userIdCounter = 1;
     this.unitIdCounter = 1;
@@ -279,6 +285,9 @@ export class MemStorage implements IStorage {
     this.aiGeneratedPlanIdCounter = 1;
     // Initialize HostAI Tasks counter
     this.hostAiTaskIdCounter = 1;
+    // Initialize HostAI Autopilot counters
+    this.hostAiAutopilotSettingsIdCounter = 1;
+    this.hostAiAutopilotLogIdCounter = 1;
     
     const MemoryStore = createMemoryStore(session);
     this.sessionStore = new MemoryStore({
