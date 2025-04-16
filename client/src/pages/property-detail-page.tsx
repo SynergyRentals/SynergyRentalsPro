@@ -108,20 +108,26 @@ export default function PropertyDetailPage() {
         throw new Error('Property ID is required to fetch calendar events');
       }
       
+      // Before making API call, check if the property has an iCalUrl
+      if (property && !property.icalUrl) {
+        console.log('Property has no iCal URL configured, returning empty array without API call');
+        return [];
+      }
+      
       console.log('Fetching calendar data from API endpoint...');
       try {
         const response = await fetch(`/api/units/${propertyId}/calendar`);
         console.log('Calendar API response status:', response.status);
         
         if (response.status === 404) {
-          // This might be a normal case if the property exists but doesn't have an iCal URL
+          // Handle 404 cases
           let errorMessage = 'Calendar not found';
           try {
             const errorData = await response.json();
             console.log('Calendar 404 response:', errorData);
             errorMessage = errorData.message || errorMessage;
             
-            if (errorData.message === "No iCal URL found for this unit") {
+            if (errorData.message && errorData.message.includes("No iCal URL found")) {
               // This is an expected case, not a true error
               console.log('No iCal URL configured for this property, returning empty array');
               return [];
@@ -153,18 +159,30 @@ export default function PropertyDetailPage() {
         
         const data = await response.json();
         console.log('Calendar events fetched successfully:', data.length, 'events');
-        return data;
+        
+        // Ensure all events have the required properties and valid dates
+        const processedEvents = data.map((event: any) => ({
+          start: new Date(event.start),
+          end: new Date(event.end),
+          title: event.title || 'Reservation',
+          uid: event.uid || `event-${Math.random().toString(36).substring(2, 9)}`,
+          status: event.status || 'confirmed'
+        }));
+        
+        return processedEvents;
       } catch (error) {
         console.error('Error in calendar fetch:', error);
         throw error;
       }
     },
-    // Always enable the query if we have a property ID, even if iCalUrl is not set yet
-    // This lets us properly handle the case where a user adds an iCal URL for the first time
+    // Always enable the query if we have a property ID
     enabled: !!propertyId && !!property,
     // Add a reasonable retry policy for transient network errors
-    retry: 2,
+    retry: 1,
     retryDelay: 1000,
+    // Ensure the cache is fresh (don't use stale data for too long)
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
   
   // Auto-refresh calendar if we have an icalUrl but no events

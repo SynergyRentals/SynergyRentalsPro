@@ -115,6 +115,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const unitId = parseInt(req.params.id);
       console.log(`Calendar request for unit ID: ${unitId}`);
       
+      // Input validation
+      if (isNaN(unitId)) {
+        console.error(`Invalid unit ID: ${req.params.id}`);
+        return res.status(400).json({ message: "Invalid unit ID" });
+      }
+      
+      // Get the unit
       const unit = await storage.getUnit(unitId);
       if (!unit) {
         console.error(`Unit not found for ID: ${unitId}`);
@@ -123,9 +130,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Retrieved unit: ${unit.name}, iCal URL: ${unit.icalUrl || 'none'}`);
       
+      // Check if unit has an iCal URL
       if (!unit.icalUrl) {
         console.log(`No iCal URL found for unit ID: ${unitId}`);
-        return res.status(404).json({ message: "No iCal URL found for this unit" });
+        return res.status(200).json([]);  // Return empty array instead of 404 error
+      }
+      
+      // Validate the iCal URL format
+      let validUrl: boolean;
+      try {
+        new URL(unit.icalUrl);
+        validUrl = true;
+      } catch (e) {
+        validUrl = false;
+      }
+      
+      if (!validUrl) {
+        console.error(`Invalid iCal URL format: ${unit.icalUrl}`);
+        return res.status(400).json({ 
+          message: "Invalid iCal URL format. Please check the URL and try again." 
+        });
       }
       
       // Use cached calendar events to avoid frequent external requests
@@ -134,22 +158,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const events = await getCachedCalendarEvents(unit.icalUrl);
         console.log(`Retrieved ${events.length} calendar events`);
         
-        // Process the events to ensure they have consistent formatting
-        const processedEvents = events.map(event => ({
-          start: event.start,
-          end: event.end,
-          title: event.title || 'Reservation',
-          uid: event.uid,
-          status: event.status || 'confirmed'
-        }));
+        // Process the events to ensure they have consistent formatting and valid dates
+        const processedEvents = events.map(event => {
+          // Handle possible invalid dates
+          let startDate = event.start;
+          let endDate = event.end;
+          
+          try {
+            // Validate that dates are properly parsed
+            if (!(startDate instanceof Date) || isNaN(startDate.getTime())) {
+              startDate = new Date();
+              console.warn(`Invalid start date in event ${event.uid}, using current date`);
+            }
+            
+            if (!(endDate instanceof Date) || isNaN(endDate.getTime())) {
+              // Default to one day after start if end date is invalid
+              endDate = new Date(startDate);
+              endDate.setDate(endDate.getDate() + 1);
+              console.warn(`Invalid end date in event ${event.uid}, using start date + 1 day`);
+            }
+          } catch (e) {
+            console.error(`Error processing dates for event ${event.uid}:`, e);
+            // Fallback to current date and next day if date processing fails
+            startDate = new Date();
+            endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 1);
+          }
+          
+          return {
+            start: startDate,
+            end: endDate,
+            title: event.title || 'Reservation',
+            uid: event.uid,
+            status: event.status || 'confirmed'
+          };
+        });
         
         res.json(processedEvents);
       } catch (calendarError) {
         console.error("Error fetching from iCal service:", calendarError);
         // Return an error status so the frontend can display a meaningful error message
-        // This is more transparent than silently returning an empty array
         return res.status(400).json({ 
-          message: `Failed to fetch calendar data: ${calendarError.message}` 
+          message: `Failed to fetch calendar data: ${calendarError instanceof Error ? calendarError.message : 'Unknown error'}` 
         });
       }
     } catch (error) {
