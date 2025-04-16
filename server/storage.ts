@@ -13,7 +13,9 @@ import {
   ProjectTask, InsertProjectTask,
   TaskComment, InsertTaskComment,
   ProjectFile, InsertProjectFile,
-  AiGeneratedPlan, InsertAiGeneratedPlan
+  AiGeneratedPlan, InsertAiGeneratedPlan,
+  // HostAI integration
+  HostAiTask, InsertHostAiTask
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -154,6 +156,14 @@ export interface IStorage {
   updateCleaningChecklistCompletion(id: number, completion: Partial<CleaningChecklistCompletion>): Promise<CleaningChecklistCompletion | undefined>;
   getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]>;
   
+  // HostAI Tasks
+  getHostAiTask(id: number): Promise<HostAiTask | undefined>;
+  createHostAiTask(task: InsertHostAiTask): Promise<HostAiTask>;
+  updateHostAiTask(id: number, task: Partial<HostAiTask>): Promise<HostAiTask | undefined>;
+  getAllHostAiTasks(): Promise<HostAiTask[]>;
+  getHostAiTasksByStatus(status: string): Promise<HostAiTask[]>;
+  getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]>;
+  
   // Session store
   sessionStore: session.Store;
 }
@@ -179,6 +189,8 @@ export class MemStorage implements IStorage {
   private taskComments: Map<number, TaskComment>;
   private projectFiles: Map<number, ProjectFile>;
   private aiGeneratedPlans: Map<number, AiGeneratedPlan>;
+  // HostAI Tasks
+  private hostAiTasks: Map<number, HostAiTask>;
   
   sessionStore: session.Store;
   
@@ -202,6 +214,8 @@ export class MemStorage implements IStorage {
   private taskCommentIdCounter: number;
   private projectFileIdCounter: number;
   private aiGeneratedPlanIdCounter: number;
+  // HostAI Tasks counter
+  private hostAiTaskIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -224,6 +238,8 @@ export class MemStorage implements IStorage {
     this.taskComments = new Map();
     this.projectFiles = new Map();
     this.aiGeneratedPlans = new Map();
+    // Initialize HostAI Tasks
+    this.hostAiTasks = new Map();
     
     this.userIdCounter = 1;
     this.unitIdCounter = 1;
@@ -245,6 +261,8 @@ export class MemStorage implements IStorage {
     this.taskCommentIdCounter = 1;
     this.projectFileIdCounter = 1;
     this.aiGeneratedPlanIdCounter = 1;
+    // Initialize HostAI Tasks counter
+    this.hostAiTaskIdCounter = 1;
     
     const MemoryStore = createMemoryStore(session);
     this.sessionStore = new MemoryStore({
