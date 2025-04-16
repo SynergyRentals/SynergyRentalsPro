@@ -67,6 +67,21 @@ export default function UnitDetailPage() {
         
         const propertyData = await propertyRes.json();
         console.log(`Found property with ID ${unitId}:`, propertyData.name);
+        
+        // Special handling for property ID 18
+        // Force it to be treated as a Guesty property regardless of what the API returns
+        if (unitId === 18) {
+          console.log('[Property 18] Special handling: Forcing source to be "guesty"');
+          
+          // Create a new property object with the source field set to "guesty"
+          return {
+            ...propertyData,
+            source: 'guesty',
+            // If icalUrl isn't set, provide the default Guesty URL
+            icalUrl: propertyData.icalUrl || 'https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb'
+          };
+        }
+        
         return propertyData;
       } catch (error) {
         console.error("Failed to fetch property details:", error);
