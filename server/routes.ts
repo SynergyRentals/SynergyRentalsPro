@@ -3173,6 +3173,266 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // HostAI Autopilot Settings Endpoints
+  app.get("/api/settings/hostai-autopilot", checkAuth, async (req: Request, res: Response) => {
+    try {
+      // Default to user ID 1 if user is not available (for development/testing)
+      const userId = req.user?.id || 1;
+      const settings = await storage.getHostAiAutopilotSettings(userId);
+      
+      // If no settings exist yet, return default settings
+      if (!settings) {
+        res.json({ 
+          enabled: false, 
+          confidenceThreshold: 0.85,
+          userId
+        });
+        return;
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching autopilot settings:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  app.patch("/api/settings/hostai-autopilot", checkAuth, async (req: Request, res: Response) => {
+    try {
+      // Default to user ID 1 if user is not available (for development/testing)
+      const userId = req.user?.id || 1;
+      const { enabled, confidenceThreshold } = req.body;
+      
+      // Validate that enabled is a boolean
+      if (typeof enabled !== 'undefined' && typeof enabled !== 'boolean') {
+        return res.status(400).json({ 
+          success: false,
+          message: "Enabled must be a boolean" 
+        });
+      }
+      
+      // Validate that confidenceThreshold is a number between 0 and 1 if provided
+      if (typeof confidenceThreshold !== 'undefined') {
+        if (typeof confidenceThreshold !== 'number' || confidenceThreshold < 0 || confidenceThreshold > 1) {
+          return res.status(400).json({ 
+            success: false,
+            message: "Confidence threshold must be a number between 0 and 1" 
+          });
+        }
+      }
+      
+      // Get current settings or create default ones
+      let settings = await storage.getHostAiAutopilotSettings(userId);
+      
+      if (!settings) {
+        // Create new settings with defaults plus the provided values
+        const newSettings = {
+          userId,
+          enabled: typeof enabled !== 'undefined' ? enabled : false,
+          confidenceThreshold: typeof confidenceThreshold !== 'undefined' ? confidenceThreshold : 0.85
+        };
+        
+        settings = await storage.createHostAiAutopilotSettings(newSettings);
+      } else {
+        // Update existing settings with any provided values
+        const updatedSettings = {
+          ...settings,
+          enabled: typeof enabled !== 'undefined' ? enabled : settings.enabled,
+          confidenceThreshold: typeof confidenceThreshold !== 'undefined' ? confidenceThreshold : settings.confidenceThreshold
+        };
+        
+        settings = await storage.updateHostAiAutopilotSettings(settings.id, updatedSettings);
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating autopilot settings:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  // HostAI Autopilot Log Endpoints
+  app.get("/api/hostai/autopilot-log", checkAuth, async (req: Request, res: Response) => {
+    try {
+      // Get optional task ID from query param
+      const taskId = req.query.taskId ? parseInt(req.query.taskId as string) : undefined;
+      
+      let logs;
+      if (taskId) {
+        logs = await storage.getHostAiAutopilotLogsByTask(taskId);
+      } else {
+        logs = await storage.getAllHostAiAutopilotLogs();
+      }
+      
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching autopilot logs:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  app.post("/api/hostai/autopilot-log", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const { taskId, decision, urgency, team, confidence, notes, scheduledFor } = req.body;
+      
+      if (!taskId || !decision || !confidence) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Required fields missing: taskId, decision, and confidence are required" 
+        });
+      }
+      
+      const log = await storage.createHostAiAutopilotLog({
+        taskId,
+        decision,
+        urgency: urgency || null,
+        team: team || null,
+        confidence,
+        notes: notes || null,
+        scheduledFor: scheduledFor ? new Date(scheduledFor) : null
+      });
+      
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Error creating autopilot log:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  // HostAI Autopilot Processing Endpoint
+  app.post("/api/hostai/tasks/:id/autopilot-process", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      
+      // Get the task
+      const task = await storage.getHostAiTask(taskId);
+      if (!task) {
+        return res.status(404).json({ 
+          success: false,
+          message: "Task not found" 
+        });
+      }
+      
+      // Get user's autopilot settings
+      const userId = req.user?.id || 1;
+      const settings = await storage.getHostAiAutopilotSettings(userId);
+      
+      if (!settings || !settings.enabled) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Autopilot is not enabled" 
+        });
+      }
+      
+      // In a production implementation, this is where you would:
+      // 1. Call your AI model to analyze the task
+      // 2. Get a confidence score, urgency, team recommendation
+      // 3. Check if confidence exceeds threshold
+      // 4. Auto-process if it does
+      
+      // For this implementation, we'll simulate the AI decision based on simple rules
+      const aiDecision = simulateAiDecision(task);
+      
+      // Check if confidence meets threshold
+      if (aiDecision.confidence < settings.confidenceThreshold) {
+        // Log the decision but don't process automatically
+        await storage.createHostAiAutopilotLog({
+          taskId,
+          decision: "skipped",
+          confidence: aiDecision.confidence,
+          urgency: aiDecision.urgency,
+          team: aiDecision.team,
+          notes: "Confidence below threshold"
+        });
+        
+        return res.json({ 
+          processed: false, 
+          reason: "Confidence below threshold", 
+          confidence: aiDecision.confidence,
+          threshold: settings.confidenceThreshold
+        });
+      }
+      
+      // Confidence is high enough, auto-process the task
+      // In a real implementation, you would create the task for the appropriate team here
+      // For now, just mark the HostAI task as processed
+      await storage.updateHostAiTask(taskId, {
+        status: "processed",
+        notes: `Auto-processed by Autopilot (confidence: ${aiDecision.confidence.toFixed(2)})`
+      });
+      
+      // Log the automatic decision
+      await storage.createHostAiAutopilotLog({
+        taskId,
+        decision: "auto-processed",
+        confidence: aiDecision.confidence,
+        urgency: aiDecision.urgency,
+        team: aiDecision.team,
+        notes: `Auto-assigned to ${aiDecision.team} team with ${aiDecision.urgency} urgency`
+      });
+      
+      res.json({
+        processed: true,
+        confidence: aiDecision.confidence,
+        urgency: aiDecision.urgency,
+        team: aiDecision.team
+      });
+      
+    } catch (error) {
+      console.error("Error auto-processing task:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+  
+  // Helper function to simulate AI decision
+  // In a real implementation, this would call your AI model
+  function simulateAiDecision(task: any) {
+    let confidence = 0.7; // Base confidence
+    let urgency = "medium";
+    let team = "maintenance";
+    
+    // Very simplified logic for demonstration
+    if (task.description?.toLowerCase().includes("water") || 
+        task.description?.toLowerCase().includes("leak") ||
+        task.description?.toLowerCase().includes("electricity") ||
+        task.description?.toLowerCase().includes("power") ||
+        task.description?.toLowerCase().includes("wifi")) {
+      confidence = 0.9;
+      urgency = "high";
+      team = "maintenance";
+    } else if (task.description?.toLowerCase().includes("clean") ||
+               task.description?.toLowerCase().includes("towel") ||
+               task.description?.toLowerCase().includes("linen") ||
+               task.description?.toLowerCase().includes("garbage") ||
+               task.description?.toLowerCase().includes("trash")) {
+      confidence = 0.85;
+      urgency = "medium";
+      team = "cleaning";
+    } else if (task.description?.toLowerCase().includes("owner") ||
+               task.description?.toLowerCase().includes("manager") ||
+               task.description?.toLowerCase().includes("landlord")) {
+      confidence = 0.8;
+      team = "vendor";
+    }
+    
+    return { confidence, urgency, team };
+  }
   
   // Create HTTP server
   const httpServer = createServer(app);

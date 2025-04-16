@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast"; 
 import Layout from "@/components/layout/Layout";
 import { 
@@ -6,11 +6,13 @@ import {
   CardContent, 
   CardDescription, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardFooter 
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { 
   Table, 
   TableBody, 
@@ -21,44 +23,110 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format, formatDistanceToNow } from 'date-fns';
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, BotIcon, CheckCircle, XCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+
+interface AutopilotSettings {
+  id?: number;
+  userId: number;
+  enabled: boolean;
+  confidenceThreshold: number;
+}
+
+interface AutopilotLog {
+  id: number;
+  taskId: number;
+  decision: string;
+  urgency: string | null;
+  team: string | null;
+  confidence: number;
+  notes: string | null;
+  createdAt: string;
+  scheduledFor: string | null;
+}
 
 export default function HostAIInboxSettingsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("settings");
+  const queryClient = useQueryClient();
 
-  // These settings would be fetched from the server in a real implementation
+  // Get autopilot settings from the API
+  const { data: autopilotSettings, isLoading: settingsLoading } = useQuery<AutopilotSettings>({
+    queryKey: ['/api/settings/hostai-autopilot'],
+    onError: (error) => {
+      toast({
+        title: 'Error loading settings',
+        description: 'Failed to load autopilot settings',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Get autopilot logs from the API
+  const { data: autopilotLogs, isLoading: logsLoading } = useQuery<AutopilotLog[]>({
+    queryKey: ['/api/hostai/autopilot-log'],
+    onError: (error) => {
+      toast({
+        title: 'Error loading logs',
+        description: 'Failed to load autopilot activity logs',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Local state to track settings changes
   const [aiSuggestionEnabled, setAiSuggestionEnabled] = useState(true);
   const [aiTrainingFeedback, setAiTrainingFeedback] = useState(true);
+  const [autopilotEnabled, setAutopilotEnabled] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(85);
 
-  // Mock data for demonstration
-  const recentDecisions = [
-    { 
-      id: 1, 
-      taskTitle: "No Hot Water", 
-      unitName: "Compton 2B", 
-      suggestedUrgency: "Medium", 
-      suggestedTeam: "Maintenance", 
-      actualUrgency: "High", 
-      actualTeam: "Maintenance", 
-      date: "2025-04-15" 
-    },
-    { 
-      id: 2, 
-      taskTitle: "Missing Kitchen Supplies", 
-      unitName: "Soulard 3A", 
-      suggestedUrgency: "Low", 
-      suggestedTeam: "Cleaning", 
-      actualUrgency: "Low", 
-      actualTeam: "Cleaning", 
-      date: "2025-04-14" 
+  // Update local state when settings are loaded
+  useEffect(() => {
+    if (autopilotSettings) {
+      setAutopilotEnabled(autopilotSettings.enabled);
+      setConfidenceThreshold(autopilotSettings.confidenceThreshold * 100);
     }
-  ];
+  }, [autopilotSettings]);
 
-  // In a real implementation, this would be saved to the server
+  // Mutation to update settings
+  const updateSettingsMutation = useMutation({
+    mutationFn: (data: Partial<AutopilotSettings>) => 
+      apiRequest('/api/settings/hostai-autopilot', {
+        method: 'PATCH',
+        data
+      }),
+    onSuccess: () => {
+      // Invalidate and refetch settings
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/hostai-autopilot'] });
+      toast({
+        title: "Settings saved",
+        description: "Your autopilot settings have been updated",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error saving settings",
+        description: "There was a problem updating your settings",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Save settings to the server
   const saveSettings = () => {
+    // Save AI suggestion and training feedback settings
     toast({
       title: "Settings saved",
       description: "Your AI inbox settings have been updated",
+    });
+    
+    // Save autopilot settings
+    updateSettingsMutation.mutate({
+      enabled: autopilotEnabled,
+      confidenceThreshold: confidenceThreshold / 100
     });
   };
 
