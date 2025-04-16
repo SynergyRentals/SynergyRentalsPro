@@ -8,9 +8,9 @@ import {
 } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// This secret key would be provided by Guesty
-// It should be stored in environment variables, not hardcoded
-const GUESTY_WEBHOOK_SECRET = process.env.GUESTY_WEBHOOK_SECRET || 'webhook-signing-secret';
+// This secret key must be provided by Guesty and stored in environment variables
+// Do not use a placeholder or default value
+const GUESTY_WEBHOOK_SECRET = process.env.GUESTY_WEBHOOK_SECRET;
 
 /**
  * Verify the signature from Guesty webhooks to ensure authenticity
@@ -21,14 +21,22 @@ export function verifyGuestySignature(req: Request): boolean {
   try {
     const signature = req.header('X-Guesty-Signature-V2');
     if (!signature) {
-      console.error('No Guesty signature found in request headers');
+      console.error('[Webhook] No Guesty signature found in request headers');
       return false;
     }
 
     // For testing, we'll allow a bypass signature
     if (process.env.NODE_ENV === 'development' && signature === 'test-bypass-signature') {
-      console.warn('Using test bypass signature - ONLY FOR DEVELOPMENT');
+      console.warn('[Webhook] Using test bypass signature - ONLY FOR DEVELOPMENT');
       return true;
+    }
+
+    // Check if the webhook secret is set in environment variables
+    if (!GUESTY_WEBHOOK_SECRET) {
+      console.error('[Webhook] GUESTY_WEBHOOK_SECRET is not set in environment variables');
+      console.error('[Webhook] Please set the GUESTY_WEBHOOK_SECRET value directly in the environment variables.');
+      console.error('[Webhook] Visit your Guesty account or contact Guesty support to get the correct webhook signing key.');
+      return false;
     }
 
     // Get raw body from the request
@@ -47,7 +55,7 @@ export function verifyGuestySignature(req: Request): boolean {
       Buffer.from(signature)
     );
   } catch (error) {
-    console.error('Error verifying Guesty webhook signature:', error);
+    console.error('[Webhook] Error verifying Guesty webhook signature:', error);
     return false;
   }
 }
