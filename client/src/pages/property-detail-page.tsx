@@ -38,8 +38,8 @@ export default function PropertyDetailPage() {
     data: property, 
     isLoading: isLoadingProperty, 
     error: propertyError 
-  } = useQuery<Unit>({
-    queryKey: ['/api/units', propertyId],
+  } = useQuery({
+    queryKey: ['/api/guesty/properties', propertyId],
     enabled: !!propertyId,
   });
   
