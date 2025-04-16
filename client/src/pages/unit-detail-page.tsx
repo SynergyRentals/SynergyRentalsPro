@@ -208,6 +208,8 @@ export default function UnitDetailPage() {
       setShowIcalDialog(false);
       
       // Invalidate queries to refetch data
+      // Invalidate both unified and legacy endpoints to ensure data consistency
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId] });
       queryClient.invalidateQueries({ queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId] });
       queryClient.invalidateQueries({ queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId, 'calendar'] });
     },
@@ -237,7 +239,8 @@ export default function UnitDetailPage() {
 
   // Fetch external calendar events (iCal)
   const { data: externalCalendarEvents, isLoading: isLoadingCalendar } = useQuery({
-    queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId, 'calendar'],
+    // Use both legacy and unified endpoint keys
+    queryKey: ['/api/properties', unitId, 'calendar'],
     queryFn: async () => {
       // Don't make the API call if there's no unit or icalUrl
       if (!unit || !unit.icalUrl) {
@@ -245,15 +248,22 @@ export default function UnitDetailPage() {
         return [];
       }
 
-      console.log(`Fetching calendar for ${unit.source === 'guesty' ? 'Guesty property' : 'unit'} with ID ${unitId}`);
+      console.log(`Fetching calendar for property with ID ${unitId}`);
       
       try {
-        // Determine the right endpoint based on the property source
-        const endpoint = unit.source === 'guesty' 
-          ? `/api/guesty/properties/${unitId}/calendar`
-          : `/api/units/${unitId}/calendar`;
-          
-        const response = await fetch(endpoint);
+        // Try the unified endpoint first
+        let endpoint = `/api/properties/${unitId}/calendar`;
+        let response = await fetch(endpoint);
+        
+        // Fall back to source-specific endpoints if the unified one isn't available yet
+        if (!response.ok) {
+          console.log("Unified calendar endpoint not available, using legacy endpoint");
+          endpoint = unit.source === 'guesty' 
+            ? `/api/guesty/properties/${unitId}/calendar`
+            : `/api/units/${unitId}/calendar`;
+            
+          response = await fetch(endpoint);
+        }
         
         if (!response.ok) {
           console.error(`Error fetching calendar: ${response.status} ${response.statusText}`);
