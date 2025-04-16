@@ -98,13 +98,23 @@ export default function PropertyForm({
   
   // Set up the mutation
   const mutation = useMutation({
-    mutationFn: (data: PropertyFormValues) => {
+    mutationFn: async (data: PropertyFormValues) => {
       // If we're editing, use PATCH, otherwise POST
-      return apiRequest(
-        isEditing ? `/api/properties/${initialData.id}` : '/api/properties',
-        isEditing ? 'PATCH' : 'POST',
-        data
-      );
+      const url = isEditing ? `/api/properties/${initialData.id}` : '/api/properties';
+      const method = isEditing ? 'PATCH' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${method === 'PATCH' ? 'updating' : 'creating'} property: ${response.status}`);
+      }
+      
+      return response.json();
     },
     onSuccess: (data) => {
       // Display success toast

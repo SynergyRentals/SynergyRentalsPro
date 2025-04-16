@@ -24,7 +24,15 @@ const PropertyList: React.FC = () => {
   // Fetch properties
   const { data: properties, isLoading, error } = useQuery({
     queryKey: ['/api/properties'],
-    queryFn: () => apiRequest('/api/properties'),
+    queryFn: async () => {
+      const response = await fetch('/api/properties', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Error fetching properties: ${response.status}`);
+      }
+      return response.json();
+    },
     staleTime: 60000, // 1 minute cache
   });
   

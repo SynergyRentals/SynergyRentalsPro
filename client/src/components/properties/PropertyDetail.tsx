@@ -91,7 +91,15 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
   // Fetch property details
   const { data: property, isLoading, error } = useQuery({
     queryKey: [`/api/properties/${id}`],
-    queryFn: () => apiRequest(`/api/properties/${id}`),
+    queryFn: async () => {
+      const response = await fetch(`/api/properties/${id}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Error fetching property: ${response.status}`);
+      }
+      return response.json();
+    },
   });
   
   // Check if property exists and has icalUrl
@@ -100,13 +108,30 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
   // Fetch calendar events if property has icalUrl
   const { data: calendarEvents, isLoading: isLoadingCalendar, refetch: refetchCalendar } = useQuery({
     queryKey: [`/api/properties/${id}/calendar`],
-    queryFn: () => apiRequest(`/api/properties/${id}/calendar`),
+    queryFn: async () => {
+      const response = await fetch(`/api/properties/${id}/calendar`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Error fetching calendar: ${response.status}`);
+      }
+      return response.json();
+    },
     enabled: !!id && hasIcalUrl,
   });
   
   // Set up delete mutation
   const deleteMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/properties/${id}`, 'DELETE'),
+    mutationFn: async () => {
+      const response = await fetch(`/api/properties/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Error deleting property: ${response.status}`);
+      }
+      return response.json();
+    },
     onSuccess: () => {
       toast({
         title: "Property deleted",
