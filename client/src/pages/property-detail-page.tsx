@@ -13,6 +13,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { queryClient } from "@/lib/queryClient";
 import { Unit, Guest, Maintenance, Inventory, Task, Document } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -778,13 +781,62 @@ export default function PropertyDetailPage() {
                   </div>
                 )}
               </div>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => refetchCalendar()}
+              >
                 <RefreshCw className="h-4 w-4 mr-2" /> Refresh Calendar
               </Button>
             </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* iCal URL Dialog */}
+      <Dialog open={showIcalInput} onOpenChange={setShowIcalInput}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add iCal URL</DialogTitle>
+            <DialogDescription>
+              Enter an iCal URL to sync calendar events from external sources like Google Calendar, Airbnb, or VRBO.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="icalUrl">iCal URL</Label>
+              <Input
+                id="icalUrl"
+                placeholder="https://example.com/calendar.ics"
+                value={newIcalUrl}
+                onChange={(e) => setNewIcalUrl(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowIcalInput(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (newIcalUrl) {
+                  updatePropertyMutation.mutate({ icalUrl: newIcalUrl });
+                }
+              }}
+              disabled={!newIcalUrl || updatePropertyMutation.isPending}
+            >
+              {updatePropertyMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
