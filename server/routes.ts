@@ -112,20 +112,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // iCal Calendar Events Endpoint
   app.get("/api/units/:id/calendar", checkAuth, async (req, res) => {
     try {
-      const unit = await storage.getUnit(parseInt(req.params.id));
+      const unitId = parseInt(req.params.id);
+      console.log(`Calendar request for unit ID: ${unitId}`);
+      
+      const unit = await storage.getUnit(unitId);
       if (!unit) {
+        console.error(`Unit not found for ID: ${unitId}`);
         return res.status(404).json({ message: "Unit not found" });
       }
       
+      console.log(`Retrieved unit: ${unit.name}, iCal URL: ${unit.icalUrl || 'none'}`);
+      
       if (!unit.icalUrl) {
+        console.log(`No iCal URL found for unit ID: ${unitId}`);
         return res.status(404).json({ message: "No iCal URL found for this unit" });
       }
       
       // Use cached calendar events to avoid frequent external requests
-      const events = await getCachedCalendarEvents(unit.icalUrl);
-      res.json(events);
+      console.log(`Fetching calendar events from URL: ${unit.icalUrl}`);
+      try {
+        const events = await getCachedCalendarEvents(unit.icalUrl);
+        console.log(`Retrieved ${events.length} calendar events`);
+        res.json(events);
+      } catch (calendarError) {
+        console.error("Error fetching from iCal service:", calendarError);
+        // Return an empty array instead of error to avoid breaking the UI
+        // This allows users to see the UI even if calendar fetching fails
+        res.json([]);
+      }
     } catch (error) {
-      console.error("Error fetching calendar events:", error);
+      console.error("Error in calendar endpoint:", error);
       res.status(500).json({ message: "Error fetching calendar events" });
     }
   });
