@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, Calendar, Check, MoreVertical } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Calendar, Check, MoreVertical, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -199,10 +199,16 @@ export default function ProjectsPage() {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Projects & Tasks</h1>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => window.location.href = "/projects-tasks/hostai-inbox"}>
+            <Mail className="mr-2 h-4 w-4" />
+            HostAI Inbox
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       <div className="flex justify-between items-center space-x-4">
