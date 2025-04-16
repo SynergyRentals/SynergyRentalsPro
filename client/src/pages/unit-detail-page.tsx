@@ -283,16 +283,16 @@ export default function UnitDetailPage() {
     // Add events from external iCal source if available
     if (externalCalendarEvents && externalCalendarEvents.length > 0) {
       externalCalendarEvents.forEach(event => {
-        // Add event start date
+        // Add event start date (already converted to Date object in the query)
         events.push({
-          date: new Date(event.start),
+          date: event.start,
           type: "urgent",
           label: `${event.title || 'Reservation'} (start)`
         });
         
-        // Add event end date
+        // Add event end date (already converted to Date object in the query)
         events.push({
-          date: new Date(event.end),
+          date: event.end,
           type: "urgent",
           label: `${event.title || 'Reservation'} (end)`
         });
