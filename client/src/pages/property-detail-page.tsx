@@ -114,6 +114,20 @@ export default function PropertyDetailPage() {
     enabled: !!propertyId && !!property?.icalUrl,
   });
   
+  // Auto-refresh calendar if we have an icalUrl but no events
+  React.useEffect(() => {
+    // If we have an iCal URL but no calendar events or calendar error, trigger a refresh
+    if (property?.icalUrl && !isLoadingCalendar && 
+        (calendarError || (calendarEvents && calendarEvents.length === 0))) {
+      // Small delay to make sure other queries have settled
+      const timer = setTimeout(() => {
+        refetchCalendar();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [property?.icalUrl, isLoadingCalendar, calendarEvents, calendarError, refetchCalendar]);
+  
   // Mutation for updating property
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: Partial<Unit>) => {
