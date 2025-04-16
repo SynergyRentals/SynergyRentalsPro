@@ -9,7 +9,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GuestyProperty } from "@shared/schema";
 import { Link as WouterLink } from "wouter";
 
-export default function GuestyPropertiesTab() {
+interface GuestyPropertiesTabProps {
+  searchQuery?: string;
+}
+
+export default function GuestyPropertiesTab({ searchQuery = "" }: GuestyPropertiesTabProps) {
   const { toast } = useToast();
   
   // Get all Guesty properties
@@ -100,7 +104,21 @@ export default function GuestyPropertiesTab() {
         </div>
       ) : properties && properties.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {properties.map((property) => (
+          {properties
+            .filter((property) => {
+              if (!searchQuery) return true;
+              const query = searchQuery.toLowerCase();
+              return (
+                property.name.toLowerCase().includes(query) ||
+                property.address.toLowerCase().includes(query) ||
+                (property.amenities && property.amenities.some(amenity => 
+                  amenity.toLowerCase().includes(query)
+                )) ||
+                (property.city && property.city.toLowerCase().includes(query)) ||
+                (property.state && property.state.toLowerCase().includes(query))
+              );
+            })
+            .map((property) => (
             <Card key={property.id}>
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
