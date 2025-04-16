@@ -50,28 +50,31 @@ export default function UnitDetailPage() {
   const [showIcalDialog, setShowIcalDialog] = useState(false);
   const [newIcalUrl, setNewIcalUrl] = useState("");
 
-  // Fetch unit details - try regular units first, then fallback to Guesty properties
+  // Fetch unit details and identify source
   const { data: unit, isLoading: isLoadingUnit } = useQuery({
     queryKey: ["/api/units", unitId],
     queryFn: async () => {
       try {
-        // First try to get as a regular unit
-        const res = await fetch(`/api/units/${unitId}`);
-        if (res.ok) {
-          const unitData = await res.json();
-          return { ...unitData, source: 'internal' };
-        }
-        
-        // If not found, try as a Guesty property
+        // Check if this is a Guesty property first by its ID structure
         const guestyRes = await fetch(`/api/guesty/properties/${unitId}`);
-        if (!guestyRes.ok) {
-          throw new Error("Unit not found");
+        if (guestyRes.ok) {
+          const guestyProperty = await guestyRes.json();
+          console.log(`Found Guesty property with ID ${unitId}:`, guestyProperty.name);
+          // Add a source field to identify this as a Guesty property
+          return { ...guestyProperty, source: 'guesty' };
         }
         
-        const guestyProperty = await guestyRes.json();
-        // Add a source field to identify this as a Guesty property
-        return { ...guestyProperty, source: 'guesty' };
+        // Try as a regular unit if not a Guesty property
+        const unitRes = await fetch(`/api/units/${unitId}`);
+        if (!unitRes.ok) {
+          throw new Error("Unit not found in either properties or Guesty properties");
+        }
+        
+        const unitData = await unitRes.json();
+        console.log(`Found regular unit with ID ${unitId}:`, unitData.name);
+        return { ...unitData, source: 'internal' };
       } catch (error) {
+        console.error("Failed to fetch unit details:", error);
         throw new Error("Failed to fetch unit details");
       }
     },
