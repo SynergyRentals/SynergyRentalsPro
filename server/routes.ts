@@ -133,16 +133,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const events = await getCachedCalendarEvents(unit.icalUrl);
         console.log(`Retrieved ${events.length} calendar events`);
-        res.json(events);
+        
+        // Process the events to ensure they have consistent formatting
+        const processedEvents = events.map(event => ({
+          start: event.start,
+          end: event.end,
+          title: event.title || 'Reservation',
+          uid: event.uid,
+          status: event.status || 'confirmed'
+        }));
+        
+        res.json(processedEvents);
       } catch (calendarError) {
         console.error("Error fetching from iCal service:", calendarError);
-        // Return an empty array instead of error to avoid breaking the UI
-        // This allows users to see the UI even if calendar fetching fails
-        res.json([]);
+        // Return an error status so the frontend can display a meaningful error message
+        // This is more transparent than silently returning an empty array
+        return res.status(400).json({ 
+          message: `Failed to fetch calendar data: ${calendarError.message}` 
+        });
       }
     } catch (error) {
       console.error("Error in calendar endpoint:", error);
-      res.status(500).json({ message: "Error fetching calendar events" });
+      res.status(500).json({ message: "Server error fetching calendar events" });
     }
   });
 

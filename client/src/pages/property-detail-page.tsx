@@ -103,12 +103,9 @@ export default function PropertyDetailPage() {
     queryKey: ['/api/units', propertyId, 'calendar'],
     queryFn: async () => {
       console.log('Attempting to fetch calendar events for property:', propertyId);
-      console.log('Property data:', property);
-      console.log('Property iCal URL:', property?.icalUrl);
       
-      if (!property?.icalUrl) {
-        console.log('No iCal URL found, returning empty array');
-        return [];
+      if (!propertyId) {
+        throw new Error('Property ID is required to fetch calendar events');
       }
       
       console.log('Fetching calendar data from API endpoint...');
@@ -116,10 +113,42 @@ export default function PropertyDetailPage() {
         const response = await fetch(`/api/units/${propertyId}/calendar`);
         console.log('Calendar API response status:', response.status);
         
+        if (response.status === 404) {
+          // This might be a normal case if the property exists but doesn't have an iCal URL
+          let errorMessage = 'Calendar not found';
+          try {
+            const errorData = await response.json();
+            console.log('Calendar 404 response:', errorData);
+            errorMessage = errorData.message || errorMessage;
+            
+            if (errorData.message === "No iCal URL found for this unit") {
+              // This is an expected case, not a true error
+              console.log('No iCal URL configured for this property, returning empty array');
+              return [];
+            }
+          } catch (e) {
+            console.error('Failed to parse 404 response:', e);
+          }
+          
+          // For other 404 cases (e.g., unit not found)
+          throw new Error(errorMessage);
+        }
+        
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Failed to fetch calendar events:', errorText);
-          throw new Error(`Failed to fetch calendar events: ${response.status} ${errorText}`);
+          let errorMessage = `Failed to fetch calendar events: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            // If we can't parse the error as JSON, try to get it as text
+            try {
+              const errorText = await response.text();
+              if (errorText) errorMessage += ` - ${errorText}`;
+            } catch {} // Ignore if we can't get text either
+          }
+          
+          console.error('Calendar fetch error:', errorMessage);
+          throw new Error(errorMessage);
         }
         
         const data = await response.json();
@@ -130,7 +159,12 @@ export default function PropertyDetailPage() {
         throw error;
       }
     },
+    // Always enable the query if we have a property ID, even if iCalUrl is not set yet
+    // This lets us properly handle the case where a user adds an iCal URL for the first time
     enabled: !!propertyId && !!property,
+    // Add a reasonable retry policy for transient network errors
+    retry: 2,
+    retryDelay: 1000,
   });
   
   // Auto-refresh calendar if we have an icalUrl but no events
