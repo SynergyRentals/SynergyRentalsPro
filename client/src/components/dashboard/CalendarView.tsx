@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { format, isSameDay } from "date-fns";
+import { format, isSameDay, addDays, isWithinInterval, isBefore, isAfter } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -7,11 +7,19 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/comp
 // Define the event types
 export type CalendarEventType = "cleaning" | "maintenance" | "inventory" | "urgent";
 
+// Define the reservation status
+export type ReservationStatus = "checkin" | "checkout" | "occupied";
+
 // Define the calendar event interface
 export interface CalendarEvent {
   date: Date;
   type: CalendarEventType;
   label: string;
+  // For reservations
+  reservationId?: string;
+  startDate?: Date; // Check-in date
+  endDate?: Date;   // Check-out date
+  status?: ReservationStatus;
 }
 
 interface CalendarViewProps {
@@ -20,14 +28,32 @@ interface CalendarViewProps {
 
 export function CalendarView({ events }: CalendarViewProps) {
   const [month, setMonth] = useState<Date>(new Date());
-  const [calendarDates, setCalendarDates] = useState<{ date: Date; hasEvents: boolean; eventTypes: CalendarEventType[] }[]>([]);
+  const [calendarDates, setCalendarDates] = useState<{ 
+    date: Date; 
+    hasEvents: boolean; 
+    eventTypes: CalendarEventType[];
+    events: CalendarEvent[];
+    isCheckIn: boolean;
+    isCheckOut: boolean;
+    isOccupied: boolean;
+    reservationId: string | null;
+  }[]>([]);
   
   useEffect(() => {
     // Process events and prepare calendar data
     console.log("Processing events for calendar:", events.length);
     
     // Create a map of dates to events
-    const dateMap = new Map<string, { hasEvents: boolean; eventTypes: CalendarEventType[]; events: CalendarEvent[] }>();
+    const dateMap = new Map<string, { 
+      hasEvents: boolean; 
+      eventTypes: CalendarEventType[]; 
+      events: CalendarEvent[];
+      // Reservation specific data
+      isCheckIn: boolean;
+      isCheckOut: boolean;
+      isOccupied: boolean;
+      reservationId: string | null;
+    }>();
     
     // Initialize calendar with all dates in the current month
     const year = month.getFullYear();
@@ -37,19 +63,94 @@ export function CalendarView({ events }: CalendarViewProps) {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, monthIndex, day);
       const dateKey = format(date, 'yyyy-MM-dd');
-      dateMap.set(dateKey, { hasEvents: false, eventTypes: [], events: [] });
+      dateMap.set(dateKey, { 
+        hasEvents: false, 
+        eventTypes: [], 
+        events: [],
+        isCheckIn: false,
+        isCheckOut: false,
+        isOccupied: false,
+        reservationId: null
+      });
     }
     
     // Add events to the map
     events.forEach(event => {
       const dateKey = format(event.date, 'yyyy-MM-dd');
-      const dateData = dateMap.get(dateKey) || { hasEvents: false, eventTypes: [], events: [] };
+      const dateData = dateMap.get(dateKey) || { 
+        hasEvents: false, 
+        eventTypes: [], 
+        events: [],
+        isCheckIn: false,
+        isCheckOut: false,
+        isOccupied: false,
+        reservationId: null
+      };
+      
       dateData.hasEvents = true;
       if (!dateData.eventTypes.includes(event.type)) {
         dateData.eventTypes.push(event.type);
       }
       dateData.events.push(event);
+      
+      // Handle reservation status if this is a reservation event
+      if (event.startDate && event.endDate && event.reservationId) {
+        // Check if this day is a check-in date (start of reservation)
+        if (isSameDay(event.date, event.startDate)) {
+          dateData.isCheckIn = true;
+          dateData.reservationId = event.reservationId;
+        }
+        
+        // Check if this day is a check-out date (end of reservation)
+        if (isSameDay(event.date, event.endDate)) {
+          dateData.isCheckOut = true;
+          dateData.reservationId = event.reservationId;
+        }
+        
+        // Check if this is an occupied date (between check-in and check-out)
+        if (isWithinInterval(event.date, { start: event.startDate, end: event.endDate })) {
+          dateData.isOccupied = true;
+          dateData.reservationId = event.reservationId;
+        }
+      }
+      
       dateMap.set(dateKey, dateData);
+    });
+    
+    // Process reservations to mark occupied dates
+    events.forEach(event => {
+      // Process only events with reservation data
+      if (event.startDate && event.endDate && event.reservationId) {
+        // Get all dates between start and end (occupied period)
+        let currentDate = new Date(event.startDate);
+        const endDate = new Date(event.endDate);
+        
+        // Loop through all dates in the reservation period
+        while (currentDate <= endDate) {
+          const dateKey = format(currentDate, 'yyyy-MM-dd');
+          const dateData = dateMap.get(dateKey);
+          
+          if (dateData) {
+            // Mark this date as part of a reservation
+            dateData.isOccupied = true;
+            dateData.reservationId = event.reservationId;
+            
+            // Special markings for check-in and check-out days
+            if (isSameDay(currentDate, event.startDate)) {
+              dateData.isCheckIn = true;
+            }
+            
+            if (isSameDay(currentDate, event.endDate)) {
+              dateData.isCheckOut = true;
+            }
+            
+            dateMap.set(dateKey, dateData);
+          }
+          
+          // Move to next day
+          currentDate = addDays(currentDate, 1);
+        }
+      }
     });
     
     // Convert map to array for rendering
@@ -57,7 +158,11 @@ export function CalendarView({ events }: CalendarViewProps) {
       date: new Date(dateString),
       hasEvents: data.hasEvents,
       eventTypes: data.eventTypes,
-      events: data.events
+      events: data.events,
+      isCheckIn: data.isCheckIn,
+      isCheckOut: data.isCheckOut,
+      isOccupied: data.isOccupied,
+      reservationId: data.reservationId
     }));
     
     setCalendarDates(dates);
@@ -86,8 +191,9 @@ export function CalendarView({ events }: CalendarViewProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex flex-wrap items-center gap-2">
+          {/* Event type indicators */}
           <Badge variant="outline" className="flex items-center gap-1">
             <div className="h-2 w-2 rounded-full bg-blue-500" />
             <span>Cleaning</span>
@@ -107,6 +213,22 @@ export function CalendarView({ events }: CalendarViewProps) {
         </div>
       </div>
       
+      {/* Reservation status indicators legend */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-gray-500" />
+          <span>Check-in</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-black" />
+          <span>Check-out</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-8 bg-yellow-300" />
+          <span>Occupied</span>
+        </div>
+      </div>
+      
       <div className="border rounded-md p-2">
         <Calendar
           mode="single"
@@ -123,13 +245,74 @@ export function CalendarView({ events }: CalendarViewProps) {
             DayContent: (props) => {
               if (!props.date) return null;
               
+              // Find current date in our processed calendar dates
+              const dateStr = format(props.date, 'yyyy-MM-dd');
+              const currentDateData = calendarDates.find(d => format(d.date, 'yyyy-MM-dd') === dateStr);
+              
+              // Get events for this day
               const dayEvents = getEventsForDay(props.date);
               const hasEvents = dayEvents.length > 0;
+              
+              // Reservation indicators
+              const isCheckIn = currentDateData?.isCheckIn || false;
+              const isCheckOut = currentDateData?.isCheckOut || false;
+              const isOccupied = currentDateData?.isOccupied || false;
+              const reservationId = currentDateData?.reservationId || null;
+              
+              // Prepare tooltip content
+              const tooltipEvents = dayEvents.map(event => ({
+                type: event.type,
+                label: event.label
+              }));
+              
+              // Add reservation info to tooltip if this day is part of a reservation
+              if (isCheckIn || isCheckOut || isOccupied) {
+                const reservationEvent = dayEvents.find(e => e.reservationId === reservationId);
+                if (reservationEvent) {
+                  if (isCheckIn) {
+                    tooltipEvents.push({
+                      type: "cleaning" as CalendarEventType,
+                      label: `Check-in: ${reservationEvent.label}`
+                    });
+                  }
+                  if (isCheckOut) {
+                    tooltipEvents.push({
+                      type: "maintenance" as CalendarEventType,
+                      label: `Check-out: ${reservationEvent.label}`
+                    });
+                  }
+                  if (isOccupied && !isCheckIn && !isCheckOut) {
+                    tooltipEvents.push({
+                      type: "inventory" as CalendarEventType,
+                      label: `Occupied: ${reservationEvent.label}`
+                    });
+                  }
+                }
+              }
               
               return (
                 <div className="relative w-full h-full flex flex-col items-center">
                   <div>{format(props.date, 'd')}</div>
                   
+                  {/* Reservation status indicators */}
+                  <div className="w-full mt-1 flex justify-center">
+                    {/* Check-in indicator (gray dot) */}
+                    {isCheckIn && (
+                      <div className="h-2 w-2 rounded-full bg-gray-500 mx-0.5" />
+                    )}
+                    
+                    {/* Occupied indicator (yellow connecting line) */}
+                    {isOccupied && !isCheckIn && !isCheckOut && (
+                      <div className="h-2 w-full bg-yellow-300 mx-0.5" style={{ maxWidth: '80%' }} />
+                    )}
+                    
+                    {/* Check-out indicator (black dot) */}
+                    {isCheckOut && (
+                      <div className="h-2 w-2 rounded-full bg-black mx-0.5" />
+                    )}
+                  </div>
+                  
+                  {/* Regular event indicators */}
                   {hasEvents && (
                     <TooltipProvider>
                       <Tooltip>
@@ -148,9 +331,17 @@ export function CalendarView({ events }: CalendarViewProps) {
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="p-1 space-y-1">
-                            {dayEvents.map((event, idx) => (
+                            {tooltipEvents.map((event, idx) => (
                               <div key={idx} className="flex items-center gap-2">
-                                <div className={`h-2 w-2 rounded-full ${getEventColor(event.type)}`} />
+                                <div className={`h-2 w-2 rounded-full ${
+                                  event.type === "cleaning" && event.label.includes("Check-in")
+                                    ? "bg-gray-500"
+                                    : event.type === "maintenance" && event.label.includes("Check-out")
+                                    ? "bg-black"
+                                    : event.type === "inventory" && event.label.includes("Occupied")
+                                    ? "bg-yellow-300"
+                                    : getEventColor(event.type)
+                                }`} />
                                 <span className="text-xs">{event.label}</span>
                               </div>
                             ))}
