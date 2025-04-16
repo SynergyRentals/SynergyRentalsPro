@@ -119,14 +119,32 @@ export default function PropertyDetailPage() {
     mutationFn: async (data: Partial<Unit>) => {
       return apiRequest('PATCH', `/api/units/${propertyId}`, data);
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       toast({
         title: "Property updated",
         description: "The property details have been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/units'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId, 'calendar'] });
+      
+      // Invalidate and refetch queries
+      await queryClient.invalidateQueries({ queryKey: ['/api/units'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId] });
+      
+      // If we've updated the iCal URL, let's make sure the calendar data is refreshed
+      // and switch to the calendar tab
+      if ('icalUrl' in variables) {
+        // Set calendar tab as active
+        const tabsElement = document.querySelector('button[value="calendar"]') as HTMLButtonElement;
+        if (tabsElement) {
+          tabsElement.click();
+        }
+        
+        await queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId, 'calendar'] });
+        // Force a refetch of the property to ensure it has the latest icalUrl
+        await queryClient.refetchQueries({ queryKey: ['/api/units', propertyId] });
+        // Force a refetch of calendar events
+        setTimeout(() => refetchCalendar(), 500);
+      }
+      
       setShowIcalInput(false);
       setNewIcalUrl("");
     },
