@@ -110,6 +110,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const propertyId = parseInt(req.params.id);
       console.log(`GET request for property ID: ${propertyId}`);
       
+      // Force refresh data for Property 18 to debug
+      if (propertyId === 18) {
+        // First get the current data for logging
+        const [currentProperty] = await db.select()
+          .from(guestyProperties)
+          .where(eq(guestyProperties.id, propertyId));
+        
+        console.log(`Current property 18 data in DB: `, JSON.stringify(currentProperty));
+      }
+      
       // Try to find as a Guesty property first
       const [guestyProperty] = await db.select()
         .from(guestyProperties)
