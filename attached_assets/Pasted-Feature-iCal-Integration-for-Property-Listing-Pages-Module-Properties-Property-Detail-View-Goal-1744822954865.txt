@@ -1,0 +1,353 @@
+Feature: iCal Integration for Property Listing Pages
+Module: Properties > Property Detail View
+
+Goal
+Integrate one-way iCal feeds from Guesty into the internal property listing pages so your team can view current and future reservation availability. This will allow both internal and Guesty-managed properties to display booking availability in a unified calendar view.
+
+This integration should be read-only and should never write or push data back to Guesty or modify the Guesty calendar.
+
+Functional Requirements
+1. iCal Feed Integration
+Input: Each property will have an assigned iCal URL (stored in the database).
+
+The iCal feed should be fetched and parsed on a scheduled basis (e.g., every hour) or on-demand when the calendar tab is loaded.
+
+Extracted data includes:
+
+Start date/time
+
+End date/time
+
+Reservation summary or title (if available)
+
+UID (optional for syncing)
+
+2. One-Way Sync Enforcement
+The integration must not write to Guesty.
+
+iCal feed should be parsed client-side or securely through the backend with cache.
+
+No POST, PUT, or DELETE requests allowed to any external system.
+
+Confirm that no webhook or trigger logic attempts to push updates back to the calendar source.
+
+3. UI: Calendar Tab on Property Page
+Add a new tab within each property’s detail page:
+
+Tab Label: Calendar
+
+Route: /properties/:id/calendar
+
+Component: PropertyCalendar.tsx
+
+Inside the tab:
+
+Render a monthly calendar view (using a library like react-calendar, fullcalendar, or equivalent)
+
+Booked dates should appear as blocked-out ranges
+
+Show the reservation summary on hover (e.g., “Guest Stay: Apr 12–15”)
+
+Add a loading skeleton and error state if iCal feed is unavailable
+
+4. Backend/API
+Data Model Update:
+
+Update property schema to include:
+
+icalUrl: string | null
+
+Backend Endpoints:
+
+GET /properties/:id/calendar
+
+Parses the iCal feed for the selected property
+
+Returns JSON with all reservations in this format:
+
+ts
+Copy
+Edit
+[
+  {
+    start: "2024-04-12T16:00:00Z",
+    end: "2024-04-15T10:00:00Z",
+    title: "Guest Reservation",
+    uid: "event-uuid-123"
+  },
+  ...
+]
+Suggested Implementation:
+
+Use ical.js or node-ical to parse the feed server-side
+
+Cache the results for 30–60 minutes to avoid overloading Guesty
+
+5. React Component – PropertyCalendar.tsx
+Use useEffect to fetch the calendar data on tab load
+
+Use useState for loading, error, and event data
+
+Display calendar view with booked date ranges blocked
+
+Allow toggling between Month, Week, and Day view (optional)
+
+6. Permissions
+Calendar tab should be accessible to:
+
+Admin
+
+Operations Team
+
+Maintenance/Cleaning Teams (read-only)
+
+Hide for roles without property access
+
+7. Testing Guidance
+Validate parsing of valid iCal feed URLs
+
+Test for:
+
+Overlapping reservations
+
+Missing fields in iCal (e.g., no title)
+
+Timezone alignment issues
+
+Confirm that no data is sent to external iCal URLs
+
+Simulate slow iCal response and confirm UI fallback behavior
+
+Validate cache refresh timing if implemented
+
+Performance Considerations
+Cache parsed events for each iCal feed to reduce load
+
+Use pagination or lazy loading if viewing large date ranges
+
+Avoid repeated parsing on every component render
+
+Would you like help building the backend GET /calendar parsing endpoint, or the UI layout in Tailwind for the calendar tab?
+
+
+
+
+
+
+You said:
+Please include everything in the prompt to fully build out the feature.
+
+
+ChatGPT said:
+Here is the complete and production-ready Replit Agent V2 prompt to fully build out the iCal integration and calendar view tab on your property pages. This prompt includes all backend routes, React frontend structure, data handling, permissions, and display logic. It's fully aligned with your system stability guidelines and written without emojis.
+
+Prompt for Replit Agent V2
+Feature: iCal Calendar Integration for Property Pages
+Module: Properties > Property Detail View > Calendar Tab
+
+Goal
+Build a read-only iCal integration that pulls calendar availability from Guesty (or other platforms) and displays bookings on a calendar UI within each property's detail page. This is a one-way integration strictly for display purposes. No writebacks, sync, or pushes to Guesty should ever occur.
+
+Requirements
+1. Backend (Node.js / Express / TypeScript)
+a. Update Property Data Model
+In the backend Property schema or table, add:
+
+ts
+Copy
+Edit
+interface Property {
+  id: string;
+  name: string;
+  address: string;
+  ...
+  icalUrl?: string | null;
+}
+Ensure the icalUrl field is:
+
+Optional
+
+Editable via admin settings
+
+Stored securely (can be public but monitored)
+
+b. Create iCal Parser Utility
+Use node-ical package to fetch and parse .ics files.
+
+Install:
+
+bash
+Copy
+Edit
+npm install node-ical
+Create a utility at server/utils/parseIcal.ts:
+
+ts
+Copy
+Edit
+import ical from 'node-ical';
+
+export async function parseICalFeed(url: string): Promise<any[]> {
+  const data = await ical.async.fromURL(url);
+  return Object.values(data)
+    .filter(event => event.type === 'VEVENT')
+    .map(event => ({
+      start: event.start,
+      end: event.end,
+      title: event.summary || 'Reservation',
+      uid: event.uid || '',
+    }));
+}
+c. Backend Route – GET Calendar Data
+Create route GET /properties/:id/calendar:
+
+ts
+Copy
+Edit
+import express from 'express';
+import { parseICalFeed } from '../utils/parseIcal';
+import { getPropertyById } from '../services/propertyService';
+
+const router = express.Router();
+
+router.get('/properties/:id/calendar', async (req, res) => {
+  try {
+    const property = await getPropertyById(req.params.id);
+    if (!property || !property.icalUrl) {
+      return res.status(404).json({ error: 'No iCal feed found for this property' });
+    }
+
+    const events = await parseICalFeed(property.icalUrl);
+    return res.json(events);
+  } catch (err) {
+    console.error('iCal parsing error:', err);
+    return res.status(500).json({ error: 'Failed to parse calendar feed' });
+  }
+});
+
+export default router;
+Use in backend router index:
+
+ts
+Copy
+Edit
+app.use('/api', propertyCalendarRouter);
+2. Frontend (React + TypeScript + Tailwind CSS)
+a. Add Calendar Tab
+Within the property detail page (e.g. PropertyDetail.tsx), add:
+
+tsx
+Copy
+Edit
+<Tabs defaultValue="overview">
+  <TabsList>
+    <TabsTrigger value="overview">Overview</TabsTrigger>
+    <TabsTrigger value="calendar">Calendar</TabsTrigger>
+  </TabsList>
+  <TabsContent value="overview">
+    {/* Existing content */}
+  </TabsContent>
+  <TabsContent value="calendar">
+    <PropertyCalendar propertyId={property.id} />
+  </TabsContent>
+</Tabs>
+b. Calendar Component – PropertyCalendar.tsx
+Install calendar library if not already installed:
+
+bash
+Copy
+Edit
+npm install react-calendar
+tsx
+Copy
+Edit
+import React, { useEffect, useState } from 'react';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
+
+interface CalendarEvent {
+  start: string;
+  end: string;
+  title: string;
+  uid: string;
+}
+
+interface Props {
+  propertyId: string;
+}
+
+export function PropertyCalendar({ propertyId }: Props) {
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchCalendar() {
+      try {
+        const res = await fetch(`/api/properties/${propertyId}/calendar`);
+        if (!res.ok) throw new Error('Failed to load calendar');
+        const data = await res.json();
+        setEvents(data);
+      } catch (err) {
+        setError('Unable to load calendar');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchCalendar();
+  }, [propertyId]);
+
+  if (loading) return <p className="text-sm text-gray-500">Loading calendar...</p>;
+  if (error) return <p className="text-red-500">{error}</p>;
+
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <h3 className="text-lg font-semibold mb-2">Booking Calendar</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {events.map(event => (
+          <div key={event.uid} className="border p-2 rounded bg-gray-50">
+            <p className="text-sm font-medium">{event.title}</p>
+            <p className="text-xs text-gray-500">{new Date(event.start).toLocaleString()} → {new Date(event.end).toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+Optional: Replace the event map with a true calendar grid if you later integrate fullcalendar, react-big-calendar, or similar.
+
+3. Permissions & Usage
+Show the calendar tab only for users with access to the unit:
+
+Admin
+
+Ops
+
+Cleaning or Maintenance (read-only)
+
+Calendar is for visibility only; no edits allowed
+
+No data from the UI should ever update or push to the iCal source
+
+4. Testing Guidance
+Add a known working Guesty iCal URL to a test property
+
+Validate correct parsing of:
+
+Basic reservation events
+
+Back-to-back stays
+
+Missing or empty calendars
+
+Confirm read-only behavior
+
+Verify no POST or update requests are sent to any iCal link
+
+5. Performance Optimization
+Cache the parsed result for each URL for 30–60 minutes server-side
+
+Use loading states to avoid blank UI
+
+Lazy-load the calendar data only when the tab is opened
+
