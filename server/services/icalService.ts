@@ -1,6 +1,7 @@
 import ical from 'node-ical';
 import https from 'https';
 import http from 'http';
+import crypto from 'crypto';
 
 export interface CalendarEvent {
   start: Date;
@@ -10,12 +11,28 @@ export interface CalendarEvent {
   status?: string;
 }
 
+interface iCalEvent {
+  type: string;
+  uid?: string;
+  start?: Date;
+  end?: Date;
+  summary?: string;
+  status?: string;
+  [key: string]: any;
+}
+
 /**
  * Validate if a URL is properly formatted and accessible
  * @param url URL to validate
  * @returns True if URL is valid, false otherwise
  */
 async function validateUrl(url: string): Promise<boolean> {
+  // Sanity check for URL parameter
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    console.error('Empty or non-string URL provided to validateUrl');
+    return false;
+  }
+
   try {
     const parsedUrl = new URL(url);
     
@@ -31,8 +48,11 @@ async function validateUrl(url: string): Promise<boolean> {
         url,
         { method: 'HEAD', timeout: 5000 },
         (res) => {
+          // Using ! assertion operator as we've verified these properties exist
           res.on('data', () => {});
-          resolve(res.statusCode >= 200 && res.statusCode < 400);
+          // Check if status code exists and is in the success range
+          const statusCode = res.statusCode !== undefined ? res.statusCode : 0;
+          resolve(statusCode >= 200 && statusCode < 400);
         }
       );
       
@@ -61,6 +81,12 @@ async function validateUrl(url: string): Promise<boolean> {
  * @returns Array of calendar events
  */
 export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
+  // Sanity check for URL parameter
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    console.error('Empty or non-string URL provided to getCalendarEvents');
+    throw new Error('Invalid URL: URL must be a non-empty string');
+  }
+
   try {
     console.log(`Fetching iCal data from: ${url}`);
     
@@ -75,45 +101,93 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
       // Add options to handle more calendar variations
       headers: {
         'User-Agent': 'Synergy-Rentals/1.0',
-        'Accept': 'text/calendar'
+        'Accept': 'text/calendar,application/calendar+xml,text/plain'
       },
-      timeout: 10000 // Increase timeout to 10 seconds
+      timeout: 15000 // Increase timeout to 15 seconds for slow calendar servers
     });
     
     // Check if we got any data
-    if (Object.keys(data).length === 0) {
+    if (!data || Object.keys(data).length === 0) {
       console.error(`No valid calendar data found at URL: ${url}`);
       throw new Error('No calendar events found. The calendar may be empty or in an unsupported format.');
     }
     
-    // Process the events
-    const events = Object.values(data)
-      .filter(event => event.type === 'VEVENT')
-      .map(event => {
-        // Ensure we have valid dates
-        if (!event.start || !event.end) {
-          console.warn(`Event missing start or end date: ${event.uid || 'unknown'}`);
-          // Skip events with missing dates by returning null and filtering them out
-          return null;
+    // Process the events with type checking and error handling
+    const events: CalendarEvent[] = [];
+    
+    try {
+      // Get the values from the data object safely
+      const entries = Object.entries(data);
+      console.log(`Processing ${entries.length} entries from iCal feed`);
+      
+      for (const [key, rawEvent] of entries) {
+        try {
+          // Type guard to ensure it's our expected event type
+          const event = rawEvent as iCalEvent;
+          
+          // Only process VEVENT type entries
+          if (event.type !== 'VEVENT') {
+            console.log(`Skipping non-VEVENT entry of type: ${event.type}`);
+            continue;
+          }
+          
+          // Validate that we have valid start and end dates
+          if (!event.start || !event.end) {
+            console.warn(`Event missing start or end date, skipping: ${event.uid || key || 'unknown'}`);
+            continue;
+          }
+          
+          // Verify dates are valid Date objects
+          const startIsValid = event.start instanceof Date && !isNaN(event.start.getTime());
+          const endIsValid = event.end instanceof Date && !isNaN(event.end.getTime());
+          
+          if (!startIsValid || !endIsValid) {
+            console.warn(`Event has invalid date objects, skipping: ${event.uid || key || 'unknown'}`);
+            continue;
+          }
+          
+          // Create a sanitized event object
+          const calendarEvent: CalendarEvent = {
+            start: event.start,
+            end: event.end,
+            title: (event.summary && typeof event.summary === 'string') 
+              ? event.summary 
+              : 'Reservation',
+            uid: (event.uid && typeof event.uid === 'string') 
+              ? event.uid 
+              : crypto.randomUUID(),
+            status: (event.status && typeof event.status === 'string')
+              ? event.status.toLowerCase() 
+              : 'confirmed'
+          };
+          
+          events.push(calendarEvent);
+        } catch (itemError) {
+          // Log the error but continue processing other events
+          console.error(`Error processing calendar event ${key}:`, itemError);
         }
-        
-        return {
-          start: event.start,
-          end: event.end,
-          title: event.summary || 'Reservation',
-          uid: event.uid || crypto.randomUUID(), // Generate a UID if not provided
-          status: event.status || 'confirmed'
-        };
-      })
-      .filter(event => event !== null) as CalendarEvent[]; // Filter out null events
+      }
+    } catch (processingError) {
+      console.error('Error while processing calendar data:', processingError);
+      // If we have some events despite the error, return them
+      if (events.length > 0) {
+        console.log(`Returning ${events.length} events despite processing errors`);
+        return events;
+      }
+      throw new Error('Failed to process calendar data');
+    }
+    
+    // Sort events by start date
+    events.sort((a, b) => a.start.getTime() - b.start.getTime());
     
     console.log(`Successfully parsed ${events.length} events from iCal feed`);
     return events;
   } catch (error) {
     console.error('Error parsing iCal feed:', error);
+    
     if (error instanceof Error) {
       console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      if (error.stack) console.error('Error stack:', error.stack);
       
       // Provide more specific error messages based on common failures
       if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
@@ -122,6 +196,10 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
         throw new Error(`Connection to calendar server timed out. The server may be slow or unresponsive.`);
       } else if (error.message.includes('401') || error.message.includes('403')) {
         throw new Error(`Authorization failed. This calendar feed may require authentication.`);
+      } else if (error.message.includes('404')) {
+        throw new Error(`Calendar feed not found (404). The URL may be incorrect or the feed may have been moved.`);
+      } else if (error.message.includes('500')) {
+        throw new Error(`Calendar server error (500). The server encountered an internal error.`);
       } else {
         throw new Error(`Failed to parse iCal feed: ${error.message}`);
       }
@@ -142,7 +220,21 @@ const icalCache = new Map<string, {
   error?: { message: string, timestamp: number } 
 }>();
 const CACHE_TTL = 60 * 60 * 1000; // 60 minutes in milliseconds
-const ERROR_CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds for errors
+const ERROR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds for errors
+
+/**
+ * Clear the iCal cache for a specific URL or all URLs
+ * @param url Optional URL to clear from cache. If not provided, clears the entire cache.
+ */
+export function clearIcalCache(url?: string): void {
+  if (url) {
+    console.log(`Clearing iCal cache for URL: ${url}`);
+    icalCache.delete(url);
+  } else {
+    console.log('Clearing entire iCal cache');
+    icalCache.clear();
+  }
+}
 
 /**
  * Get calendar events with caching
@@ -150,8 +242,9 @@ const ERROR_CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds for errors
  * @returns Array of calendar events
  */
 export async function getCachedCalendarEvents(url: string): Promise<CalendarEvent[]> {
-  if (!url || url.trim() === '') {
-    console.error('Empty iCal URL provided');
+  // Validate URL
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    console.error('Empty or invalid iCal URL provided to getCachedCalendarEvents');
     throw new Error('Empty or invalid iCal URL');
   }
   
@@ -162,12 +255,12 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
   // don't retry immediately to avoid hammering external services
   if (cachedData?.error && (now - cachedData.error.timestamp < ERROR_CACHE_TTL)) {
     console.log(`Using cached error for iCal URL: ${url}, Error: ${cachedData.error.message}`);
-    throw new Error(`Cached error: ${cachedData.error.message}`);
+    throw new Error(`${cachedData.error.message} (cached error, will retry after ${Math.ceil((ERROR_CACHE_TTL - (now - cachedData.error.timestamp)) / 60000)} minutes)`);
   }
   
   // Return cached data if it exists and is still valid
   if (cachedData?.data && (now - cachedData.timestamp < CACHE_TTL)) {
-    console.log(`Using cached iCal data for: ${url} (${cachedData.data.length} events)`);
+    console.log(`Using cached iCal data for: ${url} (${cachedData.data.length} events, cached ${Math.floor((now - cachedData.timestamp) / 60000)} minutes ago)`);
     return cachedData.data;
   }
   
@@ -192,7 +285,7 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
     
     // If we have previous valid data, return it even though it's expired
     if (cachedData?.data && cachedData.data.length > 0) {
-      console.log(`Returning stale cached data due to fetch error for: ${url}`);
+      console.log(`Returning stale cached data (${cachedData.data.length} events) due to fetch error for: ${url}`);
       
       // Update the cache with the error but keep the stale data
       icalCache.set(url, { 

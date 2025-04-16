@@ -6,7 +6,7 @@ import {
   Loader2, ChevronLeft, Building2, MapPin, Wifi, FileText, Tag, User, Calendar, ClipboardCheck,
   Wrench, Package, ReceiptText, MessageSquare, Upload, Download, ArrowUpDown, Clipboard, Users,
   CalendarDays, Clock, AlertCircle, ExternalLink, CalendarClock, Check, RefreshCw, AlertTriangle,
-  Plus, Link as LinkIcon
+  Plus, Link as LinkIcon, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -809,12 +809,12 @@ export default function PropertyDetailPage() {
                   <AlertTriangle className="h-12 w-12 text-amber-500 mb-3" />
                   <h3 className="font-semibold mb-2">Error Loading Calendar</h3>
                   <p className="text-gray-500 text-sm mb-4 max-w-md">
-                    There was an error loading calendar data. This may be due to an invalid iCal URL or temporary connectivity issues.
+                    There was an error loading calendar data. This may be due to an invalid iCal URL or temporary connectivity issues with the external calendar service.
                   </p>
                   <div className="text-xs bg-amber-50 p-3 rounded-md text-amber-700 max-w-md mb-4 overflow-auto max-h-24">
-                    {String(calendarError)}
+                    {calendarError instanceof Error ? calendarError.message : String(calendarError)}
                   </div>
-                  <div className="flex space-x-3">
+                  <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -829,44 +829,120 @@ export default function PropertyDetailPage() {
                     >
                       <RefreshCw className="h-4 w-4 mr-2" /> Retry
                     </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        // Clear iCal URL from property
+                        updatePropertyMutation.mutate({ icalUrl: null });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2 text-red-500" /> Remove iCal URL
+                    </Button>
                   </div>
                 </div>
               ) : calendarEvents && calendarEvents.length > 0 ? (
                 <div className="space-y-6">
+                  {/* Calendar view header with date filtering options could be added here */}
                   <div className="grid grid-cols-1 gap-4">
-                    {calendarEvents.map((event: any, index: number) => (
-                      <div key={index} className="flex border rounded-md p-4 hover:bg-gray-50">
-                        <div className="mr-4 flex-shrink-0">
-                          <div className="h-12 w-12 flex items-center justify-center rounded-full bg-blue-100 text-blue-900">
-                            <CalendarDays className="h-6 w-6" />
+                    {calendarEvents.map((event: any, index: number) => {
+                      // Ensure dates are valid
+                      let startDate: Date;
+                      let endDate: Date;
+                      
+                      try {
+                        startDate = new Date(event.start);
+                        if (isNaN(startDate.getTime())) {
+                          console.warn(`Invalid start date in event:`, event);
+                          startDate = new Date(); // Fallback to current date
+                        }
+                      } catch (e) {
+                        console.error(`Error parsing start date:`, e);
+                        startDate = new Date();
+                      }
+                      
+                      try {
+                        endDate = new Date(event.end);
+                        if (isNaN(endDate.getTime())) {
+                          console.warn(`Invalid end date in event:`, event);
+                          endDate = new Date(startDate);
+                          endDate.setDate(endDate.getDate() + 1); // Fallback to start + 1 day
+                        }
+                      } catch (e) {
+                        console.error(`Error parsing end date:`, e);
+                        endDate = new Date(startDate);
+                        endDate.setDate(endDate.getDate() + 1);
+                      }
+                      
+                      // Calculate night count
+                      const nights = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return (
+                        <div key={event.uid || index} className="flex border rounded-md p-4 hover:bg-gray-50">
+                          <div className="mr-4 flex-shrink-0">
+                            <div className="h-12 w-12 flex items-center justify-center rounded-full bg-blue-100 text-blue-900">
+                              <CalendarDays className="h-6 w-6" />
+                            </div>
+                          </div>
+                          <div className="flex-grow">
+                            <h4 className="font-medium">{event.title || 'Reservation'}</h4>
+                            <div className="flex items-center text-sm text-gray-500 mb-1">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {formatDate(startDate)} - {formatDate(endDate)}
+                              <span className="ml-2 text-xs text-gray-400">({nights} {nights === 1 ? 'night' : 'nights'})</span>
+                            </div>
+                            {event.status && (
+                              <div className="text-xs text-gray-500">
+                                Status: {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4 flex-shrink-0">
+                            <Badge
+                              variant="outline"
+                              className={event.status === 'cancelled' 
+                                ? 'bg-red-50 text-red-700'
+                                : event.status === 'tentative'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-blue-50 text-blue-700'
+                              }
+                            >
+                              {event.status === 'cancelled' 
+                                ? 'Cancelled' 
+                                : event.status === 'tentative' 
+                                  ? 'Tentative'
+                                  : 'Confirmed'
+                              }
+                            </Badge>
                           </div>
                         </div>
-                        <div className="flex-grow">
-                          <h4 className="font-medium">{event.title || 'Reservation'}</h4>
-                          <div className="flex items-center text-sm text-gray-500 mb-1">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {formatDate(new Date(event.start))} - {formatDate(new Date(event.end))}
-                          </div>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                          <Badge
-                            variant="outline"
-                            className="bg-blue-50 text-blue-700"
-                          >
-                            Reservation
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-8 border rounded-md flex flex-col items-center justify-center p-6">
                   <Calendar className="h-12 w-12 text-gray-300 mb-3" />
                   <h3 className="font-semibold mb-2">No Calendar Events</h3>
-                  <p className="text-gray-500 text-sm mb-4">
-                    There are no calendar events available for this property.
+                  <p className="text-gray-500 text-sm mb-4 max-w-md">
+                    There are no calendar events available for this property. This could be because there are no bookings, or the calendar URL is not returning any data.
                   </p>
+                  <div className="flex space-x-3">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowIcalInput(true)}
+                    >
+                      <LinkIcon className="h-4 w-4 mr-2" /> Edit iCal URL
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => refetchCalendar()}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
