@@ -135,17 +135,20 @@ export default function PropertyDetailPage() {
   
   // Auto-refresh calendar if we have an icalUrl but no events
   React.useEffect(() => {
-    // If we have an iCal URL but no calendar events or calendar error, trigger a refresh
-    if (property?.icalUrl && !isLoadingCalendar && 
-        (calendarError || (calendarEvents && calendarEvents.length === 0))) {
+    // If the property has changed or the iCal URL has been updated, refetch calendar data
+    if (property && !isLoadingCalendar) {
+      console.log('Property data changed, checking if we need to refetch calendar');
+      console.log('Current icalUrl:', property.icalUrl);
+      
       // Small delay to make sure other queries have settled
       const timer = setTimeout(() => {
+        console.log('Forcing calendar refetch due to property/icalUrl update');
         refetchCalendar();
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [property?.icalUrl, isLoadingCalendar, calendarEvents, calendarError, refetchCalendar]);
+  }, [property, isLoadingCalendar, refetchCalendar]);
   
   // Mutation for updating property
   const updatePropertyMutation = useMutation({
