@@ -1,0 +1,88 @@
+Feature Fix: Debug and repair the Guesty Properties calendar tab in property detail pages
+Module: Guesty Properties > Property Detail View > Calendar Tab
+
+Goal
+Review, debug, and fix the calendar tab on each Guesty property’s detail page. The calendar tab should display a reservation calendar using data pulled from the property’s submitted iCal link. This functionality should work across every Guesty property page.
+
+Current Problem (To Investigate)
+The calendar tab does not load reservation data correctly or fails to display the calendar for Guesty properties.
+
+The problem may be related to:
+
+Incorrect or missing iCal URLs
+
+iCal fetch/parse failure
+
+Component rendering error
+
+Improper routing or missing propertyId
+
+UI not recognizing Guesty-linked properties as valid input
+
+Fix Requirements
+1. iCal Integration Review
+Ensure each Guesty property has a valid icalUrl value in its property record.
+
+For each property page, the iCal link should be fetched using:
+
+A GET request to /api/properties/:id/calendar
+
+A parser function that extracts events from the .ics feed and returns:
+
+ts
+Copy
+Edit
+[
+  {
+    start: "2024-07-01T16:00:00Z",
+    end: "2024-07-04T10:00:00Z",
+    title: "Guest Reservation",
+    uid: "event-uuid-456"
+  }
+]
+Review the parseICalFeed() function and ensure it:
+
+Handles empty or malformed feeds
+
+Supports Guesty .ics format
+
+Returns valid events to the frontend
+
+2. Frontend Calendar Component Validation
+Confirm the PropertyCalendar.tsx component:
+
+Fetches data using propertyId correctly
+
+Displays a monthly calendar with event blocks
+
+Handles empty states, errors, and loading correctly
+
+Parses and renders guest reservations without throwing rendering errors
+
+Make sure the calendar displays inside the Calendar tab of each property detail view under Guesty Properties.
+
+3. Routing & Access Logic
+Confirm that routes like /guesty-properties/:id/calendar are correctly passing the propertyId to the calendar component.
+
+Ensure the icalUrl is being correctly passed from the backend (or fetched using GET /properties/:id).
+
+Error Handling & Logging
+If no icalUrl is found, show an appropriate message: "No calendar available for this property."
+
+Log parsing failures in the backend and display a user-facing fallback message.
+
+Use loading states and graceful fallbacks to avoid white screens or broken components.
+
+Testing Checklist
+Perform the following tests across several Guesty properties:
+
+Open detail page → click Calendar tab → confirm calendar renders
+
+Validate that reservation blocks are showing with correct dates
+
+Confirm loading, error, and empty states work
+
+Test for long and overlapping reservations
+
+Confirm at least 5 different Guesty properties function as expected
+
