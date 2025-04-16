@@ -149,12 +149,12 @@ export function CalendarView({ events }: CalendarViewProps) {
             checkOutDateData.events.push({
               ...event,
               date: displayCheckOutDate,
-              type: "maintenance", // Using maintenance type for check-out events
+              type: "checkout", // Using checkout type for check-out events
               label: `Check-out: ${event.label}`
             });
             checkOutDateData.hasEvents = true;
-            if (!checkOutDateData.eventTypes.includes("maintenance")) {
-              checkOutDateData.eventTypes.push("maintenance");
+            if (!checkOutDateData.eventTypes.includes("checkout")) {
+              checkOutDateData.eventTypes.push("checkout");
             }
           }
           
