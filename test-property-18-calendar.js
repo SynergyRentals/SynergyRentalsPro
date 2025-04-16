@@ -4,6 +4,8 @@
  */
 
 import fetch from 'node-fetch';
+import { CookieJar } from 'tough-cookie';
+import fetchCookie from 'fetch-cookie';
 
 const PROPERTY_ID = 18;
 const LOGIN_CREDENTIALS = {
@@ -11,9 +13,18 @@ const LOGIN_CREDENTIALS = {
   password: 'password'
 };
 
+// Create a cookie jar to store session cookies
+const cookieJar = new CookieJar();
+const fetchWithCookies = fetchCookie(fetch, cookieJar);
+
 async function login() {
   console.log('Logging in...');
-  const response = await fetch('http://localhost:5000/api/auth/login', {
+  
+  // Create a session by accessing the main page first
+  await fetchWithCookies('http://localhost:5000/');
+  
+  // Now login to get the session cookie
+  const response = await fetchWithCookies('http://localhost:5000/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(LOGIN_CREDENTIALS)
@@ -25,16 +36,14 @@ async function login() {
   
   const data = await response.json();
   console.log('Successfully logged in');
-  return data.token;
+  return data;
 }
 
-async function testCalendarEndpoint(token) {
+async function testCalendarEndpoint() {
   console.log(`Testing calendar endpoint for property ID ${PROPERTY_ID}`);
   
   // First, get the property details
-  const propertyResponse = await fetch(`http://localhost:5000/api/properties/${PROPERTY_ID}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  const propertyResponse = await fetchWithCookies(`http://localhost:5000/api/properties/${PROPERTY_ID}`);
   
   if (!propertyResponse.ok) {
     throw new Error(`Failed to get property: ${propertyResponse.status} ${propertyResponse.statusText}`);
@@ -47,9 +56,7 @@ async function testCalendarEndpoint(token) {
   
   // Now test the calendar endpoint
   console.log(`Fetching calendar data for property ID ${PROPERTY_ID}`);
-  const calendarResponse = await fetch(`http://localhost:5000/api/properties/${PROPERTY_ID}/calendar`, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  const calendarResponse = await fetchWithCookies(`http://localhost:5000/api/properties/${PROPERTY_ID}/calendar`);
   
   if (!calendarResponse.ok) {
     throw new Error(`Failed to get calendar: ${calendarResponse.status} ${calendarResponse.statusText}`);
@@ -69,8 +76,12 @@ async function testCalendarEndpoint(token) {
 
 async function main() {
   try {
-    const token = await login();
-    const result = await testCalendarEndpoint(token);
+    // First login to get cookies
+    const userData = await login();
+    console.log(`Logged in as ${userData.username} (${userData.role})`);
+    
+    // Now make the API calls using cookie authentication
+    const result = await testCalendarEndpoint();
     
     // Print results summary
     console.log('\nTest Results Summary:');
