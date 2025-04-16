@@ -20,6 +20,12 @@ export default function HostAIInboxPage() {
             <h1 className="text-2xl font-bold">HostAI Task Inbox</h1>
             <p className="text-muted-foreground">Process and route incoming tasks from HostAI</p>
           </div>
+          <Button 
+            onClick={() => window.location.href = "/projects-tasks/hostai-inbox/settings"}
+            variant="outline"
+          >
+            Settings
+          </Button>
         </div>
 
         <Card>
