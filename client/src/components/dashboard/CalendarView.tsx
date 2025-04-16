@@ -22,20 +22,28 @@ export function CalendarView({ events }: CalendarViewProps) {
 
   // Helper function to check if a date has events
   const hasEvent = (date: Date) => {
-    return events.some(event => 
-      event.date.getDate() === date.getDate() && 
-      event.date.getMonth() === date.getMonth() && 
-      event.date.getFullYear() === date.getFullYear()
-    );
+    // Check date without time component
+    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nextDate = new Date(targetDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    
+    return events.some(event => {
+      const eventDate = event.date;
+      return eventDate >= targetDate && eventDate < nextDate;
+    });
   };
 
   // Get events for a specific date
   const getEventsForDate = (date: Date) => {
-    return events.filter(event => 
-      event.date.getDate() === date.getDate() && 
-      event.date.getMonth() === date.getMonth() && 
-      event.date.getFullYear() === date.getFullYear()
-    );
+    // Check date without time component
+    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nextDate = new Date(targetDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    
+    return events.filter(event => {
+      const eventDate = event.date;
+      return eventDate >= targetDate && eventDate < nextDate;
+    });
   };
 
   // Function to render custom day contents
