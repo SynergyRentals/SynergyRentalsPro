@@ -1,6 +1,6 @@
 // Script to drop all property-related tables
 import { Pool } from '@neondatabase/serverless';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 dotenv.config();
 
 // Connect to the database
