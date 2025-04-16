@@ -87,6 +87,26 @@ export default function PropertyDetailPage() {
     enabled: !!propertyId,
   });
   
+  // Get calendar events for this property
+  const {
+    data: calendarEvents,
+    isLoading: isLoadingCalendar,
+    error: calendarError
+  } = useQuery({
+    queryKey: ['/api/units', propertyId, 'calendar'],
+    queryFn: async () => {
+      if (!property?.icalUrl) {
+        return [];
+      }
+      const response = await fetch(`/api/units/${propertyId}/calendar`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch calendar events');
+      }
+      return response.json();
+    },
+    enabled: !!propertyId && !!property?.icalUrl,
+  });
+  
   // Handle navigation back to properties list
   const handleBackToList = () => {
     setLocation("/properties");
@@ -603,6 +623,129 @@ export default function PropertyDetailPage() {
                 </div>
               )}
             </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Calendar Tab */}
+        <TabsContent value="calendar">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-lg">Calendar</CardTitle>
+                  <CardDescription>Reservation and availability calendar</CardDescription>
+                </div>
+                {property.icalUrl ? (
+                  <Badge variant="outline" className="bg-green-50 text-green-700">
+                    <Check className="h-3 w-3 mr-1" /> iCal Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700">
+                    <AlertCircle className="h-3 w-3 mr-1" /> No iCal Source
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!property.icalUrl ? (
+                <div className="text-center py-8 border rounded-md flex flex-col items-center justify-center p-6">
+                  <CalendarClock className="h-12 w-12 text-gray-300 mb-3" />
+                  <h3 className="font-semibold mb-2">No Calendar Source Connected</h3>
+                  <p className="text-gray-500 text-sm mb-4 max-w-md">
+                    This property doesn't have an iCal URL configured. Add an iCal URL to see reservations and availability from external booking platforms.
+                  </p>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" /> Add iCal URL
+                  </Button>
+                </div>
+              ) : isLoadingCalendar ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : calendarError ? (
+                <div className="text-center py-8 border rounded-md flex flex-col items-center justify-center p-6">
+                  <AlertTriangle className="h-12 w-12 text-amber-500 mb-3" />
+                  <h3 className="font-semibold mb-2">Error Loading Calendar</h3>
+                  <p className="text-gray-500 text-sm mb-4 max-w-md">
+                    There was an error loading calendar data. Please check the iCal URL or try again later.
+                  </p>
+                  <div className="text-xs bg-amber-50 p-3 rounded-md text-amber-700 max-w-md">
+                    {String(calendarError)}
+                  </div>
+                </div>
+              ) : calendarEvents && calendarEvents.length > 0 ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4">
+                    {calendarEvents.map((event, index) => (
+                      <div key={index} className="flex border rounded-md p-4 hover:bg-gray-50">
+                        <div className="mr-4 flex-shrink-0">
+                          <div className="h-12 w-12 flex items-center justify-center rounded-full bg-blue-100 text-blue-900">
+                            <CalendarDays className="h-6 w-6" />
+                          </div>
+                        </div>
+                        <div className="flex-grow">
+                          <h4 className="font-medium">{event.summary || 'Reservation'}</h4>
+                          <div className="flex items-center text-sm text-gray-500 mb-1">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {formatDate(new Date(event.start))} - {formatDate(new Date(event.end))}
+                          </div>
+                          {event.description && (
+                            <p className="text-sm text-gray-600 mt-2">{event.description}</p>
+                          )}
+                          {event.location && (
+                            <div className="flex items-center text-xs text-gray-500 mt-1">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {event.location}
+                            </div>
+                          )}
+                          {event.organizer && (
+                            <div className="flex items-center text-xs text-gray-500 mt-1">
+                              <User className="h-3 w-3 mr-1" />
+                              {event.organizer}
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-4 flex-shrink-0">
+                          <Badge
+                            variant={event.status === 'CONFIRMED' ? 'default' : 'outline'}
+                            className={
+                              event.status === 'CANCELLED' 
+                                ? 'bg-red-50 text-red-700' 
+                                : event.status === 'TENTATIVE' 
+                                  ? 'bg-amber-50 text-amber-700' 
+                                  : ''
+                            }
+                          >
+                            {event.status || 'Active'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 border rounded-md flex flex-col items-center justify-center p-6">
+                  <Calendar className="h-12 w-12 text-gray-300 mb-3" />
+                  <h3 className="font-semibold mb-2">No Calendar Events</h3>
+                  <p className="text-gray-500 text-sm mb-4">
+                    There are no calendar events available for this property.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between items-center border-t px-6 py-4">
+              <div className="text-sm text-gray-500">
+                {property.icalUrl && (
+                  <div className="flex items-center">
+                    <Link className="h-4 w-4 mr-1" />
+                    <span className="truncate max-w-md">{property.icalUrl}</span>
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh Calendar
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
