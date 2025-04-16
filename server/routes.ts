@@ -143,6 +143,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Unified endpoint to update any property type (both Guesty properties and internal units)
+  app.patch("/api/properties/:id", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      
+      // First, try to find as a Guesty property
+      const [guestyProperty] = await db.select()
+        .from(guestyProperties)
+        .where(eq(guestyProperties.id, propertyId));
+        
+      if (guestyProperty) {
+        // It's a Guesty property, update it
+        await db.update(guestyProperties)
+          .set({
+            ...req.body,
+            updatedAt: new Date()
+          })
+          .where(eq(guestyProperties.id, propertyId));
+        
+        // Log the update if it includes iCal URL
+        if (req.body.icalUrl !== undefined) {
+          console.log(`iCal URL updated for Guesty property ${propertyId}: ${req.body.icalUrl}`);
+        }
+        
+        // Get the updated property
+        const [updatedProperty] = await db.select()
+          .from(guestyProperties)
+          .where(eq(guestyProperties.id, propertyId));
+        
+        return res.json({
+          ...updatedProperty,
+          source: 'guesty'
+        });
+      }
+      
+      // If not a Guesty property, try to find as a regular unit
+      const unit = await storage.getUnit(propertyId);
+      if (unit) {
+        // It's a regular unit, update it
+        const updatedUnit = await storage.updateUnit(propertyId, req.body);
+        
+        // Log the update if it includes iCal URL
+        if (req.body.icalUrl) {
+          console.log(`iCal URL updated for unit ${propertyId}: ${req.body.icalUrl}`);
+        }
+        
+        return res.json({
+          ...updatedUnit,
+          source: 'internal',
+          bedrooms: null,
+          bathrooms: null,
+          amenities: []
+        });
+      }
+      
+      // If not found in either place
+      return res.status(404).json({ message: "Property not found" });
+    } catch (error) {
+      console.error("Error updating property:", error);
+      res.status(500).json({ message: "Error updating property" });
+    }
+  });
+  
   // Unified calendar endpoint for all property types
   app.get("/api/properties/:id/calendar", checkAuth, async (req, res) => {
     try {
