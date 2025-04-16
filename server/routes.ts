@@ -2901,25 +2901,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test endpoint for HostAI webhook
   app.post("/api/webhooks/hostai/test", async (req: Request, res: Response) => {
     try {
-      // Use a predefined test payload
+      // Use a predefined test payload that matches HostAI's exact format
       const testPayload = {
         task: {
-          id: "test-task-123",
-          description: "Test task for HostAI integration",
           action: "clean",
+          description: "Test task for HostAI integration",
           assignee: {
             firstName: "Test",
             lastName: "User"
           }
         },
         source: {
-          sourceType: "test",
-          link: "https://test.hostai.com/task/test-task-123"
+          sourceType: "TaskSource",
+          link: "https://hostai.example.com/tasks/123"
         },
         attachments: [
           {
-            type: "image",
-            url: "https://test.hostai.com/images/sample.jpg"
+            name: "Task Photo",
+            extension: "jpg",
+            url: "https://hostai.example.com/attachments/123.jpg"
           }
         ],
         guest: {
@@ -2957,25 +2957,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // so we don't need a verification middleware
   app.post("/api/webhooks/hostai", express.json(), async (req: Request, res: Response) => {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] HostAI webhook received`);
+    console.log(`[${timestamp}] HostAI webhook received:`, JSON.stringify(req.body, null, 2));
     
     try {
       const webhookData = req.body;
       
-      // Validate webhook format
-      if (!webhookData || !webhookData.task) {
+      // More flexible validation (matches the logic in hostAiWebhookHandler.ts)
+      const hasValidTask = webhookData && 
+        (webhookData.task || 
+        (typeof webhookData === 'object' && 'description' in webhookData));
+      
+      if (!hasValidTask) {
         console.error('Invalid HostAI webhook payload structure');
         return res.status(400).json({
           success: false,
-          message: 'Invalid webhook payload structure'
+          message: 'Invalid webhook payload structure. Required format expected per documentation.'
         });
       }
       
       // Log the webhook receipt
+      const taskDescription = webhookData.task ? 
+        webhookData.task.description || 'No description' : 
+        webhookData.description || 'No description';
+        
       await storage.createLog({
         action: "HOSTAI_WEBHOOK_RECEIVED",
         targetTable: "host_ai_tasks",
-        notes: `Task description: ${webhookData.task.description || 'No description'}`,
+        notes: `Task description: ${taskDescription}`,
         ipAddress: req.ip
       });
       

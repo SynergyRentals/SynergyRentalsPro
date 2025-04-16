@@ -14,13 +14,57 @@ export async function processHostAiWebhook(webhookData: any): Promise<{ success:
   try {
     console.log('Processing HostAI webhook:', JSON.stringify(webhookData, null, 2));
     
-    if (!webhookData || !webhookData.task) {
-      return { success: false, message: 'Invalid webhook payload structure: missing task data' };
+    // More flexible validation to ensure we can process HostAI webhooks
+    // We'll check for task.description or task, and try to extract as much data as possible
+    const hasValidTask = webhookData && 
+      (webhookData.task || 
+      (typeof webhookData === 'object' && 'description' in webhookData));
+    
+    if (!hasValidTask) {
+      return { 
+        success: false, 
+        message: 'Invalid webhook payload structure: missing task data. Please ensure payload contains a task object with description.' 
+      };
     }
     
-    // Extract data from the webhook payload
-    const { task, source, attachments, guest, listing } = webhookData;
-    const creationDate = webhookData._creationDate ? new Date(webhookData._creationDate) : new Date();
+    // If the main data is at the root level instead of under 'task', restructure it
+    let task, source, attachments, guest, listing, creationDate;
+    
+    if (webhookData.task) {
+      // Standard format with task object
+      task = webhookData.task;
+      source = webhookData.source;
+      attachments = webhookData.attachments;
+      guest = webhookData.guest;
+      listing = webhookData.listing;
+      creationDate = webhookData._creationDate ? new Date(webhookData._creationDate) : new Date();
+    } else {
+      // Alternative format where task data might be at the root
+      task = {
+        description: webhookData.description || 'No description provided',
+        action: webhookData.action,
+        assignee: webhookData.assignee
+      };
+      source = webhookData.source;
+      attachments = webhookData.attachments;
+      guest = webhookData.guest;
+      listing = webhookData.listing;
+      creationDate = webhookData._creationDate ? new Date(webhookData._creationDate) : new Date();
+    }
+    
+    // Log what we extracted for debugging
+    console.log('Extracted HostAI webhook data:', { 
+      task, source, attachments: Array.isArray(attachments) ? `${attachments.length} attachments` : 'No attachments',
+      guest, listing, creationDate 
+    });
+    
+    // Convert attachments to proper format if needed
+    let attachmentsJson = attachments;
+    
+    // If attachments is just a URL string, convert to proper format
+    if (typeof attachments === 'string') {
+      attachmentsJson = [{ url: attachments }];
+    }
     
     // Create a new HostAI task
     const newTask = await storage.createHostAiTask({
@@ -31,7 +75,7 @@ export async function processHostAiWebhook(webhookData: any): Promise<{ success:
       hostAiAssigneeLastName: task.assignee?.lastName || null,
       sourceType: source?.sourceType || null,
       sourceLink: source?.link || null,
-      attachmentsJson: attachments || null,
+      attachmentsJson: attachmentsJson || null,
       guestName: guest?.guestName || null,
       guestEmail: guest?.guestEmail || null,
       guestPhone: guest?.guestPhone || null,
@@ -40,6 +84,8 @@ export async function processHostAiWebhook(webhookData: any): Promise<{ success:
       assignedToUserId: null, // Will be assigned by a team member later
       hostAiCreatedAt: creationDate
     });
+    
+    console.log(`HostAI task created successfully with ID: ${newTask.id}`);
     
     return { 
       success: true, 
