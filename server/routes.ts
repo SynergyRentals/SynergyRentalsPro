@@ -2799,6 +2799,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Temporary route to get a Guesty API access token
+  app.get("/api/guesty-management/get-access-token", checkRole(["admin"]), async (req: Request, res: Response) => {
+    try {
+      console.log('[Access Token] Getting access token from Guesty API');
+      
+      // Ensure the token is retrieved/refreshed
+      await guestyClient._ensureTokenValid();
+      
+      // Return the access token
+      res.json({
+        success: true,
+        message: 'Successfully retrieved access token',
+        accessToken: guestyClient.accessToken
+      });
+      
+      // Log the API call
+      await storage.createLog({
+        action: "GUESTY_GET_ACCESS_TOKEN",
+        userId: req.user?.id,
+        targetTable: "guesty",
+        notes: "Retrieved access token from Guesty API",
+        ipAddress: req.ip
+      });
+    } catch (error) {
+      console.error('[Access Token] Error getting access token:', error);
+      
+      // Log the error
+      await storage.createLog({
+        action: "GUESTY_GET_ACCESS_TOKEN_ERROR",
+        userId: req.user?.id,
+        targetTable: "guesty",
+        notes: `Error getting access token: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving access token',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
   // For testing purposes - a non-authenticated version that directly tests the Guesty API client
   app.get("/api/guesty-management/test-webhook-secret", async (req: Request, res: Response) => {
     try {

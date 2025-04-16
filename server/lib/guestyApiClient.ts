@@ -1,7 +1,7 @@
 import { AxiosError, AxiosInstance, AxiosResponse, default as axios } from 'axios';
 
 export class GuestyAPIClient {
-  private accessToken: string | null = null;
+  accessToken: string | null = null; // Changed from private to public for temporary access
   private tokenExpiry: Date | null = null;
   private readonly clientId: string;
   private readonly clientSecret: string;
@@ -20,7 +20,8 @@ export class GuestyAPIClient {
     });
   }
 
-  private async _ensureTokenValid(): Promise<void> {
+  // Changed from private to public for temporary access
+  public async _ensureTokenValid(): Promise<void> {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] GuestyClient: _ensureTokenValid called`);
 
