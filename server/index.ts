@@ -1,8 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import { registerRoutes } from "./routes";
+import { setupRoutes } from "./routes-new";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
+import { setupAuth } from "./auth";
+import { createServer } from "http";
 
 const app = express();
 app.use(express.json());
@@ -47,7 +50,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  // Create HTTP server
+  const server = createServer(app);
+  
+  // Set up authentication
+  setupAuth(app);
+  
+  // Set up new routes
+  setupRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
