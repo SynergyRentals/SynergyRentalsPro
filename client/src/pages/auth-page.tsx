@@ -16,17 +16,18 @@ import { AutoAwesome } from "@mui/icons-material";
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (loginMutation.error) {
+    if (loginMutation.error || registerMutation.error) {
+      const error = loginMutation.error || registerMutation.error;
       toast({
-        title: "Login failed",
-        description: loginMutation.error.message || "Invalid username or password",
+        title: loginMutation.error ? "Login failed" : "Registration failed",
+        description: error?.message || "An error occurred during authentication",
         variant: "destructive"
       });
     }
-  }, [loginMutation.error, toast]);
-  const [, navigate] = useLocation();
+  }, [loginMutation.error, registerMutation.error, toast]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -48,8 +49,18 @@ export default function AuthPage() {
     try {
       await loginMutation.mutateAsync(data);
     } catch (error) {
-      // Error will be handled by the useEffect above
       console.error("Login error:", error);
+      // Error will be handled by the useEffect above
+    }
+  };
+
+  const handleRegister = async (data: z.infer<typeof extendedRegisterSchema>) => {
+    try {
+      const { confirmPassword, ...userData } = data;
+      await registerMutation.mutateAsync(userData);
+    } catch (error) {
+      console.error("Registration error:", error);
+      // Error will be handled by the useEffect above
     }
   };
 
