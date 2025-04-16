@@ -13,6 +13,9 @@ import OccupancyChart from '@/components/dashboard/OccupancyChart';
 import MaintenanceStatusChart from '@/components/dashboard/MaintenanceStatusChart';
 import GuestAnalytics from '@/components/dashboard/GuestAnalytics';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 import { 
   Today, 
   Refresh, 
@@ -29,7 +32,17 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [dateRange] = useState('Aug 1 - Aug 31');
+  const [dateRange, setDateRange] = useState('Aug 1 - Aug 31');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      const start = new Date(date.getFullYear(), date.getMonth(), 1);
+      const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      setDateRange(`${format(start, 'MMM d')} - ${format(end, 'MMM d')}`);
+      setIsCalendarOpen(false);
+    }
+  };
 
   // Fetch tasks
   const { data: tasks, isLoading: isLoadingTasks } = useQuery({
@@ -225,10 +238,21 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex items-center mt-3 md:mt-0 space-x-2">
-            <Button variant="outline" className="flex items-center px-3 py-1.5 bg-white rounded border border-gray-200 text-sm">
-              <Today className="h-4 w-4 mr-1" />
-              <span>{dateRange}</span>
-            </Button>
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex items-center px-3 py-1.5 bg-white rounded border border-gray-200 text-sm">
+                  <Today className="h-4 w-4 mr-1" />
+                  <span>{dateRange}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  onSelect={handleDateSelect}
+                  disabled={(date) => date > new Date() || date < new Date('2020-01-01')}
+                />
+              </PopoverContent>
+            </Popover>
             
             <Button 
               variant="outline"
