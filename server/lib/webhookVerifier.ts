@@ -34,9 +34,29 @@ export function verifyGuestyWebhookMiddleware(req: Request, res: Response, next:
     }
 
     // Ensure we have a raw body to verify
-    if (!req.body || !Buffer.isBuffer(req.body)) {
-      console.error('[Webhook] Request body is not a buffer');
-      return res.status(400).send('Invalid request format');
+    console.log('[Webhook] Request body type:', typeof req.body);
+    console.log('[Webhook] Is Buffer?', Buffer.isBuffer(req.body));
+    console.log('[Webhook] Content-Type:', req.headers['content-type']);
+    
+    if (!req.body) {
+      console.error('[Webhook] Request body is missing');
+      return res.status(400).send('Missing request body');
+    }
+    
+    // If body is not a buffer but is a string or object, convert it to a buffer
+    let bodyBuffer: Buffer;
+    if (!Buffer.isBuffer(req.body)) {
+      if (typeof req.body === 'string') {
+        bodyBuffer = Buffer.from(req.body);
+      } else if (typeof req.body === 'object') {
+        bodyBuffer = Buffer.from(JSON.stringify(req.body));
+      } else {
+        console.error('[Webhook] Request body is not in a processable format');
+        return res.status(400).send('Invalid request format');
+      }
+      
+      // Replace the request body with our buffer
+      req.body = bodyBuffer;
     }
 
     // Calculate the expected signature

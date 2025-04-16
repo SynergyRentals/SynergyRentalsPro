@@ -1,23 +1,6 @@
 # Guesty Webhook Integration Guide
 
-This document provides information about the Guesty webhook integration in the Synergy Rentals platform.
-
-## Overview
-
-Due to Guesty's severe API rate limitations (approximately 5 requests/day), we've implemented a dual-approach strategy:
-
-1. **On-Demand Full Synchronization** - For initial setup and occasional manual refreshes
-2. **Real-time Webhooks** - For incremental updates as they happen in Guesty
-
-## Webhook Implementation
-
-Our webhook implementation follows Guesty's specifications:
-
-- Accepts POST requests at `/api/webhooks/guesty`
-- Verifies webhook signatures using HMAC-SHA256 via the `X-Guesty-Signature-V2` header
-- Requires the `GUESTY_WEBHOOK_SECRET` environment variable to be set
-- Returns 200 OK immediately after verification to prevent Guesty retries
-- Processes webhooks asynchronously to prevent timeouts
+This guide explains how to set up and test the Guesty webhook integration in the Synergy Rentals application.
 
 ## Setting Up Webhooks in Guesty
 
@@ -119,17 +102,40 @@ If you're getting 403 Forbidden responses when testing with real Guesty webhooks
 2. Ensure it matches the Signing Key provided by Guesty
 3. Check that the webhook is being sent with the `X-Guesty-Signature-V2` header
 
-### Processing Errors
+### Development Mode
 
-If webhooks are being received but not processed correctly:
+In development mode, if the `GUESTY_WEBHOOK_SECRET` environment variable is not set, the system will use a development fallback secret for testing:
 
-1. Check the application logs for error messages
-2. View the webhook event in the database to see the processing error
-3. Try reprocessing the webhook using the reprocess endpoint
+```
+test-webhook-secret-for-signature-validation
+```
 
-## Implementation Details
+This allows you to test the webhook functionality without needing the actual secret, but this is NOT secure for production use.
 
-- The webhook endpoint is defined in `server/routes.ts`
-- Webhook verification logic is in `server/lib/webhookVerifier.ts`
-- Webhook processing logic is in `server/lib/webhookProcessor.ts`
-- Entity-specific handlers are in `server/lib/guestyWebhookHandler.ts`
+### Test Scripts
+
+The repository includes several scripts for testing webhook functionality:
+
+- `test-guesty-webhook-test.js` - Tests the webhook test endpoint with different modes
+- `test-webhook-secret.js` - Tests retrieving the webhook secret from the Guesty API
+- `test-webhook-direct.js` - Tests sending a webhook request directly to the main endpoint
+- `test-guesty-webhook.js` - Test script that simulates a Guesty webhook with proper signature
+
+## Security Considerations
+
+1. **Never** hardcode webhook secrets in the application code
+2. Always use HTTPS for webhook URLs in production
+3. Implement rate limiting to prevent abuse
+4. Log all webhook events for auditing purposes
+5. Use signature verification to ensure webhooks are coming from Guesty
+
+## Webhook Flow
+
+1. Guesty sends a webhook to the `/api/webhooks/guesty` endpoint
+2. The middleware verifies the signature in the `X-Guesty-Signature-V2` header
+3. The webhook is logged and stored in the database
+4. The webhook is processed asynchronously to avoid blocking the response
+5. The application responds with a 202 Accepted status to Guesty
+6. When processing completes, the webhook status is updated in the database
+
+This approach ensures that webhook processing is reliable and does not impact the performance of the application.
