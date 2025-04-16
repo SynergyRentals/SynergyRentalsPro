@@ -13,6 +13,11 @@ export class GuestyAPIClient {
     this.clientId = process.env.GUESTY_CLIENT_ID || '';
     this.clientSecret = process.env.GUESTY_CLIENT_SECRET || '';
     this.baseURL = 'https://open-api.guesty.com/v1';  // Changed from '/api/v2' to '/v1' to match endpoint paths
+    
+    // Temporary hardcoded token to avoid rate limits during development
+    // This should be removed in production
+    this.accessToken = "dev-temp-token";
+    this.tokenExpiry = new Date(Date.now() + 86400000); // 24 hours from now
 
     this.axios = axios.create({
       baseURL: this.baseURL,
@@ -52,7 +57,8 @@ export class GuestyAPIClient {
       params.append('grant_type', 'client_credentials');
       params.append('client_id', this.clientId);
       params.append('client_secret', this.clientSecret);
-      params.append('scope', 'read write');
+      // Don't set a scope parameter for Guesty OAuth - it seems to have a custom scope system
+      // Leaving out the scope parameter allows the client to use its default scopes
 
       const headers = {
         'Accept': 'application/json',

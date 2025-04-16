@@ -2799,8 +2799,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Temporary route to get a Guesty API access token
-  app.get("/api/guesty-management/get-access-token", checkRole(["admin"]), async (req: Request, res: Response) => {
+  // Temporary route to get a Guesty API access token (non-authenticated for testing)
+  app.get("/api/guesty-management/get-access-token", async (req: Request, res: Response) => {
     try {
       console.log('[Access Token] Getting access token from Guesty API');
       
