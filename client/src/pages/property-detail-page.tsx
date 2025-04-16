@@ -5,7 +5,8 @@ import { useLocation, useRoute, Link } from "wouter";
 import { 
   Loader2, ChevronLeft, Building2, MapPin, Wifi, FileText, Tag, User, Calendar, ClipboardCheck,
   Wrench, Package, ReceiptText, MessageSquare, Upload, Download, ArrowUpDown, Clipboard, Users,
-  CalendarDays, Clock, AlertCircle, ExternalLink
+  CalendarDays, Clock, AlertCircle, ExternalLink, CalendarClock, Check, RefreshCw, AlertTriangle,
+  Plus, Link as LinkIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -676,7 +677,7 @@ export default function PropertyDetailPage() {
               ) : calendarEvents && calendarEvents.length > 0 ? (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-4">
-                    {calendarEvents.map((event, index) => (
+                    {calendarEvents.map((event: any, index: number) => (
                       <div key={index} className="flex border rounded-md p-4 hover:bg-gray-50">
                         <div className="mr-4 flex-shrink-0">
                           <div className="h-12 w-12 flex items-center justify-center rounded-full bg-blue-100 text-blue-900">
@@ -737,7 +738,7 @@ export default function PropertyDetailPage() {
               <div className="text-sm text-gray-500">
                 {property.icalUrl && (
                   <div className="flex items-center">
-                    <Link className="h-4 w-4 mr-1" />
+                    <LinkIcon className="h-4 w-4 mr-1" />
                     <span className="truncate max-w-md">{property.icalUrl}</span>
                   </div>
                 )}
