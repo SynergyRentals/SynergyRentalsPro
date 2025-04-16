@@ -146,18 +146,35 @@ export default function UnitDetailPage() {
     mutationFn: async () => {
       if (!unit) return;
       
+      // Special handling for property ID 18 (known inconsistency)
+      if (unitId === 18) {
+        console.log("[Property 18] Special handling for iCal URL update");
+        // For property 18, always use the Guesty iCal URL if the field is blank
+        if (!newIcalUrl) {
+          console.log("[Property 18] Setting default Guesty iCal URL");
+          // Set the Guesty iCal URL as a default if the user doesn't provide one
+          setNewIcalUrl("https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb");
+        }
+      }
+      
       console.log("Updating iCal URL for property:", unitId);
       
       // Use the unified endpoint for all property types
       const endpoint = `/api/properties/${unitId}`;
       console.log("Using unified endpoint for iCal update:", endpoint);
+      
+      const finalIcalUrl = unitId === 18 && !newIcalUrl 
+        ? "https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb"
+        : newIcalUrl;
+      
+      console.log(`[API Debug] Using iCal URL for update: ${finalIcalUrl}`);
         
       const response = await fetch(endpoint, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ icalUrl: newIcalUrl })
+        body: JSON.stringify({ icalUrl: finalIcalUrl })
       });
       
       if (!response.ok) {
@@ -169,7 +186,7 @@ export default function UnitDetailPage() {
       console.log("Successfully updated iCal URL, response:", data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Success",
         description: "Calendar URL has been updated",
@@ -182,12 +199,16 @@ export default function UnitDetailPage() {
       console.log("Current icalUrl:", unit?.icalUrl);
       console.log("New icalUrl:", newIcalUrl);
       
-      // Force refetch for property 18 no matter what
+      // Special handling for property ID 18
       if (unitId === 18) {
-        console.log("Forcing calendar refetch due to property/icalUrl update");
+        console.log("[Property 18] Forcing calendar refetch due to property/icalUrl update");
+        
+        // For property 18, we need to fetch the calendar regardless of API response
+        // This ensures we always get the calendar events even with source inconsistency
+        queryClient.refetchQueries({ queryKey: ['/api/properties', unitId, 'calendar'] });
       }
       
-      // Invalidate only the unified API queries
+      // Invalidate relevant API queries
       queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId] });
       queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId, 'calendar'] });
     },
@@ -1258,16 +1279,46 @@ export default function UnitDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
+            {/* Special note for property 18 */}
+            {unitId === 18 && (
+              <div className="flex items-center rounded-md border border-amber-100 bg-amber-50 p-3">
+                <AlertCircle className="h-5 w-5 text-amber-500 mr-2" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-amber-900">Guesty Calendar Feed</p>
+                  <p className="text-xs text-amber-700">
+                    This property should use the Guesty iCal feed. Setting this URL will connect to the external Guesty calendar.
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-col gap-2">
               <Label htmlFor="icalUrl">Calendar URL (iCal/ICS)</Label>
               <Input
                 id="icalUrl"
-                placeholder="https://example.com/calendar.ics"
+                placeholder={unitId === 18 
+                  ? "https://app.guesty.com/api/public/icalendar-dashboard-api/export/..."
+                  : "https://example.com/calendar.ics"
+                }
                 value={newIcalUrl}
                 onChange={(e) => setNewIcalUrl(e.target.value)}
                 className="w-full"
               />
+              
+              {/* Default Guesty URL button for property 18 */}
+              {unitId === 18 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2" 
+                  onClick={() => setNewIcalUrl("https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb")}
+                >
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                  Use Guesty Default URL
+                </Button>
+              )}
             </div>
+            
             {unit.icalUrl && (
               <div className="flex items-center rounded-md border border-blue-100 bg-blue-50 p-3">
                 <CalendarDays className="h-5 w-5 text-blue-500 mr-2" />
