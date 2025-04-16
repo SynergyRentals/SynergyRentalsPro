@@ -25,6 +25,7 @@ export default function PropertiesPage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [sourceTab, setSourceTab] = useState<string>("internal");
   const [currentUnit, setCurrentUnit] = useState<Unit | null>(null);
   const [showUnitDialog, setShowUnitDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -242,9 +243,6 @@ export default function PropertiesPage() {
       </div>
     );
   }
-  
-  // Add a state to track source tab (internal vs guesty)
-  const [sourceTab, setSourceTab] = useState<string>("internal");
 
   return (
     <div className="container mx-auto py-6">
