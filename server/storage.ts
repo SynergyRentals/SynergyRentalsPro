@@ -168,13 +168,13 @@ export interface IStorage {
   getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]>;
   
   // HostAI Autopilot Settings
-  getHostAiAutopilotSettingsByUser(userId: number): Promise<any>;
-  createHostAiAutopilotSettings(settings: InsertHostAiAutopilotSettings): Promise<any>;
-  updateHostAiAutopilotSettings(id: number, settings: Partial<any>): Promise<any>;
+  getHostAiAutopilotSettingsByUser(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined>;
+  createHostAiAutopilotSettings(settings: InsertHostAiAutopilotSettings): Promise<typeof hostAiAutopilotSettings.$inferSelect>;
+  updateHostAiAutopilotSettings(id: number, settings: Partial<typeof hostAiAutopilotSettings.$inferSelect>): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined>;
   
   // HostAI Autopilot Log
-  createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<any>;
-  getHostAiAutopilotLogsByTask(taskId: number): Promise<any[]>;
+  createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<typeof hostAiAutopilotLog.$inferSelect>;
+  getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]>;
   
   // Session store
   sessionStore: session.Store;
@@ -1025,6 +1025,57 @@ export class MemStorage implements IStorage {
   async getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]> {
     return Array.from(this.hostAiTasks.values()).filter(task => task.assignedToUserId === userId);
   }
+
+  // HostAI Autopilot Settings Methods
+  async getHostAiAutopilotSettingsByUser(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
+    return Array.from(this.hostAiAutopilotSettings.values()).find(settings => settings.userId === userId);
+  }
+
+  async createHostAiAutopilotSettings(settings: InsertHostAiAutopilotSettings): Promise<typeof hostAiAutopilotSettings.$inferSelect> {
+    const id = this.hostAiAutopilotSettingsIdCounter++;
+    const createdAt = new Date();
+    // Ensure all required fields are set with defaults if not provided
+    const newSettings: typeof hostAiAutopilotSettings.$inferSelect = {
+      ...settings,
+      id,
+      createdAt,
+      updatedAt: createdAt,
+      enabled: settings.enabled ?? true,
+      confidenceThreshold: settings.confidenceThreshold ?? 0.85
+    };
+    this.hostAiAutopilotSettings.set(id, newSettings);
+    return newSettings;
+  }
+
+  async updateHostAiAutopilotSettings(id: number, settingsData: Partial<typeof hostAiAutopilotSettings.$inferSelect>): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
+    const settings = this.hostAiAutopilotSettings.get(id);
+    if (!settings) return undefined;
+    
+    const updatedSettings = { 
+      ...settings, 
+      ...settingsData,
+      updatedAt: new Date() 
+    };
+    this.hostAiAutopilotSettings.set(id, updatedSettings);
+    return updatedSettings;
+  }
+  
+  // HostAI Autopilot Log Methods
+  async createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<typeof hostAiAutopilotLog.$inferSelect> {
+    const id = this.hostAiAutopilotLogIdCounter++;
+    const timestamp = new Date();
+    const newLog: typeof hostAiAutopilotLog.$inferSelect = {
+      ...log,
+      id,
+      timestamp
+    };
+    this.hostAiAutopilotLogs.set(id, newLog);
+    return newLog;
+  }
+
+  async getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]> {
+    return Array.from(this.hostAiAutopilotLogs.values()).filter(log => log.taskId === taskId);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1661,6 +1712,45 @@ export class DatabaseStorage implements IStorage {
   
   async getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]> {
     return await db.select().from(schema.hostAiTasks).where(eq(schema.hostAiTasks.assignedToUserId, userId));
+  }
+  
+  // HostAI Autopilot Settings Methods
+  async getHostAiAutopilotSettingsByUser(userId: number): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
+    const [settings] = await db.select().from(schema.hostAiAutopilotSettings).where(eq(schema.hostAiAutopilotSettings.userId, userId));
+    return settings;
+  }
+
+  async createHostAiAutopilotSettings(settings: InsertHostAiAutopilotSettings): Promise<typeof hostAiAutopilotSettings.$inferSelect> {
+    const [newSettings] = await db.insert(schema.hostAiAutopilotSettings).values({
+      ...settings,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return newSettings;
+  }
+
+  async updateHostAiAutopilotSettings(id: number, settingsData: Partial<typeof hostAiAutopilotSettings.$inferSelect>): Promise<typeof hostAiAutopilotSettings.$inferSelect | undefined> {
+    const [updatedSettings] = await db.update(schema.hostAiAutopilotSettings)
+      .set({
+        ...settingsData,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.hostAiAutopilotSettings.id, id))
+      .returning();
+    return updatedSettings;
+  }
+  
+  // HostAI Autopilot Log Methods
+  async createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<typeof hostAiAutopilotLog.$inferSelect> {
+    const [newLog] = await db.insert(schema.hostAiAutopilotLog).values({
+      ...log,
+      createdAt: new Date()
+    }).returning();
+    return newLog;
+  }
+
+  async getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]> {
+    return await db.select().from(schema.hostAiAutopilotLog).where(eq(schema.hostAiAutopilotLog.taskId, taskId));
   }
 }
 
