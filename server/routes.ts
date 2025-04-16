@@ -31,6 +31,7 @@ import { guestyClient } from "./lib/guestyApiClient";
 import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } from "./services/guestySyncService";
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
+import { processHostAiWebhook } from "./lib/hostAiWebhookHandler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user

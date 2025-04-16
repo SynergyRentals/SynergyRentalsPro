@@ -1,8 +1,8 @@
 /**
- * Process webhook events from Guesty
+ * Process webhook events from external services
  */
 import { db } from '../db';
-import { guestyWebhookEvents } from '../../shared/schema';
+import { guestyWebhookEvents, hostAiTasks } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { 
   processPropertyWebhook, 
@@ -10,6 +10,7 @@ import {
   processPropertyDeletionWebhook,
   processReservationDeletionWebhook 
 } from './guestyWebhookHandler';
+import { processHostAiWebhook } from './hostAiWebhookHandler';
 
 /**
  * Log a webhook event to the database
