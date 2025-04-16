@@ -84,6 +84,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.json(unit);
   });
+  
+  // iCal Calendar Events Endpoint
+  app.get("/api/units/:id/calendar", checkAuth, async (req, res) => {
+    try {
+      const unit = await storage.getUnit(parseInt(req.params.id));
+      if (!unit) {
+        return res.status(404).json({ message: "Unit not found" });
+      }
+      
+      if (!unit.icalUrl) {
+        return res.status(404).json({ message: "No iCal URL found for this unit" });
+      }
+      
+      const events = await getCalendarEvents(unit.icalUrl);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+      res.status(500).json({ message: "Error fetching calendar events" });
+    }
+  });
 
   app.post("/api/units", checkRole(["admin", "ops"]), async (req, res) => {
     try {
