@@ -177,6 +177,16 @@ export default function UnitDetailPage() {
       });
       setShowIcalDialog(false);
       
+      // Log property data changed event to help with debugging
+      console.log("Property data changed, checking if we need to refetch calendar");
+      console.log("Current icalUrl:", unit?.icalUrl);
+      console.log("New icalUrl:", newIcalUrl);
+      
+      // Force refetch for property 18 no matter what
+      if (unitId === 18) {
+        console.log("Forcing calendar refetch due to property/icalUrl update");
+      }
+      
       // Invalidate only the unified API queries
       queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId] });
       queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId, 'calendar'] });
