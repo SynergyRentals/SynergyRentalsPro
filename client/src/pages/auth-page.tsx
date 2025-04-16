@@ -15,6 +15,17 @@ import { AutoAwesome } from "@mui/icons-material";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (loginMutation.error) {
+      toast({
+        title: "Login failed",
+        description: loginMutation.error.message || "Invalid username or password",
+        variant: "destructive"
+      });
+    }
+  }, [loginMutation.error, toast]);
   const [, navigate] = useLocation();
 
   // Redirect if already logged in
@@ -33,8 +44,13 @@ export default function AuthPage() {
     },
   });
 
-  const handleLogin = (data: z.infer<typeof loginUserSchema>) => {
-    loginMutation.mutate(data);
+  const handleLogin = async (data: z.infer<typeof loginUserSchema>) => {
+    try {
+      await loginMutation.mutateAsync(data);
+    } catch (error) {
+      // Error will be handled by the useEffect above
+      console.error("Login error:", error);
+    }
   };
 
   // Register form with extended validation
