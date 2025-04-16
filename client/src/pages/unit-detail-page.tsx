@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { Container } from "@/components/ui/container";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -15,11 +15,25 @@ import {
   Wrench, 
   Package, 
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  CalendarDays,
+  Plus,
+  RefreshCw,
+  LinkIcon,
+  Trash2,
+  CalendarClock,
+  Check,
+  AlertCircle,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { queryClient } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Components
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,6 +47,8 @@ export default function UnitDetailPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showIcalDialog, setShowIcalDialog] = useState(false);
+  const [newIcalUrl, setNewIcalUrl] = useState("");
 
   // Fetch unit details - try regular units first, then fallback to Guesty properties
   const { data: unit, isLoading: isLoadingUnit } = useQuery({
@@ -127,9 +143,138 @@ export default function UnitDetailPage() {
     enabled: !!unitId
   });
 
+  // Mutation for updating iCal URL
+  const updateIcalUrlMutation = useMutation({
+    mutationFn: async () => {
+      if (!unit) return;
+      
+      const endpoint = unit.source === 'guesty' 
+        ? `/api/guesty/properties/${unitId}`
+        : `/api/units/${unitId}`;
+        
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ icalUrl: newIcalUrl })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Failed to update iCal URL: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Calendar URL has been updated",
+        variant: "default"
+      });
+      setShowIcalDialog(false);
+      
+      // Invalidate queries to refetch data
+      queryClient.invalidateQueries({ queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId] });
+      queryClient.invalidateQueries({ queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId, 'calendar'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update iCal URL",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Handle iCal URL dialog
+  const handleOpenIcalDialog = () => {
+    setNewIcalUrl(unit?.icalUrl || "");
+    setShowIcalDialog(true);
+  };
+  
+  const handleSaveIcalUrl = () => {
+    updateIcalUrlMutation.mutate();
+  };
+  
+  const handleRemoveIcalUrl = () => {
+    setNewIcalUrl("");
+    updateIcalUrlMutation.mutate();
+  };
+
+  // Fetch external calendar events (iCal)
+  const { data: externalCalendarEvents, isLoading: isLoadingCalendar } = useQuery({
+    queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId, 'calendar'],
+    queryFn: async () => {
+      // Don't make the API call if there's no unit or icalUrl
+      if (!unit || !unit.icalUrl) {
+        console.log('No iCal URL configured, skipping calendar fetch');
+        return [];
+      }
+
+      console.log(`Fetching calendar for ${unit.source === 'guesty' ? 'Guesty property' : 'unit'} with ID ${unitId}`);
+      
+      try {
+        // Determine the right endpoint based on the property source
+        const endpoint = unit.source === 'guesty' 
+          ? `/api/guesty/properties/${unitId}/calendar`
+          : `/api/units/${unitId}/calendar`;
+          
+        const response = await fetch(endpoint);
+        
+        if (!response.ok) {
+          console.error(`Error fetching calendar: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          throw new Error(errorText || `Failed to fetch calendar events: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`Retrieved ${data.length} calendar events from external source`);
+        return data.map(event => ({
+          start: new Date(event.start),
+          end: new Date(event.end),
+          title: event.title || 'Reservation',
+          status: event.status || 'confirmed'
+        }));
+      } catch (error) {
+        console.error('Calendar fetch error:', error);
+        toast({
+          title: "Calendar Error",
+          description: error instanceof Error ? error.message : "Failed to load calendar events",
+          variant: "destructive"
+        });
+        return [];
+      }
+    },
+    enabled: !!unit && !!unit.icalUrl,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Prepare calendar events
   const getCalendarEvents = () => {
     const events = [];
+    
+    // Add events from external iCal source if available
+    if (externalCalendarEvents && externalCalendarEvents.length > 0) {
+      externalCalendarEvents.forEach(event => {
+        // Add event start date
+        events.push({
+          date: new Date(event.start),
+          type: "urgent",
+          label: `${event.title || 'Reservation'} (start)`
+        });
+        
+        // Add event end date
+        events.push({
+          date: new Date(event.end),
+          type: "urgent",
+          label: `${event.title || 'Reservation'} (end)`
+        });
+      });
+    }
     
     // Add guest check-ins and check-outs
     if (guests && guests.length > 0) {
@@ -1041,6 +1186,80 @@ export default function UnitDetailPage() {
           </Tabs>
         </div>
       </Container>
+      
+      {/* iCal URL Dialog */}
+      <Dialog open={showIcalDialog} onOpenChange={setShowIcalDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>External Calendar Integration</DialogTitle>
+            <DialogDescription>
+              Add a calendar feed URL (iCal/ICS) to show bookings from external platforms.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="icalUrl">Calendar URL (iCal/ICS)</Label>
+              <Input
+                id="icalUrl"
+                placeholder="https://example.com/calendar.ics"
+                value={newIcalUrl}
+                onChange={(e) => setNewIcalUrl(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            {unit.icalUrl && (
+              <div className="flex items-center rounded-md border border-blue-100 bg-blue-50 p-3">
+                <CalendarDays className="h-5 w-5 text-blue-500 mr-2" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-blue-900">Current Calendar URL</p>
+                  <p className="text-xs text-blue-700 break-all">{unit.icalUrl}</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <div>
+              {unit.icalUrl && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleRemoveIcalUrl}
+                  disabled={updateIcalUrlMutation.isPending}
+                >
+                  {updateIcalUrlMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Removing...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Remove
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            <Button
+              type="button"
+              onClick={handleSaveIcalUrl}
+              disabled={updateIcalUrlMutation.isPending}
+            >
+              {updateIcalUrlMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Save
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
