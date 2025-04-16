@@ -16,7 +16,15 @@ export default function PropertyEditNewPage() {
   // Fetch property data
   const { data: property, isLoading, error } = useQuery({
     queryKey: [`/api/properties/${propertyId}`],
-    queryFn: () => apiRequest(`/api/properties/${propertyId}`),
+    queryFn: async () => {
+      const response = await fetch(`/api/properties/${propertyId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Error fetching property: ${response.status}`);
+      }
+      return response.json();
+    },
     enabled: !!propertyId && !isNaN(propertyId),
   });
   
