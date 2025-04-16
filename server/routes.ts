@@ -2734,8 +2734,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('[Webhook Secret] Getting webhook secret from Guesty API');
       
+      // Check if we already have the secret in environment variables
+      if (process.env.GUESTY_WEBHOOK_SECRET) {
+        console.log('[Webhook Secret] GUESTY_WEBHOOK_SECRET is already set in environment variables');
+        
+        // Return a message indicating the secret is already set
+        res.json({
+          success: true,
+          message: 'GUESTY_WEBHOOK_SECRET is already set in environment variables',
+          environmentVariableSet: true
+        });
+        return;
+      }
+      
       // Make the request to Guesty API to get the webhook secret
       const response = await guestyClient.makeRequest('GET', '/svix/secret');
+      
+      // Check if the response contains the expected data structure
+      if (!response || !response.secret || !response.secret.key) {
+        throw new Error('Unexpected response format from Guesty API - missing secret.key');
+      }
       
       // Log the success (without the actual secret for security)
       console.log('[Webhook Secret] Successfully retrieved webhook secret from Guesty API');
@@ -2743,7 +2761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return the response from Guesty API
       res.json({
         success: true,
-        message: 'Successfully retrieved webhook secret',
+        message: 'Successfully retrieved webhook secret. Please set the GUESTY_WEBHOOK_SECRET value in your environment variables.',
         data: response
       });
       
@@ -2756,7 +2774,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ipAddress: req.ip
       });
     } catch (error) {
+      // Log detailed error information for debugging
       console.error('[Webhook Secret] Error getting webhook secret:', error);
+      if (error?.response?.data) {
+        console.error('[Webhook Secret] API Error Response:', error.response.data);
+      }
       
       // Log the error
       await storage.createLog({
@@ -2767,10 +2789,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ipAddress: req.ip
       });
       
-      // Return error response
+      // Return error response with clear instructions
       res.status(500).json({
         success: false,
-        message: 'Error retrieving webhook secret from Guesty API',
+        message: 'Error retrieving the webhook secret. Please set the GUESTY_WEBHOOK_SECRET value directly in the environment variables.',
+        instruction: 'Please visit your Guesty account or contact Guesty support to get the correct webhook signing key, then add it to Replit Secrets under the name GUESTY_WEBHOOK_SECRET.',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
+  // For testing purposes - a non-authenticated version that directly tests the Guesty API client
+  app.get("/api/guesty-management/test-webhook-secret", async (req: Request, res: Response) => {
+    try {
+      console.log('[Test Webhook Secret] Testing the Guesty API webhook secret endpoint');
+      
+      // Check if we already have the secret in environment variables
+      if (process.env.GUESTY_WEBHOOK_SECRET) {
+        console.log('[Test Webhook Secret] GUESTY_WEBHOOK_SECRET is already set in environment variables');
+        
+        // Return a message indicating the secret is already set
+        res.json({
+          success: true,
+          message: 'GUESTY_WEBHOOK_SECRET is already set in environment variables',
+          environmentVariableSet: true
+        });
+        return;
+      }
+      
+      // Make the request to Guesty API to get the webhook secret
+      const response = await guestyClient.makeRequest('GET', '/svix/secret');
+      
+      // Check if the response contains the expected data structure
+      if (!response || !response.secret || !response.secret.key) {
+        throw new Error('Unexpected response format from Guesty API - missing secret.key');
+      }
+      
+      // Log the success (without the actual secret for security)
+      console.log('[Test Webhook Secret] Successfully retrieved webhook secret from Guesty API');
+      
+      // Return the response from Guesty API
+      res.json({
+        success: true,
+        message: 'Successfully retrieved webhook secret. Please set the GUESTY_WEBHOOK_SECRET value in your environment variables.',
+        data: response
+      });
+      
+    } catch (error) {
+      // Log detailed error information
+      console.error('[Test Webhook Secret] Error getting webhook secret:', error);
+      if (error?.response?.data) {
+        console.error('[Test Webhook Secret] API Error Response:', error.response.data);
+      }
+      
+      // Return error response with clear instructions
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving the webhook secret. Please set the GUESTY_WEBHOOK_SECRET value directly in the environment variables.',
+        instruction: 'Please visit your Guesty account or contact Guesty support to get the correct webhook signing key, then add it to Replit Secrets under the name GUESTY_WEBHOOK_SECRET.',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

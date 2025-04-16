@@ -1,6 +1,6 @@
 // Simple script to test the webhook secret endpoint
 
-const axios = require('axios');
+import axios from 'axios';
 
 // Step 1: Get a JWT token by logging in
 async function login() {
