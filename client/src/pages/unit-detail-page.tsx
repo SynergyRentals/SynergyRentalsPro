@@ -289,8 +289,8 @@ export default function UnitDetailPage() {
         // Add event start date as check-in (already converted to Date object in the query)
         events.push({
           date: event.start,
-          type: "urgent",
-          label: `${event.title || 'Reservation'} (Check-in)`,
+          type: "checkin", // Use a specific type for check-in events
+          label: `Check-in: ${event.title || 'Reservation'}`,
           // Important: Add these properties for the reservation visualization
           startDate: event.start,
           endDate: event.end,
@@ -300,11 +300,11 @@ export default function UnitDetailPage() {
         // Add event end date as check-out (already converted to Date object in the query)
         events.push({
           date: event.end,
-          type: "urgent",
-          label: `${event.title || 'Reservation'} (Check-out)`,
+          type: "checkout", // Use a specific type for check-out events
+          label: `Check-out: ${event.title || 'Reservation'}`,
           // Important: Add these properties for the reservation visualization
           startDate: event.start,
-          endDate: event.end,
+          endDate: event.end, 
           reservationId: reservationId
         });
       });
@@ -313,18 +313,30 @@ export default function UnitDetailPage() {
     // Add guest check-ins and check-outs
     if (guests && guests.length > 0) {
       guests.forEach(guest => {
+        // Generate a unique ID for this guest stay
+        const guestStayId = `guest-${guest.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        
         if (guest.checkIn) {
+          const checkInDate = new Date(guest.checkIn);
           events.push({
-            date: new Date(guest.checkIn),
-            type: "urgent",
-            label: `Check-in: ${guest.name}`
+            date: checkInDate,
+            type: "checkin", // Use specific type for check-in
+            label: `Check-in: ${guest.name}`,
+            startDate: checkInDate,
+            endDate: guest.checkOut ? new Date(guest.checkOut) : new Date(checkInDate.getTime() + 86400000), // Next day if no checkout
+            reservationId: guestStayId
           });
         }
+        
         if (guest.checkOut) {
+          const checkOutDate = new Date(guest.checkOut);
           events.push({
-            date: new Date(guest.checkOut),
-            type: "urgent",
-            label: `Check-out: ${guest.name}`
+            date: checkOutDate,
+            type: "checkout", // Use specific type for check-out
+            label: `Check-out: ${guest.name}`,
+            startDate: guest.checkIn ? new Date(guest.checkIn) : new Date(checkOutDate.getTime() - 86400000), // Previous day if no checkin
+            endDate: checkOutDate,
+            reservationId: guestStayId
           });
         }
       });

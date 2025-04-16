@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 // Define the event types
-export type CalendarEventType = "cleaning" | "maintenance" | "inventory" | "urgent";
+export type CalendarEventType = "cleaning" | "maintenance" | "inventory" | "urgent" | "checkin" | "checkout";
 
 // Define the reservation status
 export type ReservationStatus = "checkin" | "checkout" | "occupied";
@@ -189,6 +189,10 @@ export function CalendarView({ events }: CalendarViewProps) {
         return "bg-green-500";
       case "urgent":
         return "bg-red-500";
+      case "checkin":
+        return "bg-gray-500"; // Gray for check-in events
+      case "checkout":
+        return "bg-black";    // Black for check-out events
       default:
         return "bg-gray-500";
     }
@@ -219,6 +223,14 @@ export function CalendarView({ events }: CalendarViewProps) {
           <Badge variant="outline" className="flex items-center gap-1">
             <div className="h-2 w-2 rounded-full bg-red-500" />
             <span>Urgent</span>
+          </Badge>
+          <Badge variant="outline" className="flex items-center gap-1">
+            <div className="h-2 w-2 rounded-full bg-gray-500" />
+            <span>Check-in</span>
+          </Badge>
+          <Badge variant="outline" className="flex items-center gap-1">
+            <div className="h-2 w-2 rounded-full bg-black" />
+            <span>Check-out</span>
           </Badge>
         </div>
       </div>
@@ -281,13 +293,13 @@ export function CalendarView({ events }: CalendarViewProps) {
                 if (reservationEvent) {
                   if (isCheckIn) {
                     tooltipEvents.push({
-                      type: "cleaning" as CalendarEventType,
+                      type: "checkin" as CalendarEventType,
                       label: `Check-in: ${reservationEvent.label}`
                     });
                   }
                   if (isCheckOut) {
                     tooltipEvents.push({
-                      type: "maintenance" as CalendarEventType,
+                      type: "checkout" as CalendarEventType,
                       label: `Check-out: ${reservationEvent.label}`
                     });
                   }
@@ -344,9 +356,9 @@ export function CalendarView({ events }: CalendarViewProps) {
                             {tooltipEvents.map((event, idx) => (
                               <div key={idx} className="flex items-center gap-2">
                                 <div className={`h-2 w-2 rounded-full ${
-                                  event.type === "cleaning" && event.label.includes("Check-in")
+                                  event.type === "checkin"
                                     ? "bg-gray-500"
-                                    : event.type === "maintenance" && event.label.includes("Check-out")
+                                    : event.type === "checkout"
                                     ? "bg-black"
                                     : event.type === "inventory" && event.label.includes("Occupied")
                                     ? "bg-yellow-300"
