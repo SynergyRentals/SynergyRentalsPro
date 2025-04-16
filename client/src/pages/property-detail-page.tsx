@@ -102,14 +102,32 @@ export default function PropertyDetailPage() {
   } = useQuery({
     queryKey: ['/api/units', propertyId, 'calendar'],
     queryFn: async () => {
+      console.log('Attempting to fetch calendar events for property:', propertyId);
+      console.log('Property iCal URL:', property?.icalUrl);
+      
       if (!property?.icalUrl) {
+        console.log('No iCal URL found, returning empty array');
         return [];
       }
-      const response = await fetch(`/api/units/${propertyId}/calendar`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch calendar events');
+      
+      console.log('Fetching calendar data from API endpoint...');
+      try {
+        const response = await fetch(`/api/units/${propertyId}/calendar`);
+        console.log('Calendar API response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to fetch calendar events:', errorText);
+          throw new Error(`Failed to fetch calendar events: ${response.status} ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Calendar events fetched successfully:', data.length, 'events');
+        return data;
+      } catch (error) {
+        console.error('Error in calendar fetch:', error);
+        throw error;
       }
-      return response.json();
     },
     enabled: !!propertyId && !!property?.icalUrl,
   });
