@@ -105,7 +105,7 @@ export default function PropertyDetailPage() {
     error: calendarError,
     refetch: refetchCalendar
   } = useQuery({
-    queryKey: ['/api/units', propertyId, 'calendar'],
+    queryKey: ['/api/guesty/properties', propertyId, 'calendar'],
     queryFn: async () => {
       console.log('Attempting to fetch calendar events for property:', propertyId);
       
@@ -121,7 +121,7 @@ export default function PropertyDetailPage() {
       
       console.log('Fetching calendar data from API endpoint...');
       try {
-        const response = await fetch(`/api/units/${propertyId}/calendar`);
+        const response = await fetch(`/api/guesty/properties/${propertyId}/calendar`);
         console.log('Calendar API response status:', response.status);
         
         if (response.status === 404) {
@@ -305,7 +305,7 @@ export default function PropertyDetailPage() {
   // Mutation for updating property
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: Partial<Unit>) => {
-      return apiRequest('PATCH', `/api/units/${propertyId}`, data);
+      return apiRequest('PATCH', `/api/guesty/properties/${propertyId}`, data);
     },
     onSuccess: async (_, variables) => {
       toast({
@@ -314,8 +314,9 @@ export default function PropertyDetailPage() {
       });
       
       // Invalidate and refetch queries
-      await queryClient.invalidateQueries({ queryKey: ['/api/units'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties', propertyId] });
       
       // If we've updated the iCal URL, let's make sure the calendar data is refreshed
       // and switch to the calendar tab
@@ -326,9 +327,9 @@ export default function PropertyDetailPage() {
           tabsElement.click();
         }
         
-        await queryClient.invalidateQueries({ queryKey: ['/api/units', propertyId, 'calendar'] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties', propertyId, 'calendar'] });
         // Force a refetch of the property to ensure it has the latest icalUrl
-        await queryClient.refetchQueries({ queryKey: ['/api/units', propertyId] });
+        await queryClient.refetchQueries({ queryKey: ['/api/guesty/properties', propertyId] });
         // Force a refetch of calendar events
         setTimeout(() => refetchCalendar(), 500);
       }
