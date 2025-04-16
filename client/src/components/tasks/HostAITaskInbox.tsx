@@ -81,8 +81,8 @@ export function HostAITaskInbox() {
 
   // Mark HostAI task as processed mutation
   const updateHostAiTaskMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const response = await apiRequest("PATCH", `/api/hostai/tasks/${id}`, { status });
+    mutationFn: async ({ id, status, notes }: { id: number; status: string; notes?: string }) => {
+      const response = await apiRequest("PATCH", `/api/hostai/tasks/${id}`, { status, notes });
       return response.json();
     },
     onSuccess: () => {
@@ -120,6 +120,54 @@ export function HostAITaskInbox() {
     }));
   };
 
+  // Watch a task for future recurring issues
+  const handleWatchTask = async (task: HostAITask) => {
+    if (!user) return;
+    
+    try {
+      await updateHostAiTaskMutation.mutateAsync({
+        id: task.id,
+        status: "watched",
+        notes: `Task watched by ${user.name} (${user.username}) for potential recurring issues at listing: ${task.listingName}`
+      });
+      
+      toast({
+        title: "Task watched",
+        description: "This task is now being watched. If similar issues occur at this listing, they'll be bundled together.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to mark task as watched",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Close a task without further action
+  const handleCloseTask = async (task: HostAITask) => {
+    if (!user) return;
+    
+    try {
+      await updateHostAiTaskMutation.mutateAsync({
+        id: task.id,
+        status: "closed",
+        notes: `Task closed by ${user.name} (${user.username}) - No action needed`
+      });
+      
+      toast({
+        title: "Task closed",
+        description: "The task has been marked as closed.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to close task",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Submit the task: create a project task and mark the HostAI task as processed
   const handleSubmitTask = async (task: HostAITask) => {
     if (!user) return;
@@ -150,35 +198,44 @@ export function HostAITaskInbox() {
       "low": "normal",
     };
 
-    // Create a new project task with the data from HostAI task
-    await createTaskMutation.mutateAsync({
-      description: task.description,
-      taskType: taskTypeMap[selection.team] || "General",
-      priority: priorityMap[selection.urgency] || "normal",
-      // Use unit ID if we have a mapping from listingName to unitId
-      // unitId: null, // This would need to be implemented based on property/listing mapping
-      status: "pending",
-      createdBy: user.id,
-      notes: `Task from HostAI for guest: ${task.guestName}. Original listing: ${task.listingName}`,
-    });
+    try {
+      // Create a new project task with the data from HostAI task
+      await createTaskMutation.mutateAsync({
+        description: task.description,
+        taskType: taskTypeMap[selection.team] || "General",
+        priority: priorityMap[selection.urgency] || "normal",
+        // Use unit ID if we have a mapping from listingName to unitId
+        // unitId: null, // This would need to be implemented based on property/listing mapping
+        status: "pending",
+        createdBy: user.id,
+        notes: `Task from HostAI for guest: ${task.guestName}. Original listing: ${task.listingName}`,
+      });
 
-    // Mark the HostAI task as processed
-    await updateHostAiTaskMutation.mutateAsync({
-      id: task.id,
-      status: "processed"
-    });
+      // Mark the HostAI task as processed
+      await updateHostAiTaskMutation.mutateAsync({
+        id: task.id,
+        status: "processed",
+        notes: `Task processed by ${user.name} and assigned to ${selection.team} team with ${selection.urgency} urgency`
+      });
 
-    // Clear the selection for this task
-    setTaskSelections(prev => {
-      const newSelections = { ...prev };
-      delete newSelections[task.id];
-      return newSelections;
-    });
+      // Clear the selection for this task
+      setTaskSelections(prev => {
+        const newSelections = { ...prev };
+        delete newSelections[task.id];
+        return newSelections;
+      });
 
-    toast({
-      title: "Task processed",
-      description: "The task has been routed to the appropriate team",
-    });
+      toast({
+        title: "Task processed",
+        description: "The task has been routed to the appropriate team",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to process task",
+        variant: "destructive",
+      });
+    }
   };
 
   // Check if both urgency and team are selected for a task
@@ -359,14 +416,33 @@ export function HostAITaskInbox() {
                   </div>
                 </CardContent>
                 
-                <CardFooter>
+                <CardFooter className="flex flex-col space-y-3">
                   <Button 
                     onClick={() => handleSubmitTask(task)}
-                    disabled={!isTaskSelectionComplete(task.id) || createTaskMutation.isPending}
+                    disabled={!isTaskSelectionComplete(task.id) || createTaskMutation.isPending || updateHostAiTaskMutation.isPending}
                     className="w-full"
                   >
                     {createTaskMutation.isPending ? "Processing..." : "Submit Task"}
                   </Button>
+                  
+                  <div className="flex w-full space-x-2">
+                    <Button 
+                      onClick={() => handleWatchTask(task)}
+                      variant="outline"
+                      disabled={updateHostAiTaskMutation.isPending}
+                      className="w-1/2 border-yellow-400 hover:bg-yellow-50"
+                    >
+                      Watch
+                    </Button>
+                    <Button 
+                      onClick={() => handleCloseTask(task)}
+                      variant="outline"
+                      disabled={updateHostAiTaskMutation.isPending}
+                      className="w-1/2 border-gray-400 hover:bg-gray-50"
+                    >
+                      Close
+                    </Button>
+                  </div>
                 </CardFooter>
               </Card>
             );
