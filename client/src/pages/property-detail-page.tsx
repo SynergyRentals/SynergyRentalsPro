@@ -831,7 +831,12 @@ export default function PropertyDetailPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => refetchCalendar()}
+                onClick={async () => {
+                  // First refetch the property to get the latest icalUrl
+                  await queryClient.refetchQueries({ queryKey: ['/api/units', propertyId] });
+                  // Then refetch the calendar data
+                  refetchCalendar();
+                }}
               >
                 <RefreshCw className="h-4 w-4 mr-2" /> Refresh Calendar
               </Button>
