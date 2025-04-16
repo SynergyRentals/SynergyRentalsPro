@@ -50,37 +50,24 @@ export default function UnitDetailPage() {
   const [showIcalDialog, setShowIcalDialog] = useState(false);
   const [newIcalUrl, setNewIcalUrl] = useState("");
 
-  // Fetch property details from a unified endpoint
+  // Fetch property details using only the unified endpoint
   const { data: unit, isLoading: isLoadingUnit } = useQuery({
     queryKey: ["/api/properties", unitId],
     queryFn: async () => {
       try {
-        // First try the unified property endpoint
+        // Use only the unified property endpoint
         const propertyRes = await fetch(`/api/properties/${unitId}`);
-        if (propertyRes.ok) {
-          const propertyData = await propertyRes.json();
-          console.log(`Found property with ID ${unitId}:`, propertyData.name);
-          return propertyData;
+        if (!propertyRes.ok) {
+          if (propertyRes.status === 404) {
+            throw new Error("Property not found");
+          } else {
+            throw new Error(`Failed to fetch property: ${propertyRes.status}`);
+          }
         }
         
-        // Fallback to old endpoints for backward compatibility
-        // Check if this is a Guesty property
-        const guestyRes = await fetch(`/api/guesty/properties/${unitId}`);
-        if (guestyRes.ok) {
-          const guestyProperty = await guestyRes.json();
-          console.log(`Found Guesty property with ID ${unitId} (legacy endpoint):`, guestyProperty.name);
-          return { ...guestyProperty, source: 'guesty' };
-        }
-        
-        // Try as a regular unit if not a Guesty property
-        const unitRes = await fetch(`/api/units/${unitId}`);
-        if (!unitRes.ok) {
-          throw new Error("Property not found");
-        }
-        
-        const unitData = await unitRes.json();
-        console.log(`Found regular unit with ID ${unitId} (legacy endpoint):`, unitData.name);
-        return { ...unitData, source: 'internal' };
+        const propertyData = await propertyRes.json();
+        console.log(`Found property with ID ${unitId}:`, propertyData.name);
+        return propertyData;
       } catch (error) {
         console.error("Failed to fetch property details:", error);
         throw new Error("Failed to fetch property details");
@@ -154,33 +141,16 @@ export default function UnitDetailPage() {
     enabled: !!unitId
   });
 
-  // Mutation for updating iCal URL
+  // Mutation for updating iCal URL using the unified endpoint
   const updateIcalUrlMutation = useMutation({
     mutationFn: async () => {
       if (!unit) return;
       
-      console.log("Updating iCal URL for property:", unitId, "Source:", unit.source);
+      console.log("Updating iCal URL for property:", unitId);
       
-      // Double-check that this is a Guesty property if needed
-      let isGuesty = unit.source === 'guesty';
-      if (!isGuesty) {
-        // Extra check - try to find if a Guesty property exists with this ID
-        try {
-          const guestyCheckRes = await fetch(`/api/guesty/properties/${unitId}`);
-          if (guestyCheckRes.ok) {
-            isGuesty = true;
-            console.log(`Found Guesty property with ID ${unitId}, overriding source detection`);
-          }
-        } catch (err) {
-          console.log("No Guesty property found with this ID, using regular unit");
-        }
-      }
-      
-      const endpoint = isGuesty
-        ? `/api/guesty/properties/${unitId}`
-        : `/api/units/${unitId}`;
-        
-      console.log("Using endpoint for iCal update:", endpoint);
+      // Use the unified endpoint for all property types
+      const endpoint = `/api/properties/${unitId}`;
+      console.log("Using unified endpoint for iCal update:", endpoint);
         
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -207,11 +177,9 @@ export default function UnitDetailPage() {
       });
       setShowIcalDialog(false);
       
-      // Invalidate queries to refetch data
-      // Invalidate both unified and legacy endpoints to ensure data consistency
+      // Invalidate only the unified API queries
       queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId] });
-      queryClient.invalidateQueries({ queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId] });
-      queryClient.invalidateQueries({ queryKey: [unit?.source === 'guesty' ? '/api/guesty/properties' : '/api/units', unitId, 'calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', unitId, 'calendar'] });
     },
     onError: (error) => {
       toast({
@@ -251,19 +219,9 @@ export default function UnitDetailPage() {
       console.log(`Fetching calendar for property with ID ${unitId}`);
       
       try {
-        // Try the unified endpoint first
-        let endpoint = `/api/properties/${unitId}/calendar`;
-        let response = await fetch(endpoint);
-        
-        // Fall back to source-specific endpoints if the unified one isn't available yet
-        if (!response.ok) {
-          console.log("Unified calendar endpoint not available, using legacy endpoint");
-          endpoint = unit.source === 'guesty' 
-            ? `/api/guesty/properties/${unitId}/calendar`
-            : `/api/units/${unitId}/calendar`;
-            
-          response = await fetch(endpoint);
-        }
+        // Use only the unified endpoint
+        const endpoint = `/api/properties/${unitId}/calendar`;
+        const response = await fetch(endpoint);
         
         if (!response.ok) {
           console.error(`Error fetching calendar: ${response.status} ${response.statusText}`);
