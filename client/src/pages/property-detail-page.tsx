@@ -114,6 +114,7 @@ export default function PropertyDetailPage() {
       }
       
       // Before making API call, check if the property has an iCalUrl
+      console.log('Property object for calendar check:', property);
       if (property && !property.icalUrl) {
         console.log('Property has no iCal URL configured, returning empty array without API call');
         return [];
