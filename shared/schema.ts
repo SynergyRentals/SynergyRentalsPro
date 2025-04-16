@@ -504,6 +504,34 @@ export const insertGuestyWebhookEventSchema = createInsertSchema(guestyWebhookEv
   createdAt: true,
 });
 
+// HostAI Tasks
+export const hostAiTasks = pgTable("host_ai_tasks", {
+  id: serial("id").primaryKey(),
+  hostAiAction: text("host_ai_action"), // from task.action
+  description: text("description").notNull(), // from task.description
+  hostAiAssigneeFirstName: text("host_ai_assignee_first_name"), // from task.assignee.firstName
+  hostAiAssigneeLastName: text("host_ai_assignee_last_name"), // from task.assignee.lastName  
+  sourceType: text("source_type"), // from source.sourceType
+  sourceLink: text("source_link"), // from source.link
+  attachmentsJson: jsonb("attachments_json"), // store the attachments array as JSON
+  guestName: text("guest_name"), // from guest.guestName
+  guestEmail: text("guest_email"), // from guest.guestEmail
+  guestPhone: text("guest_phone"), // from guest.guestPhone
+  listingName: text("listing_name"), // from listing.listingName
+  listingId: text("listing_id"), // from listing.listingId
+  status: text("status").default("new").notNull(), // 'new', 'assigned', 'in_progress', 'completed'
+  assignedToUserId: integer("assigned_to_user_id"), // foreign key to users
+  hostAiCreatedAt: timestamp("host_ai_created_at"), // parsed from _creationDate
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHostAiTaskSchema = createInsertSchema(hostAiTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // AI Prompt Schema
 export const aiPromptSchema = z.object({
   prompt: z.string().min(10, "Please provide a detailed description of at least 10 characters"),
@@ -718,3 +746,6 @@ export type InsertEfficiencyMetric = z.infer<typeof insertEfficiencyMetricSchema
 
 export type InsightLog = typeof insightLogs.$inferSelect;
 export type InsertInsightLog = z.infer<typeof insertInsightLogSchema>;
+
+export type HostAiTask = typeof hostAiTasks.$inferSelect;
+export type InsertHostAiTask = z.infer<typeof insertHostAiTaskSchema>;
