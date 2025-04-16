@@ -413,7 +413,13 @@ export default function PropertyDetailPage() {
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <div>
-                <CardTitle className="text-2xl">{property.name}</CardTitle>
+                <div className="flex items-center">
+                  <CardTitle className="text-2xl">{property.name}</CardTitle>
+                  {/* Source badge */}
+                  <Badge variant="outline" className={`ml-2 ${property.source === 'guesty' ? 'text-blue-500 bg-blue-50' : 'text-green-500 bg-green-50'}`}>
+                    {property.source === 'guesty' ? 'Guesty' : 'Internal'}
+                  </Badge>
+                </div>
                 <CardDescription className="flex items-center text-gray-500 mt-1">
                   <MapPin className="h-4 w-4 mr-1" />
                   {property.address}
