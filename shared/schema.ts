@@ -566,6 +566,12 @@ export const insertHostAiAutopilotLogSchema = createInsertSchema(hostAiAutopilot
   createdAt: true,
 });
 
+export type HostAiAutopilotSettings = typeof hostAiAutopilotSettings.$inferSelect;
+export type InsertHostAiAutopilotSettings = z.infer<typeof insertHostAiAutopilotSettingsSchema>;
+
+export type HostAiAutopilotLog = typeof hostAiAutopilotLog.$inferSelect;
+export type InsertHostAiAutopilotLog = z.infer<typeof insertHostAiAutopilotLogSchema>;
+
 // AI Prompt Schema
 export const aiPromptSchema = z.object({
   prompt: z.string().min(10, "Please provide a detailed description of at least 10 characters"),

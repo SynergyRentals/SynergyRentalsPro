@@ -15,7 +15,10 @@ import {
   ProjectFile, InsertProjectFile,
   AiGeneratedPlan, InsertAiGeneratedPlan,
   // HostAI integration
-  HostAiTask, InsertHostAiTask
+  HostAiTask, InsertHostAiTask,
+  // HostAI Autopilot features
+  hostAiAutopilotSettings, hostAiAutopilotLog,
+  InsertHostAiAutopilotSettings, InsertHostAiAutopilotLog
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -164,6 +167,15 @@ export interface IStorage {
   getHostAiTasksByStatus(status: string): Promise<HostAiTask[]>;
   getHostAiTasksByAssignee(userId: number): Promise<HostAiTask[]>;
   
+  // HostAI Autopilot Settings
+  getHostAiAutopilotSettingsByUser(userId: number): Promise<any>;
+  createHostAiAutopilotSettings(settings: InsertHostAiAutopilotSettings): Promise<any>;
+  updateHostAiAutopilotSettings(id: number, settings: Partial<any>): Promise<any>;
+  
+  // HostAI Autopilot Log
+  createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<any>;
+  getHostAiAutopilotLogsByTask(taskId: number): Promise<any[]>;
+  
   // Session store
   sessionStore: session.Store;
 }
@@ -191,6 +203,10 @@ export class MemStorage implements IStorage {
   private aiGeneratedPlans: Map<number, AiGeneratedPlan>;
   // HostAI Tasks
   private hostAiTasks: Map<number, HostAiTask>;
+  // HostAI Autopilot Settings
+  private hostAiAutopilotSettings: Map<number, HostAiAutopilotSettings>;
+  // HostAI Autopilot Logs
+  private hostAiAutopilotLogs: Map<number, HostAiAutopilotLog>;
   
   sessionStore: session.Store;
   
