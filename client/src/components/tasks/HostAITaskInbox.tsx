@@ -378,111 +378,152 @@ export function HostAITaskInbox() {
             // Get the AI suggestion for this task
             const aiSuggestion = getAiSuggestion(task);
             
+            // Is this task flipped to show the scheduling view?
+            const isFlipped = flippedTasks[task.id];
+            const selection = taskSelections[task.id] || { urgency: null, team: null };
+            
+            // If the task is flipped and we have complete selection, show scheduling card
+            if (isFlipped && isTaskSelectionComplete(task.id)) {
+              return (
+                <motion.div
+                  key={task.id}
+                  initial={{ rotateY: -90 }}
+                  animate={{ rotateY: 0 }}
+                  exit={{ rotateY: 90 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <SchedulingCard
+                    task={task}
+                    selection={selection as { urgency: string, team: string }}
+                    onCancel={() => handleCancelScheduling(task.id)}
+                    onScheduled={handleTaskScheduled}
+                  />
+                </motion.div>
+              );
+            }
+            
+            // Otherwise show the default task card for selection
             return (
-              <Card key={task.id} className="overflow-hidden border-l-4 border-blue-500">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{task.listingName}</CardTitle>
-                      <CardDescription className="flex items-center space-x-2">
-                        <span>{task.guestName}</span>
-                        {task.hostAiCreatedAt && (
-                          <span>• {format(new Date(task.hostAiCreatedAt), "MMM d–d")}</span>
-                        )}
-                      </CardDescription>
+              <motion.div
+                key={task.id}
+                initial={isFlipped === false ? { rotateY: 90 } : false}
+                animate={{ rotateY: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <Card className="overflow-hidden border-l-4 border-blue-500">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{task.listingName}</CardTitle>
+                        <CardDescription className="flex items-center space-x-2">
+                          <span>{task.guestName}</span>
+                          {task.hostAiCreatedAt && (
+                            <span>• {format(new Date(task.hostAiCreatedAt), "MMM d–d")}</span>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="outline" className="bg-blue-50">
+                        New Task
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="bg-blue-50">
-                      New Task
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-lg">{task.description.split('.')[0]}</h4>
-                    <p className="text-muted-foreground mt-1">{task.description}</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium mb-1">Urgency Level:</p>
-                      <ToggleGroup type="single" variant="outline" className="justify-start" 
-                        value={taskSelections[task.id]?.urgency || ""}
-                        onValueChange={(value) => value && handleUrgencySelect(task.id, value)}
-                      >
-                        <ToggleGroupItem value="high" className="text-red-700 data-[state=on]:bg-red-100">
-                          High
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="medium" className="text-amber-700 data-[state=on]:bg-amber-100">
-                          Medium
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="low" className="text-green-700 data-[state=on]:bg-green-100">
-                          Low
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-medium mb-1">Route To:</p>
-                      <ToggleGroup type="single" variant="outline" className="justify-start" 
-                        value={taskSelections[task.id]?.team || ""}
-                        onValueChange={(value) => value && handleTeamSelect(task.id, value)}
-                      >
-                        <ToggleGroupItem value="cleaning" className="data-[state=on]:bg-blue-100">
-                          Cleaning Team
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="maintenance" className="data-[state=on]:bg-blue-100">
-                          Maintenance Team
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="internal" className="data-[state=on]:bg-blue-100">
-                          Internal Team
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="vendor" className="data-[state=on]:bg-blue-100">
-                          Vendor / Landlord
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground italic">
-                      Suggested: {aiSuggestion.urgency.charAt(0).toUpperCase() + aiSuggestion.urgency.slice(1)} • {
-                        aiSuggestion.team === "cleaning" ? "Cleaning Team" :
-                        aiSuggestion.team === "maintenance" ? "Maintenance Team" :
-                        aiSuggestion.team === "internal" ? "Internal Team" :
-                        aiSuggestion.team === "vendor" ? "Vendor / Landlord" : ""
-                      }
-                    </p>
-                  </div>
-                </CardContent>
-                
-                <CardFooter className="flex flex-col space-y-3">
-                  <Button 
-                    onClick={() => handleSubmitTask(task)}
-                    disabled={!isTaskSelectionComplete(task.id) || createTaskMutation.isPending || updateHostAiTaskMutation.isPending}
-                    className="w-full"
-                  >
-                    {createTaskMutation.isPending ? "Processing..." : "Submit Task"}
-                  </Button>
+                  </CardHeader>
                   
-                  <div className="flex w-full space-x-2">
-                    <Button 
-                      onClick={() => handleWatchTask(task)}
-                      variant="outline"
-                      disabled={updateHostAiTaskMutation.isPending}
-                      className="w-1/2 border-yellow-400 hover:bg-yellow-50"
-                    >
-                      Watch
-                    </Button>
-                    <Button 
-                      onClick={() => handleCloseTask(task)}
-                      variant="outline"
-                      disabled={updateHostAiTaskMutation.isPending}
-                      className="w-1/2 border-gray-400 hover:bg-gray-50"
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-lg">{task.description.split('.')[0]}</h4>
+                      <p className="text-muted-foreground mt-1">{task.description}</p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium mb-1">Urgency Level:</p>
+                        <ToggleGroup type="single" variant="outline" className="justify-start" 
+                          value={taskSelections[task.id]?.urgency || ""}
+                          onValueChange={(value) => value && handleUrgencySelect(task.id, value)}
+                        >
+                          <ToggleGroupItem value="high" className="text-red-700 data-[state=on]:bg-red-100">
+                            High
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="medium" className="text-amber-700 data-[state=on]:bg-amber-100">
+                            Medium
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="low" className="text-green-700 data-[state=on]:bg-green-100">
+                            Low
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium mb-1">Route To:</p>
+                        <ToggleGroup type="single" variant="outline" className="justify-start" 
+                          value={taskSelections[task.id]?.team || ""}
+                          onValueChange={(value) => value && handleTeamSelect(task.id, value)}
+                        >
+                          <ToggleGroupItem value="cleaning" className="data-[state=on]:bg-blue-100">
+                            Cleaning Team
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="maintenance" className="data-[state=on]:bg-blue-100">
+                            Maintenance Team
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="internal" className="data-[state=on]:bg-blue-100">
+                            Internal Team
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="vendor" className="data-[state=on]:bg-blue-100">
+                            Vendor / Landlord
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
+
+                      <p className="text-sm text-muted-foreground italic">
+                        Suggested: {aiSuggestion.urgency.charAt(0).toUpperCase() + aiSuggestion.urgency.slice(1)} • {
+                          aiSuggestion.team === "cleaning" ? "Cleaning Team" :
+                          aiSuggestion.team === "maintenance" ? "Maintenance Team" :
+                          aiSuggestion.team === "internal" ? "Internal Team" :
+                          aiSuggestion.team === "vendor" ? "Vendor / Landlord" : ""
+                        }
+                      </p>
+                    </div>
+                  </CardContent>
+                  
+                  <CardFooter className="flex flex-col space-y-3">
+                    {isTaskSelectionComplete(task.id) ? (
+                      <Button 
+                        onClick={() => handleContinueToSchedule(task.id)}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        Continue to Schedule
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={() => handleSubmitTask(task)}
+                        disabled={!isTaskSelectionComplete(task.id) || createTaskMutation.isPending || updateHostAiTaskMutation.isPending}
+                        className="w-full"
+                      >
+                        {createTaskMutation.isPending ? "Processing..." : "Submit Task"}
+                      </Button>
+                    )}
+                    
+                    <div className="flex w-full space-x-2">
+                      <Button 
+                        onClick={() => handleWatchTask(task)}
+                        variant="outline"
+                        disabled={updateHostAiTaskMutation.isPending}
+                        className="w-1/2 border-yellow-400 hover:bg-yellow-50"
+                      >
+                        Watch
+                      </Button>
+                      <Button 
+                        onClick={() => handleCloseTask(task)}
+                        variant="outline"
+                        disabled={updateHostAiTaskMutation.isPending}
+                        className="w-1/2 border-gray-400 hover:bg-gray-50"
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              </motion.div>
             );
           })}
         </div>
