@@ -85,6 +85,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(unit);
   });
   
+  // Update a unit
+  app.patch("/api/units/:id", checkRole(["admin", "ops", "va"]), async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.id);
+      const unit = await storage.getUnit(unitId);
+      
+      if (!unit) {
+        return res.status(404).json({ message: "Unit not found" });
+      }
+      
+      const updatedUnit = await storage.updateUnit(unitId, req.body);
+      
+      // Log the update if it includes iCal URL
+      if (req.body.icalUrl) {
+        console.log(`iCal URL updated for unit ${unitId}: ${req.body.icalUrl}`);
+      }
+      
+      res.json(updatedUnit);
+    } catch (error) {
+      console.error("Error updating unit:", error);
+      res.status(500).json({ message: "Error updating unit" });
+    }
+  });
+  
   // iCal Calendar Events Endpoint
   app.get("/api/units/:id/calendar", checkAuth, async (req, res) => {
     try {
@@ -119,17 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/units/:id", checkRole(["admin", "ops"]), async (req, res) => {
-    try {
-      const unit = await storage.updateUnit(parseInt(req.params.id), req.body);
-      if (!unit) {
-        return res.status(404).json({ message: "Unit not found" });
-      }
-      res.json(unit);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
+  // Removed duplicate PATCH endpoint for /api/units/:id
 
   // Guests
   app.get("/api/guests", checkAuth, async (req, res) => {
