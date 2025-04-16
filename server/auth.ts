@@ -16,16 +16,46 @@ declare global {
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
+  console.log(`[Auth Debug] Hashing password`);
   const salt = randomBytes(16).toString("hex");
+  console.log(`[Auth Debug] Generated salt: ${salt}, length: ${salt.length}`);
+  
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+  const hashedPassword = `${buf.toString("hex")}.${salt}`;
+  
+  console.log(`[Auth Debug] Generated hash of length: ${hashedPassword.length}`);
+  return hashedPassword;
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  console.log(`[Auth Debug] Comparing passwords - stored hash length: ${stored.length}`);
+  
+  try {
+    // Extract hash and salt from stored password
+    const [hashed, salt] = stored.split(".");
+    
+    if (!hashed || !salt) {
+      console.error(`[Auth Debug] Invalid password format - missing hash or salt`);
+      return false;
+    }
+    
+    console.log(`[Auth Debug] Hash length: ${hashed.length}, Salt length: ${salt.length}`);
+    
+    // Convert stored hash to buffer
+    const hashedBuf = Buffer.from(hashed, "hex");
+    
+    // Hash the supplied password with the same salt
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    
+    // Compare the hashes
+    const result = timingSafeEqual(hashedBuf, suppliedBuf);
+    console.log(`[Auth Debug] Password comparison result: ${result}`);
+    
+    return result;
+  } catch (error) {
+    console.error(`[Auth Debug] Error comparing passwords:`, error);
+    return false;
+  }
 }
 
 export function setupAuth(app: Express) {
@@ -43,10 +73,21 @@ export function setupAuth(app: Express) {
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
+      console.log(`[Auth] Login attempt for username: ${username}`);
       const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
+      
+      if (!user) {
+        console.log(`[Auth] User not found: ${username}`);
+        return done(null, false);
+      }
+      
+      const isPasswordValid = await comparePasswords(password, user.password);
+      console.log(`[Auth] Password validation result: ${isPasswordValid}`);
+      
+      if (!isPasswordValid) {
         return done(null, false);
       } else {
+        console.log(`[Auth] Login successful for: ${username}`);
         return done(null, user);
       }
     }),
