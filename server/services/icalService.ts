@@ -1,99 +1,73 @@
 import ical from 'node-ical';
-import axios from 'axios';
 
-interface ICalEvent {
-  id: string;
-  summary: string;
-  description: string | null;
+export interface CalendarEvent {
   start: Date;
   end: Date;
-  location: string | null;
-  created: Date | null;
-  lastModified: Date | null;
-  status: string | null;
-  organizer: string | null;
+  title: string;
+  uid: string;
 }
 
 /**
- * Fetch and parse iCal data from a URL
- * @param icalUrl - URL to the iCal file
- * @returns Array of parsed calendar events
+ * Parse an iCal feed from a URL and return a list of calendar events
+ * @param url The URL of the iCal feed
+ * @returns Array of calendar events
  */
-export async function getCalendarEvents(icalUrl: string): Promise<ICalEvent[]> {
-  console.log(`Fetching iCal data from URL: ${icalUrl}`);
+export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
   try {
-    // Fetch the iCal data
-    console.log('Making axios request...');
-    const response = await axios.get(icalUrl, {
-      headers: {
-        'Accept': '*/*',
-        'User-Agent': 'Synergy-Rentals-Calendar/1.0'
-      }
-    });
-    console.log('Received response with status:', response.status);
-    const icalData = response.data;
+    console.log(`Fetching iCal data from: ${url}`);
+    const data = await ical.async.fromURL(url);
     
-    if (!icalData || typeof icalData !== 'string') {
-      console.error('Invalid iCal data format. Expected string but got:', typeof icalData);
-      console.log('iCal data sample:', JSON.stringify(icalData).substring(0, 200) + '...');
-      throw new Error('Invalid iCal data format');
-    }
+    // Process the events
+    const events = Object.values(data)
+      .filter(event => event.type === 'VEVENT')
+      .map(event => ({
+        start: event.start,
+        end: event.end,
+        title: event.summary || 'Reservation',
+        uid: event.uid || crypto.randomUUID(), // Generate a UID if not provided
+      }));
     
-    // Parse the iCal data
-    console.log('Parsing iCal data...');
-    try {
-      const parsedEvents = ical.parseICS(icalData);
-      console.log(`Found ${Object.keys(parsedEvents).length} total items, filtering for events...`);
-      
-      // Convert to our event format
-      const events: ICalEvent[] = [];
-      
-      for (const [key, event] of Object.entries(parsedEvents)) {
-        if (event.type !== 'VEVENT') {
-          console.log(`Skipping non-event item of type: ${event.type}`);
-          continue;
-        }
-        
-        try {
-          if (!event.start || !event.end) {
-            console.log(`Skipping event with missing start/end time:`, event);
-            continue;
-          }
-          
-          events.push({
-            id: key,
-            summary: event.summary || 'Untitled Event',
-            description: event.description || null,
-            start: event.start,
-            end: event.end,
-            location: event.location || null,
-            created: event.created || null,
-            lastModified: event.lastmodified || null,
-            status: event.status || null,
-            organizer: typeof event.organizer === 'string' ? event.organizer : event.organizer?.params?.CN || null
-          });
-        } catch (eventError) {
-          console.error('Error processing individual event:', eventError);
-        }
-      }
-      
-      console.log(`Successfully processed ${events.length} calendar events`);
-      
-      // Sort events by start date
-      return events.sort((a, b) => a.start.getTime() - b.start.getTime());
-    } catch (parseError) {
-      console.error('Error parsing iCal data:', parseError);
-      throw parseError;
-    }
+    console.log(`Parsed ${events.length} events from iCal feed`);
+    return events;
   } catch (error) {
-    console.error('Error fetching or parsing iCal data:', error);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-      console.error('Response data:', error.response.data);
+    console.error('Error parsing iCal feed:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    } else {
+      console.error('Unknown error type:', error);
     }
-    throw new Error(`Failed to fetch or parse iCal data: ${error.message}`);
+    throw new Error('Failed to parse iCal feed');
   }
 }
 
-export { ICalEvent };
+/**
+ * Simple cache implementation for iCal data
+ * Caches results for 60 minutes to avoid overloading external services
+ */
+const icalCache = new Map<string, { data: CalendarEvent[], timestamp: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 60 minutes in milliseconds
+
+/**
+ * Get calendar events with caching
+ * @param url The URL of the iCal feed
+ * @returns Array of calendar events
+ */
+export async function getCachedCalendarEvents(url: string): Promise<CalendarEvent[]> {
+  const now = Date.now();
+  const cachedData = icalCache.get(url);
+  
+  // Return cached data if it exists and is still valid
+  if (cachedData && now - cachedData.timestamp < CACHE_TTL) {
+    console.log(`Using cached iCal data for: ${url}`);
+    return cachedData.data;
+  }
+  
+  // Otherwise fetch new data
+  const events = await getCalendarEvents(url);
+  
+  // Cache the results
+  icalCache.set(url, { data: events, timestamp: now });
+  
+  return events;
+}

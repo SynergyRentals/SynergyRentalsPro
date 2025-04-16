@@ -28,11 +28,11 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
+import { getCalendarEvents, getCachedCalendarEvents } from "./services/icalService";
 import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } from "./services/guestySyncService";
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
 import { processHostAiWebhook } from "./lib/hostAiWebhookHandler";
-import { getCalendarEvents, ICalEvent } from "./services/icalService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
@@ -121,7 +121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No iCal URL found for this unit" });
       }
       
-      const events = await getCalendarEvents(unit.icalUrl);
+      // Use cached calendar events to avoid frequent external requests
+      const events = await getCachedCalendarEvents(unit.icalUrl);
       res.json(events);
     } catch (error) {
       console.error("Error fetching calendar events:", error);
