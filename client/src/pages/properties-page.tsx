@@ -467,6 +467,18 @@ export default function PropertiesPage() {
               </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="icalUrl" className="text-right">
+                  iCal URL
+                </Label>
+                <Input
+                  id="icalUrl"
+                  className="col-span-3"
+                  {...form.register("icalUrl")}
+                  placeholder="https://example.com/calendar.ics"
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="tags" className="text-right">
                   Tags
                 </Label>
