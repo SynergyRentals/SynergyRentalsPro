@@ -434,6 +434,7 @@ export const guestyProperties = pgTable("guesty_properties", {
   bathrooms: real("bathrooms"),
   amenities: text("amenities").array(),
   listingUrl: text("listing_url"),
+  icalUrl: text("ical_url"),  // Added iCal URL support
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -2183,6 +2183,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error fetching Guesty property" });
     }
   });
+
+  // Update a Guesty property
+  app.patch("/api/guesty/properties/:id", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      
+      // Get the property to make sure it exists
+      const [property] = await db.select()
+        .from(guestyProperties)
+        .where(eq(guestyProperties.id, propertyId));
+      
+      if (!property) {
+        return res.status(404).json({ message: "Guesty property not found" });
+      }
+      
+      // Update the property in the database
+      await db.update(guestyProperties)
+        .set({
+          ...req.body,
+          updatedAt: new Date()
+        })
+        .where(eq(guestyProperties.id, propertyId));
+      
+      // Log the update if it includes iCal URL
+      if (req.body.icalUrl !== undefined) {
+        console.log(`iCal URL updated for Guesty property ${propertyId}: ${req.body.icalUrl}`);
+      }
+      
+      // Get the updated property
+      const [updatedProperty] = await db.select()
+        .from(guestyProperties)
+        .where(eq(guestyProperties.id, propertyId));
+      
+      res.json(updatedProperty);
+    } catch (error) {
+      console.error("Error updating Guesty property:", error);
+      res.status(500).json({ message: "Error updating Guesty property" });
+    }
+  });
+  
+  // Get calendar events for a Guesty property
+  app.get("/api/guesty/properties/:id/calendar", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      console.log(`Calendar request for Guesty property ID: ${propertyId}`);
+      
+      // Input validation
+      if (isNaN(propertyId)) {
+        console.error(`Invalid Guesty property ID: ${req.params.id}`);
+        return res.status(400).json({ message: "Invalid Guesty property ID" });
+      }
+      
+      // Get the property
+      const [property] = await db.select()
+        .from(guestyProperties)
+        .where(eq(guestyProperties.id, propertyId));
+      
+      if (!property) {
+        console.error(`Guesty property not found for ID: ${propertyId}`);
+        return res.status(404).json({ message: "Guesty property not found" });
+      }
+      
+      console.log(`Retrieved Guesty property: ${property.name}, iCal URL: ${property.icalUrl || 'none'}`);
+      
+      // Check if property has an iCal URL
+      if (!property.icalUrl) {
+        console.log(`No iCal URL found for Guesty property ID: ${propertyId}`);
+        return res.status(200).json([]);  // Return empty array instead of 404 error
+      }
+      
+      // Validate the iCal URL format
+      let validUrl: boolean;
+      try {
+        new URL(property.icalUrl);
+        validUrl = true;
+      } catch (e) {
+        validUrl = false;
+      }
+      
+      if (!validUrl) {
+        console.error(`Invalid iCal URL format: ${property.icalUrl}`);
+        return res.status(400).json({ 
+          message: "Invalid iCal URL format. Please check the URL and try again." 
+        });
+      }
+      
+      // Use cached calendar events to avoid frequent external requests
+      console.log(`Fetching calendar events from URL: ${property.icalUrl}`);
+      try {
+        const events = await getCachedCalendarEvents(property.icalUrl);
+        console.log(`Retrieved ${events.length} calendar events`);
+        
+        // Process the events to ensure they have consistent formatting and valid dates
+        const processedEvents = events.map(event => {
+          // Handle possible invalid dates
+          let startDate = event.start;
+          let endDate = event.end;
+          
+          try {
+            // Validate that dates are properly parsed
+            if (!(startDate instanceof Date) || isNaN(startDate.getTime())) {
+              startDate = new Date();
+              console.warn(`Invalid start date in event ${event.uid}, using current date`);
+            }
+            
+            if (!(endDate instanceof Date) || isNaN(endDate.getTime())) {
+              // Default to one day after start if end date is invalid
+              endDate = new Date(startDate);
+              endDate.setDate(endDate.getDate() + 1);
+              console.warn(`Invalid end date in event ${event.uid}, using start date + 1 day`);
+            }
+          } catch (e) {
+            console.error(`Error processing dates for event ${event.uid}:`, e);
+            // Fallback to current date and next day if date processing fails
+            startDate = new Date();
+            endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 1);
+          }
+          
+          return {
+            start: startDate,
+            end: endDate,
+            title: event.title || 'Reservation',
+            uid: event.uid,
+            status: event.status || 'confirmed'
+          };
+        });
+        
+        res.json(processedEvents);
+      } catch (calendarError) {
+        console.error("Error fetching from iCal service:", calendarError);
+        // Return an error status so the frontend can display a meaningful error message
+        return res.status(400).json({ 
+          message: `Failed to fetch calendar data: ${calendarError instanceof Error ? calendarError.message : 'Unknown error'}` 
+        });
+      }
+    } catch (error) {
+      console.error("Error in Guesty calendar endpoint:", error);
+      res.status(500).json({ message: "Server error fetching calendar events" });
+    }
+  });
   
   // Get all Guesty reservations
   app.get("/api/guesty/reservations", checkAuth, async (req: Request, res: Response) => {
