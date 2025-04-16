@@ -50,10 +50,10 @@ const PropertyList: React.FC = () => {
   }
   
   // Filter properties based on search query
-  const filteredProperties = properties 
+  const filteredProperties = properties && Array.isArray(properties)
     ? properties.filter((property: Property) => 
-        property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        property.address.toLowerCase().includes(searchQuery.toLowerCase())
+        property && property.name && property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        property && property.address && property.address.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
   

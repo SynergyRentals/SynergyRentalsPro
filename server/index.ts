@@ -1,6 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
-import { registerRoutes } from "./routes";
 import { setupRoutes } from "./routes-new";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";

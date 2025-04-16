@@ -94,11 +94,14 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
     queryFn: () => apiRequest(`/api/properties/${id}`),
   });
   
+  // Check if property exists and has icalUrl
+  const hasIcalUrl = property && typeof property === 'object' && 'icalUrl' in property && !!property.icalUrl;
+  
   // Fetch calendar events if property has icalUrl
   const { data: calendarEvents, isLoading: isLoadingCalendar, refetch: refetchCalendar } = useQuery({
     queryKey: [`/api/properties/${id}/calendar`],
     queryFn: () => apiRequest(`/api/properties/${id}/calendar`),
-    enabled: !!property?.icalUrl,
+    enabled: !!id && hasIcalUrl,
   });
   
   // Set up delete mutation
