@@ -10,7 +10,7 @@ async function main() {
     console.log('Applying schema to database...');
     
     // Use executeSQL helper to provide "yes" to all prompts
-    const result = await executeSQL('npx drizzle-kit push:pg --verbose');
+    const result = await executeSQL('npx drizzle-kit push:pg');
     
     if (result) {
       console.log('Database schema successfully applied!');
