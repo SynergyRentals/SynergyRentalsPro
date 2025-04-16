@@ -770,39 +770,18 @@ export default function PropertyDetailPage() {
                           </div>
                         </div>
                         <div className="flex-grow">
-                          <h4 className="font-medium">{event.summary || 'Reservation'}</h4>
+                          <h4 className="font-medium">{event.title || 'Reservation'}</h4>
                           <div className="flex items-center text-sm text-gray-500 mb-1">
                             <Calendar className="h-3 w-3 mr-1" />
                             {formatDate(new Date(event.start))} - {formatDate(new Date(event.end))}
                           </div>
-                          {event.description && (
-                            <p className="text-sm text-gray-600 mt-2">{event.description}</p>
-                          )}
-                          {event.location && (
-                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              {event.location}
-                            </div>
-                          )}
-                          {event.organizer && (
-                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                              <User className="h-3 w-3 mr-1" />
-                              {event.organizer}
-                            </div>
-                          )}
                         </div>
                         <div className="ml-4 flex-shrink-0">
                           <Badge
-                            variant={event.status === 'CONFIRMED' ? 'default' : 'outline'}
-                            className={
-                              event.status === 'CANCELLED' 
-                                ? 'bg-red-50 text-red-700' 
-                                : event.status === 'TENTATIVE' 
-                                  ? 'bg-amber-50 text-amber-700' 
-                                  : ''
-                            }
+                            variant="outline"
+                            className="bg-blue-50 text-blue-700"
                           >
-                            {event.status || 'Active'}
+                            Reservation
                           </Badge>
                         </div>
                       </div>
