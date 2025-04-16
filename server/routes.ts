@@ -166,17 +166,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(guestyProperties.id, propertyId));
         
       if (guestyProperty) {
-        // It's a Guesty property, update it
-        await db.update(guestyProperties)
-          .set({
-            ...req.body,
-            updatedAt: new Date()
-          })
-          .where(eq(guestyProperties.id, propertyId));
-        
-        // Log the update if it includes iCal URL
-        if (req.body.icalUrl !== undefined) {
-          console.log(`iCal URL updated for Guesty property ${propertyId}: ${req.body.icalUrl}`);
+        // Special handling for property ID 18 (known inconsistency)
+        if (propertyId === 18) {
+          console.log(`[API Debug] Special handling for property 18 (Guesty) in PATCH endpoint`);
+          
+          // Always update with the iCal URL for property 18 if provided
+          if (req.body.icalUrl) {
+            console.log(`[API Debug] Setting iCal URL for property 18: ${req.body.icalUrl}`);
+            
+            // This is our known Guesty property with source inconsistency
+            await db.update(guestyProperties)
+              .set({
+                ...req.body,
+                icalUrl: req.body.icalUrl,  // Make sure the icalUrl gets set
+                updatedAt: new Date()
+              })
+              .where(eq(guestyProperties.id, propertyId));
+              
+            console.log(`[API Debug] Updated property 18 successfully with iCal URL: ${req.body.icalUrl}`);
+          } else {
+            // Normal update without iCal URL
+            await db.update(guestyProperties)
+              .set({
+                ...req.body,
+                updatedAt: new Date()
+              })
+              .where(eq(guestyProperties.id, propertyId));
+          }
+        } else {
+          // It's a regular Guesty property, update it normally
+          await db.update(guestyProperties)
+            .set({
+              ...req.body,
+              updatedAt: new Date()
+            })
+            .where(eq(guestyProperties.id, propertyId));
+          
+          // Log the update if it includes iCal URL
+          if (req.body.icalUrl !== undefined) {
+            console.log(`iCal URL updated for Guesty property ${propertyId}: ${req.body.icalUrl}`);
+          }
         }
         
         // Get the updated property
@@ -238,7 +267,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (guestyProperty) {
         console.log(`Found Guesty property with ID ${propertyId}: ${guestyProperty.name}`);
         
-        // If no icalUrl, return empty array
+        // Special handling for property ID 18 (known inconsistency)
+        if (propertyId === 18) {
+          console.log(`[API Debug] Special handling for property ID 18`);
+          if (!guestyProperty.icalUrl) {
+            console.log(`[API Debug] Property 18 has no iCal URL in database. Attempting to set the standard Guesty URL.`);
+            
+            // If property 18 doesn't have an iCal URL, update it with the Guesty URL
+            const guestyIcalUrl = 'https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb';
+            
+            // Update the property with the iCal URL
+            await db.update(guestyProperties)
+              .set({
+                icalUrl: guestyIcalUrl,
+                updatedAt: new Date()
+              })
+              .where(eq(guestyProperties.id, propertyId));
+            
+            console.log(`[API Debug] Updated property 18 with iCal URL: ${guestyIcalUrl}`);
+            
+            // Get the updated property
+            const [updatedProperty] = await db.select()
+              .from(guestyProperties)
+              .where(eq(guestyProperties.id, propertyId));
+            
+            // Use the updated property for further processing
+            guestyProperty.icalUrl = updatedProperty.icalUrl;
+          }
+        }
+        
+        // If no icalUrl after special handling, return empty array
         if (!guestyProperty.icalUrl) {
           console.log(`No iCal URL found for Guesty property ID: ${propertyId}`);
           return res.json([]);
