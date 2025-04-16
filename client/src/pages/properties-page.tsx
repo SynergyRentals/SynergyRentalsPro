@@ -42,6 +42,7 @@ export default function PropertiesPage() {
     address: "",
     leaseUrl: "",
     wifiInfo: "",
+    icalUrl: "",
     notes: "",
     tags: [],
   };
@@ -180,6 +181,7 @@ export default function PropertiesPage() {
       address: unit.address,
       leaseUrl: unit.leaseUrl || "",
       wifiInfo: unit.wifiInfo || "",
+      icalUrl: unit.icalUrl || "",
       notes: unit.notes || "",
       tags: unit.tags || [],
     });
