@@ -6,7 +6,7 @@ import {
   Loader2, ChevronLeft, Building2, MapPin, Wifi, FileText, Tag, User, Calendar, ClipboardCheck,
   Wrench, Package, ReceiptText, MessageSquare, Upload, Download, ArrowUpDown, Clipboard, Users,
   CalendarDays, Clock, AlertCircle, ExternalLink, CalendarClock, Check, RefreshCw, AlertTriangle,
-  Plus, Link as LinkIcon, Trash2, Home
+  Plus, Link as LinkIcon, Trash2, Home, CalendarPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -660,7 +660,7 @@ export default function PropertyDetailPage() {
                 <>
                   <CalendarView events={getCalendarEvents()} />
                   
-                  {!property.icalUrl && !showIcalInput && calendarData?.length === 0 && (
+                  {!property.icalUrl && !showIcalInput && calendarEvents?.length === 0 && (
                     <div className="text-center py-6 mt-6 border rounded-md">
                       <CalendarDays className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                       <h3 className="text-lg font-semibold">No Calendar Data</h3>
