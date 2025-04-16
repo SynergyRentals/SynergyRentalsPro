@@ -16,15 +16,18 @@ interface GuestyPropertiesTabProps {
 export default function GuestyPropertiesTab({ searchQuery = "" }: GuestyPropertiesTabProps) {
   const { toast } = useToast();
   
-  // Get all Guesty properties
+  // Get all properties from unified endpoint
   const { 
-    data: properties, 
+    data: allProperties, 
     isLoading, 
     error 
-  } = useQuery<GuestyProperty[]>({
-    queryKey: ['/api/guesty/properties'],
+  } = useQuery({
+    queryKey: ['/api/properties'],
     retry: 1,
   });
+  
+  // Filter for properties that are from Guesty source
+  const properties = allProperties?.filter(property => property.source === 'guesty');
 
   // Sync properties from Guesty API
   const syncMutation = useMutation({
@@ -33,7 +36,9 @@ export default function GuestyPropertiesTab({ searchQuery = "" }: GuestyProperti
       return await res.json();
     },
     onSuccess: (data) => {
+      // Invalidate both legacy and unified endpoints
       queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({
         title: "Properties synced",
         description: `Successfully synced ${data.propertiesCount || 0} properties from Guesty.`,
@@ -61,7 +66,10 @@ export default function GuestyPropertiesTab({ searchQuery = "" }: GuestyProperti
           <div className="flex gap-4">
             <Button 
               variant="outline" 
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties'] })}
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/guesty/properties'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+              }}
             >
               Try Again
             </Button>
