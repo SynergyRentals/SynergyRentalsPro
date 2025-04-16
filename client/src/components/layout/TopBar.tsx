@@ -56,10 +56,10 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
           <div className="flex items-center ml-2 lg:ml-0">
             <AutoAwesome className="text-[#FFCF45] h-6 w-6 mr-2" />
             <h1 className="text-lg font-semibold text-[#2C2E3E] hidden md:block">
-              Synergy Rentals AI Brain
+              SynergyOps
             </h1>
             <h1 className="text-lg font-semibold text-[#2C2E3E] md:hidden">
-              SR Brain
+              SynergyOps
             </h1>
           </div>
         </div>
