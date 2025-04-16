@@ -151,9 +151,28 @@ export default function UnitDetailPage() {
     mutationFn: async () => {
       if (!unit) return;
       
-      const endpoint = unit.source === 'guesty' 
+      console.log("Updating iCal URL for property:", unitId, "Source:", unit.source);
+      
+      // Double-check that this is a Guesty property if needed
+      let isGuesty = unit.source === 'guesty';
+      if (!isGuesty) {
+        // Extra check - try to find if a Guesty property exists with this ID
+        try {
+          const guestyCheckRes = await fetch(`/api/guesty/properties/${unitId}`);
+          if (guestyCheckRes.ok) {
+            isGuesty = true;
+            console.log(`Found Guesty property with ID ${unitId}, overriding source detection`);
+          }
+        } catch (err) {
+          console.log("No Guesty property found with this ID, using regular unit");
+        }
+      }
+      
+      const endpoint = isGuesty
         ? `/api/guesty/properties/${unitId}`
         : `/api/units/${unitId}`;
+        
+      console.log("Using endpoint for iCal update:", endpoint);
         
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -169,6 +188,7 @@ export default function UnitDetailPage() {
       }
       
       const data = await response.json();
+      console.log("Successfully updated iCal URL, response:", data);
       return data;
     },
     onSuccess: () => {
