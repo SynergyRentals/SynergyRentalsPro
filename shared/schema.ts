@@ -35,6 +35,7 @@ export const units = pgTable("units", {
   wifiInfo: text("wifi_info"),
   notes: text("notes"),
   tags: text("tags").array(),
+  icalUrl: text("ical_url"),
   active: boolean("active").notNull().default(true),
 });
 
