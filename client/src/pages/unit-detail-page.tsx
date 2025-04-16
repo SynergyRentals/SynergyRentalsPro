@@ -283,18 +283,29 @@ export default function UnitDetailPage() {
     // Add events from external iCal source if available
     if (externalCalendarEvents && externalCalendarEvents.length > 0) {
       externalCalendarEvents.forEach(event => {
-        // Add event start date (already converted to Date object in the query)
+        // Generate a unique reservation ID for tracking connected events
+        const reservationId = event.uid || `reservation-${Math.random().toString(36).substring(2, 11)}`;
+        
+        // Add event start date as check-in (already converted to Date object in the query)
         events.push({
           date: event.start,
           type: "urgent",
-          label: `${event.title || 'Reservation'} (start)`
+          label: `${event.title || 'Reservation'} (Check-in)`,
+          // Important: Add these properties for the reservation visualization
+          startDate: event.start,
+          endDate: event.end,
+          reservationId: reservationId
         });
         
-        // Add event end date (already converted to Date object in the query)
+        // Add event end date as check-out (already converted to Date object in the query)
         events.push({
           date: event.end,
           type: "urgent",
-          label: `${event.title || 'Reservation'} (end)`
+          label: `${event.title || 'Reservation'} (Check-out)`,
+          // Important: Add these properties for the reservation visualization
+          startDate: event.start,
+          endDate: event.end,
+          reservationId: reservationId
         });
       });
     }
