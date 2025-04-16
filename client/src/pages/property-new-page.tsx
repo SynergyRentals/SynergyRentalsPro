@@ -1,37 +1,35 @@
 import React from "react";
-import { useAuth } from "../hooks/use-auth";
+import { useLocation } from "wouter";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import PropertyForm from "../components/properties/PropertyForm";
-import { Loader2 } from "lucide-react";
 
 export default function PropertyNewPage() {
-  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
   
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8 flex justify-center items-center min-h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  // Redirect or show login prompt if not authenticated
-  if (!user) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-          <h2 className="text-lg font-semibold text-amber-800 mb-2">Authentication Required</h2>
-          <p className="text-amber-700">
-            Please log in to create a new property.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Handle success after property creation
+  const handleSuccess = (data: any) => {
+    navigate(`/properties/${data.id}`);
+  };
   
   return (
-    <div className="container mx-auto py-6">
-      <PropertyForm isEditMode={false} />
+    <div className="container mx-auto py-8 max-w-4xl">
+      <div className="mb-8">
+        <Button 
+          variant="ghost" 
+          className="mb-2" 
+          onClick={() => navigate("/properties")}
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back to Properties
+        </Button>
+        <h1 className="text-3xl font-bold">Add New Property</h1>
+        <p className="text-muted-foreground">
+          Create a new property to manage in the system
+        </p>
+      </div>
+      
+      <PropertyForm onSuccess={handleSuccess} />
     </div>
   );
 }

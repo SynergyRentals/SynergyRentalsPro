@@ -1,39 +1,54 @@
-import React from "react";
-import { useParams } from "wouter";
-import { useAuth } from "../hooks/use-auth";
+import React, { useState } from "react";
+import { useParams, useLocation } from "wouter";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import PropertyDetail from "../components/properties/PropertyDetail";
-import { Loader2 } from "lucide-react";
 
 export default function PropertyDetailNewPage() {
   const { id } = useParams();
-  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+  const [isEditing, setIsEditing] = useState(false);
   
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8 flex justify-center items-center min-h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Get property ID as number
+  const propertyId = id ? parseInt(id, 10) : undefined;
   
-  // Redirect or show login prompt if not authenticated
-  if (!user) {
+  // Handle navigation back to properties list
+  const handleBack = () => {
+    navigate("/properties");
+  };
+  
+  // Toggle edit mode
+  const handleEdit = () => {
+    navigate(`/properties/${id}/edit`);
+  };
+  
+  // If no valid property ID, return error state
+  if (!propertyId || isNaN(propertyId)) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-          <h2 className="text-lg font-semibold text-amber-800 mb-2">Authentication Required</h2>
-          <p className="text-amber-700">
-            Please log in to view property details.
+      <div className="container mx-auto py-8 max-w-4xl">
+        <div className="bg-red-50 border border-red-200 rounded-md p-8 text-center">
+          <h1 className="text-xl font-bold text-red-800 mb-2">Invalid Property ID</h1>
+          <p className="text-red-700 mb-4">
+            The property ID provided is invalid or missing.
           </p>
+          <Button onClick={handleBack}>Return to Properties</Button>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="container mx-auto py-6">
-      <PropertyDetail />
+    <div className="container mx-auto py-8 max-w-4xl">
+      <Button 
+        variant="ghost" 
+        className="mb-6" 
+        onClick={handleBack}
+      >
+        <ChevronLeft className="h-4 w-4 mr-2" />
+        Back to Properties
+      </Button>
+      
+      <PropertyDetail id={propertyId} onEdit={handleEdit} />
     </div>
   );
 }

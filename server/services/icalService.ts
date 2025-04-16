@@ -306,3 +306,27 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
     throw new Error(`Failed to fetch calendar data: ${errorMessage}`);
   }
 }
+
+/**
+ * Main function to process an iCal URL and return calendar events
+ * @param url The URL of the iCal feed
+ * @returns Array of calendar events
+ */
+export async function processIcalURL(url: string): Promise<CalendarEvent[]> {
+  try {
+    // Get calendar events using the cached function
+    const events = await getCachedCalendarEvents(url);
+    
+    // Only return future and current events (events that end after now)
+    const now = new Date();
+    const filteredEvents = events.filter(event => {
+      return event.end >= now;
+    });
+    
+    console.log(`Processed iCal URL: ${url} - Found ${events.length} total events, ${filteredEvents.length} future events`);
+    return filteredEvents;
+  } catch (error) {
+    console.error(`Error processing iCal URL: ${url}`, error);
+    throw error;
+  }
+}
