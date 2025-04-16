@@ -6,7 +6,7 @@ import {
   Loader2, ChevronLeft, Building2, MapPin, Wifi, FileText, Tag, User, Calendar, ClipboardCheck,
   Wrench, Package, ReceiptText, MessageSquare, Upload, Download, ArrowUpDown, Clipboard, Users,
   CalendarDays, Clock, AlertCircle, ExternalLink, CalendarClock, Check, RefreshCw, AlertTriangle,
-  Plus, Link as LinkIcon, Trash2
+  Plus, Link as LinkIcon, Trash2, Home
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,11 @@ import { Label } from "@/components/ui/label";
 import { queryClient } from "@/lib/queryClient";
 import { Unit, Guest, Maintenance, Inventory, Task, Document } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
+import TaskCard from "@/components/dashboard/TaskCard";
+import { CalendarView } from "../components/dashboard/CalendarView";
+import { Separator } from "@/components/ui/separator";
 
 export default function PropertyDetailPage() {
   const { toast } = useToast();
@@ -436,8 +441,14 @@ export default function PropertyDetailPage() {
         </Card>
       </div>
       
-      <Tabs defaultValue="guests" className="mt-4">
+      <Tabs defaultValue="overview" className="mt-4">
         <TabsList>
+          <TabsTrigger value="overview">
+            <Home className="h-4 w-4 mr-2" /> Overview
+          </TabsTrigger>
+          <TabsTrigger value="calendar">
+            <CalendarDays className="h-4 w-4 mr-2" /> Calendar
+          </TabsTrigger>
           <TabsTrigger value="guests">
             <User className="h-4 w-4 mr-2" /> Guests
           </TabsTrigger>
@@ -452,9 +463,6 @@ export default function PropertyDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="documents">
             <FileText className="h-4 w-4 mr-2" /> Documents
-          </TabsTrigger>
-          <TabsTrigger value="calendar">
-            <CalendarDays className="h-4 w-4 mr-2" /> Calendar
           </TabsTrigger>
         </TabsList>
         
