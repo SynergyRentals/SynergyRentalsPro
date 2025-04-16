@@ -68,21 +68,44 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
     const isValid = await validateUrl(url);
     if (!isValid) {
       console.error(`Invalid or inaccessible iCal URL: ${url}`);
-      throw new Error('Invalid or inaccessible URL');
+      throw new Error('Invalid or inaccessible URL. Please check that the URL is correct and accessible.');
     }
     
-    const data = await ical.async.fromURL(url);
+    const data = await ical.async.fromURL(url, {
+      // Add options to handle more calendar variations
+      headers: {
+        'User-Agent': 'Synergy-Rentals/1.0',
+        'Accept': 'text/calendar'
+      },
+      timeout: 10000 // Increase timeout to 10 seconds
+    });
+    
+    // Check if we got any data
+    if (Object.keys(data).length === 0) {
+      console.error(`No valid calendar data found at URL: ${url}`);
+      throw new Error('No calendar events found. The calendar may be empty or in an unsupported format.');
+    }
     
     // Process the events
     const events = Object.values(data)
       .filter(event => event.type === 'VEVENT')
-      .map(event => ({
-        start: event.start,
-        end: event.end,
-        title: event.summary || 'Reservation',
-        uid: event.uid || crypto.randomUUID(), // Generate a UID if not provided
-        status: event.status || 'confirmed'
-      }));
+      .map(event => {
+        // Ensure we have valid dates
+        if (!event.start || !event.end) {
+          console.warn(`Event missing start or end date: ${event.uid || 'unknown'}`);
+          // Skip events with missing dates by returning null and filtering them out
+          return null;
+        }
+        
+        return {
+          start: event.start,
+          end: event.end,
+          title: event.summary || 'Reservation',
+          uid: event.uid || crypto.randomUUID(), // Generate a UID if not provided
+          status: event.status || 'confirmed'
+        };
+      })
+      .filter(event => event !== null) as CalendarEvent[]; // Filter out null events
     
     console.log(`Successfully parsed ${events.length} events from iCal feed`);
     return events;
@@ -91,10 +114,21 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
     if (error instanceof Error) {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
+      
+      // Provide more specific error messages based on common failures
+      if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+        throw new Error(`Cannot connect to calendar server. The domain may be incorrect or the server is unavailable.`);
+      } else if (error.message.includes('timeout')) {
+        throw new Error(`Connection to calendar server timed out. The server may be slow or unresponsive.`);
+      } else if (error.message.includes('401') || error.message.includes('403')) {
+        throw new Error(`Authorization failed. This calendar feed may require authentication.`);
+      } else {
+        throw new Error(`Failed to parse iCal feed: ${error.message}`);
+      }
     } else {
       console.error('Unknown error type:', error);
+      throw new Error(`Failed to parse iCal feed: Unknown error`);
     }
-    throw new Error(`Failed to parse iCal feed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

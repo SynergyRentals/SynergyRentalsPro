@@ -791,10 +791,26 @@ export default function PropertyDetailPage() {
                   <AlertTriangle className="h-12 w-12 text-amber-500 mb-3" />
                   <h3 className="font-semibold mb-2">Error Loading Calendar</h3>
                   <p className="text-gray-500 text-sm mb-4 max-w-md">
-                    There was an error loading calendar data. Please check the iCal URL or try again later.
+                    There was an error loading calendar data. This may be due to an invalid iCal URL or temporary connectivity issues.
                   </p>
-                  <div className="text-xs bg-amber-50 p-3 rounded-md text-amber-700 max-w-md">
+                  <div className="text-xs bg-amber-50 p-3 rounded-md text-amber-700 max-w-md mb-4 overflow-auto max-h-24">
                     {String(calendarError)}
+                  </div>
+                  <div className="flex space-x-3">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowIcalInput(true)}
+                    >
+                      <LinkIcon className="h-4 w-4 mr-2" /> Edit iCal URL
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => refetchCalendar()}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" /> Retry
+                    </Button>
                   </div>
                 </div>
               ) : calendarEvents && calendarEvents.length > 0 ? (
