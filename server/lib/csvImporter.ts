@@ -49,6 +49,7 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
             bathrooms: parseFloat(row.BATHROOMS || '1.0'),
             amenities: row.AMENITIES ? row.AMENITIES.split(',') : [],
             listingUrl: row.LISTING_URL || '',
+            icalUrl: row.ICAL_URL || null,
           };
 
           properties.push(property);
