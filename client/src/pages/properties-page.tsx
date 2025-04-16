@@ -60,7 +60,9 @@ export default function PropertiesPage() {
       return await res.json();
     },
     onSuccess: () => {
+      // Invalidate both endpoints for complete sync
       queryClient.invalidateQueries({ queryKey: ['/api/units'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       setShowUnitDialog(false);
       toast({
         title: "Property created",
@@ -83,7 +85,9 @@ export default function PropertiesPage() {
       return await res.json();
     },
     onSuccess: () => {
+      // Invalidate both endpoints for complete sync
       queryClient.invalidateQueries({ queryKey: ['/api/units'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       setShowUnitDialog(false);
       toast({
         title: "Property updated",
@@ -107,7 +111,9 @@ export default function PropertiesPage() {
       return await res.json();
     },
     onSuccess: () => {
+      // Invalidate both endpoints for complete sync
       queryClient.invalidateQueries({ queryKey: ['/api/units'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       setShowDeleteDialog(false);
       setCurrentUnit(null);
       toast({
@@ -130,28 +136,40 @@ export default function PropertiesPage() {
     defaultValues,
   });
   
-  // Filter properties based on search query and active tab
-  const filteredUnits = units?.filter((unit) => {
-    // Filter by search query
-    const matchesSearch = 
-      unit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      unit.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      unit.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      unit.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    // Filter by tab
-    if (activeTab === "all") return matchesSearch;
-    if (activeTab === "active") return matchesSearch && unit.active;
-    if (activeTab === "inactive") return matchesSearch && !unit.active;
-    
-    // Filter by tag if activeTab is not one of the above
-    return matchesSearch && unit.tags?.includes(activeTab);
-  });
+  // Filter properties based on source (internal vs guesty)
+  const internalProperties = properties?.filter(
+    property => property.source === 'internal'
+  ) || [];
   
-  // Get all tags from units
+  const guestyProperties = properties?.filter(
+    property => property.source === 'guesty'
+  ) || [];
+  
+  // Filter internal properties based on search query and active tab
+  const filteredUnits = sourceTab === 'internal' ? 
+    internalProperties.filter((unit) => {
+      // Filter by search query
+      const matchesSearch = 
+        unit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        unit.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        unit.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        unit.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      // Filter by tab
+      if (activeTab === "all") return matchesSearch;
+      if (activeTab === "active") return matchesSearch && unit.active;
+      if (activeTab === "inactive") return matchesSearch && !unit.active;
+      
+      // Filter by tag if activeTab is not one of the above
+      return matchesSearch && unit.tags?.includes(activeTab);
+    }) : 
+    // When on Guesty tab, we'll use the GuestyPropertiesTab component
+    [];
+  
+  // Get all tags from internal units
   const allTags = Array.from(
     new Set(
-      units?.flatMap((unit) => unit.tags || []) || []
+      internalProperties?.flatMap((unit) => unit.tags || []) || []
     )
   );
   
