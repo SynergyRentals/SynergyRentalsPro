@@ -45,12 +45,19 @@ async function simulateGuestyWebhook() {
     // Set temporary environment variable for test
     process.env.GUESTY_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET;
     
-    const response = await axios.post('http://localhost:5000/api/webhooks/guesty', rawBody, {
+    // Convert the string to a Buffer
+    const bodyBuffer = Buffer.from(rawBody);
+    
+    const response = await axios.post('http://localhost:5000/api/webhooks/guesty', bodyBuffer, {
       headers: {
+        // Important: When sending a buffer, we need to specify the Content-Type as application/json
+        // but also tell axios not to transform our data
         'Content-Type': 'application/json',
         'X-Guesty-Signature-V2': signature,
         'Accept': 'application/json'
-      }
+      },
+      // This is critical - prevent axios from trying to convert our buffer
+      transformRequest: [(data) => data]
     });
     
     console.log('\n--- RESPONSE RECEIVED ---');
