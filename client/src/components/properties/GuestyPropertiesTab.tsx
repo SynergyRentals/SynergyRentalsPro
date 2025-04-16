@@ -148,11 +148,12 @@ export default function GuestyPropertiesTab() {
               </CardContent>
               
               <CardFooter className="pt-2 flex flex-wrap gap-2">
-                <WouterLink to={`/properties/${property.id}`} className="flex-1">
+                <WouterLink to={`/unit/${property.id}`} className="flex-1">
                   <Button
                     variant="default"
                     size="sm"
                     className="w-full"
+                    onClick={() => console.log("Navigating to Guesty property:", property.id, property.name)}
                   >
                     <Eye className="h-4 w-4 mr-1" /> View Details
                   </Button>
