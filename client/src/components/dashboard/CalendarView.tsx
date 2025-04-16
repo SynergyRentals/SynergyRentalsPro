@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { format, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -19,72 +20,48 @@ interface CalendarViewProps {
 
 export function CalendarView({ events }: CalendarViewProps) {
   const [month, setMonth] = useState<Date>(new Date());
-
-  // Helper function to check if a date has events
-  const hasEvent = (date: Date) => {
-    // Check date without time component
-    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const nextDate = new Date(targetDate);
-    nextDate.setDate(nextDate.getDate() + 1);
+  const [calendarDates, setCalendarDates] = useState<{ date: Date; hasEvents: boolean; eventTypes: CalendarEventType[] }[]>([]);
+  
+  useEffect(() => {
+    // Process events and prepare calendar data
+    console.log("Processing events for calendar:", events.length);
     
-    return events.some(event => {
-      const eventDate = event.date;
-      return eventDate >= targetDate && eventDate < nextDate;
+    // Create a map of dates to events
+    const dateMap = new Map<string, { hasEvents: boolean; eventTypes: CalendarEventType[]; events: CalendarEvent[] }>();
+    
+    // Initialize calendar with all dates in the current month
+    const year = month.getFullYear();
+    const monthIndex = month.getMonth();
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, monthIndex, day);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      dateMap.set(dateKey, { hasEvents: false, eventTypes: [], events: [] });
+    }
+    
+    // Add events to the map
+    events.forEach(event => {
+      const dateKey = format(event.date, 'yyyy-MM-dd');
+      const dateData = dateMap.get(dateKey) || { hasEvents: false, eventTypes: [], events: [] };
+      dateData.hasEvents = true;
+      if (!dateData.eventTypes.includes(event.type)) {
+        dateData.eventTypes.push(event.type);
+      }
+      dateData.events.push(event);
+      dateMap.set(dateKey, dateData);
     });
-  };
-
-  // Get events for a specific date
-  const getEventsForDate = (date: Date) => {
-    // Check date without time component
-    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const nextDate = new Date(targetDate);
-    nextDate.setDate(nextDate.getDate() + 1);
     
-    return events.filter(event => {
-      const eventDate = event.date;
-      return eventDate >= targetDate && eventDate < nextDate;
-    });
-  };
-
-  // Function to render custom day contents
-  const renderDay = (day: Date | undefined) => {
-    if (!day) return null;
+    // Convert map to array for rendering
+    const dates = Array.from(dateMap.entries()).map(([dateString, data]) => ({
+      date: new Date(dateString),
+      hasEvents: data.hasEvents,
+      eventTypes: data.eventTypes,
+      events: data.events
+    }));
     
-    const dateEvents = getEventsForDate(day);
-    if (dateEvents.length === 0) return null;
-    
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="w-full h-full flex items-center justify-center relative">
-              <div className="absolute bottom-1 flex gap-0.5">
-                {dateEvents.slice(0, 3).map((event, index) => (
-                  <div 
-                    key={index} 
-                    className={`h-1.5 w-1.5 rounded-full ${getEventColor(event.type)}`}
-                  />
-                ))}
-                {dateEvents.length > 3 && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                )}
-              </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="space-y-1 max-w-[200px]">
-              {dateEvents.map((event, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${getEventColor(event.type)}`} />
-                  <span className="text-xs">{event.label}</span>
-                </div>
-              ))}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  };
+    setCalendarDates(dates);
+  }, [events, month]);
 
   // Function to get color for event type
   const getEventColor = (type: CalendarEventType) => {
@@ -101,11 +78,16 @@ export function CalendarView({ events }: CalendarViewProps) {
         return "bg-gray-500";
     }
   };
+  
+  // Get all events for a particular day
+  const getEventsForDay = (day: Date) => {
+    return events.filter(event => isSameDay(event.date, day));
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="flex items-center gap-1">
             <div className="h-2 w-2 rounded-full bg-blue-500" />
             <span>Cleaning</span>
@@ -125,20 +107,64 @@ export function CalendarView({ events }: CalendarViewProps) {
         </div>
       </div>
       
-      <Calendar
-        mode="single"
-        month={month}
-        onMonthChange={setMonth}
-        className="rounded-md border"
-        components={{
-          DayContent: ({ day }) => (
-            <>
-              <div>{day?.getDate()}</div>
-              {renderDay(day)}
-            </>
-          ),
-        }}
-      />
+      <div className="border rounded-md p-2">
+        <Calendar
+          mode="single"
+          month={month}
+          onMonthChange={setMonth}
+          modifiers={{
+            // Highlight days with events
+            hasEvent: events.map(event => new Date(event.date))
+          }}
+          modifiersStyles={{
+            hasEvent: { fontWeight: 'bold', backgroundColor: 'var(--primary-50)' }
+          }}
+          components={{
+            DayContent: (props) => {
+              if (!props.date) return null;
+              
+              const dayEvents = getEventsForDay(props.date);
+              const hasEvents = dayEvents.length > 0;
+              
+              return (
+                <div className="relative w-full h-full flex flex-col items-center">
+                  <div>{format(props.date, 'd')}</div>
+                  
+                  {hasEvents && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="absolute bottom-0 flex justify-center w-full gap-0.5 pb-1">
+                            {dayEvents.slice(0, Math.min(3, dayEvents.length)).map((event, idx) => (
+                              <div 
+                                key={idx}
+                                className={`h-1.5 w-1.5 rounded-full ${getEventColor(event.type)}`}
+                              />
+                            ))}
+                            {dayEvents.length > 3 && (
+                              <div className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="p-1 space-y-1">
+                            {dayEvents.map((event, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <div className={`h-2 w-2 rounded-full ${getEventColor(event.type)}`} />
+                                <span className="text-xs">{event.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              );
+            }
+          }}
+        />
+      </div>
       
       <div className="mt-4">
         <h3 className="font-medium text-sm mb-2">Upcoming Events</h3>
@@ -153,7 +179,7 @@ export function CalendarView({ events }: CalendarViewProps) {
                 <div>
                   <div className="text-sm font-medium">{event.label}</div>
                   <div className="text-xs text-muted-foreground">
-                    {event.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {format(event.date, 'MMM d, yyyy')}
                   </div>
                 </div>
               </div>
