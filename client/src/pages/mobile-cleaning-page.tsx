@@ -66,6 +66,23 @@ interface ChecklistCompletion {
   photoUrl: string | null;
 }
 
+interface CleaningFlag {
+  id: number;
+  cleaningTaskId: number;
+  reportedBy: number;
+  assignedTo: number | null;
+  status: string;
+  priority: string;
+  flagType: string;
+  description: string;
+  photos: string[] | null;
+  createdAt: Date;
+  resolvedAt: Date | null;
+  resolvedBy: number | null;
+  escalatedTo: string | null;
+  resolution: string | null;
+}
+
 interface Unit {
   id: number;
   name: string;
@@ -642,6 +659,17 @@ export default function MobileCleaningPage() {
                     >
                       Start Cleaning
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="text-amber-500 hover:text-amber-600"
+                      onClick={() => {
+                        setSelectedTaskId(task.id);
+                        setFlagDialogOpen(true);
+                      }}
+                    >
+                      <Flag className="h-4 w-4" />
+                    </Button>
                   </CardFooter>
                 </Card>
               ))
@@ -687,11 +715,120 @@ export default function MobileCleaningPage() {
                       </div>
                     )}
                   </CardContent>
+                  <CardFooter>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full text-amber-500 hover:text-amber-600 flex items-center gap-1"
+                      onClick={() => {
+                        setSelectedTaskId(task.id);
+                        setFlagDialogOpen(true);
+                      }}
+                    >
+                      <Flag className="h-4 w-4" />
+                      Report Issue
+                    </Button>
+                  </CardFooter>
                 </Card>
               ))
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Flag Dialog */}
+      <Dialog open={flagDialogOpen} onOpenChange={setFlagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Cleaning Issue</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-2">
+              <Label htmlFor="flag-type">Issue Type</Label>
+              <select
+                id="flag-type"
+                className="w-full p-2 border rounded-md"
+                value={flagType}
+                onChange={e => setFlagType(e.target.value)}
+              >
+                <option value="cleanliness">Cleanliness Issue</option>
+                <option value="damage">Damage or Breakage</option>
+                <option value="missing">Missing Item</option>
+                <option value="maintenance">Maintenance Needed</option>
+                <option value="other">Other Issue</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="flag-priority">Priority</Label>
+              <select
+                id="flag-priority"
+                className="w-full p-2 border rounded-md"
+                value={flagPriority}
+                onChange={e => setFlagPriority(e.target.value)}
+              >
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="flag-description">Description</Label>
+              <Textarea
+                id="flag-description"
+                placeholder="Describe the issue in detail"
+                className="min-h-[100px]"
+                value={flagDescription}
+                onChange={e => setFlagDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setFlagDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!selectedTaskId) {
+                  toast({
+                    title: "Error",
+                    description: "No task selected",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                if (!flagDescription.trim()) {
+                  toast({
+                    title: "Error",
+                    description: "Please describe the issue",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                createFlagMutation.mutate({
+                  cleaningTaskId: selectedTaskId,
+                  flagType,
+                  priority: flagPriority,
+                  description: flagDescription,
+                });
+              }}
+              disabled={createFlagMutation.isPending}
+            >
+              {createFlagMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Report"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
