@@ -2158,6 +2158,52 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.hostAiAutopilotLog)
       .orderBy(desc(schema.hostAiAutopilotLog.createdAt));
   }
+  
+  // AI Planner Interaction Methods
+  async getAiPlannerInteraction(id: number): Promise<AiPlannerInteraction | undefined> {
+    const [interaction] = await db.select().from(schema.aiPlannerInteractions).where(eq(schema.aiPlannerInteractions.id, id));
+    return interaction;
+  }
+  
+  async createAiPlannerInteraction(interaction: InsertAiPlannerInteraction): Promise<AiPlannerInteraction> {
+    const [newInteraction] = await db.insert(schema.aiPlannerInteractions).values({
+      ...interaction,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return newInteraction;
+  }
+  
+  async updateAiPlannerInteraction(id: number, interactionData: Partial<AiPlannerInteraction>): Promise<AiPlannerInteraction | undefined> {
+    // Always update the updatedAt field
+    const updatedData = {
+      ...interactionData,
+      updatedAt: new Date()
+    };
+    
+    const [updatedInteraction] = await db.update(schema.aiPlannerInteractions)
+      .set(updatedData)
+      .where(eq(schema.aiPlannerInteractions.id, id))
+      .returning();
+    return updatedInteraction;
+  }
+  
+  async getAiPlannerInteractionsByUser(userId: number): Promise<AiPlannerInteraction[]> {
+    return await db.select().from(schema.aiPlannerInteractions)
+      .where(eq(schema.aiPlannerInteractions.userId, userId))
+      .orderBy(desc(schema.aiPlannerInteractions.createdAt));
+  }
+  
+  async getAiPlannerInteractionsByStatus(status: string): Promise<AiPlannerInteraction[]> {
+    return await db.select().from(schema.aiPlannerInteractions)
+      .where(eq(schema.aiPlannerInteractions.status, status))
+      .orderBy(desc(schema.aiPlannerInteractions.createdAt));
+  }
+  
+  async getAllAiPlannerInteractions(): Promise<AiPlannerInteraction[]> {
+    return await db.select().from(schema.aiPlannerInteractions)
+      .orderBy(desc(schema.aiPlannerInteractions.createdAt));
+  }
 }
 
 export const storage = new DatabaseStorage();
