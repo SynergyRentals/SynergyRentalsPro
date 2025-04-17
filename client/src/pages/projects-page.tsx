@@ -124,6 +124,7 @@ export default function ProjectsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<number | null>(null);
   const [dueDateFilter, setDueDateFilter] = useState<string | null>(null); // "today", "week", "overdue"
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string | null>(null);
 
   // Fetch projects
   const { data: projects, isLoading: projectsLoading, error: projectsError } = useQuery({
@@ -746,6 +747,179 @@ export default function ProjectsPage() {
             </div>
           </div>
           
+          {/* Team Workload Visualization */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Team Workload Distribution</CardTitle>
+              <CardDescription>
+                See how tasks are distributed among team members
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tasksLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {users?.filter((user: any) => {
+                    // Only show users who have tasks assigned
+                    const userTasks = allTasks?.filter((t: any) => t.assignedTo === user.id) || [];
+                    return userTasks.length > 0;
+                  }).map((user: any) => {
+                    const userTasks = allTasks?.filter((t: any) => t.assignedTo === user.id) || [];
+                    const openTasks = userTasks.filter((t: any) => t.status !== "completed").length;
+                    const urgentTasks = userTasks.filter((t: any) => 
+                      t.priority === "urgent" && t.status !== "completed"
+                    ).length;
+                    const highTasks = userTasks.filter((t: any) => 
+                      t.priority === "high" && t.status !== "completed"
+                    ).length;
+                    const normalTasks = userTasks.filter((t: any) => 
+                      (t.priority === "normal" || !t.priority) && t.status !== "completed"
+                    ).length;
+                    const lowTasks = userTasks.filter((t: any) => 
+                      t.priority === "low" && t.status !== "completed"
+                    ).length;
+                    
+                    return (
+                      <div key={user.id} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <Avatar className="h-6 w-6 mr-2">
+                              <AvatarFallback className="text-xs">{user.name.split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium">{user.name}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <BarChart className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{openTasks} open tasks</span>
+                          </div>
+                        </div>
+                        
+                        <div className="h-2 flex rounded-full overflow-hidden">
+                          {urgentTasks > 0 && (
+                            <div 
+                              className="bg-red-500" 
+                              style={{ width: `${(urgentTasks / openTasks) * 100}%` }}
+                              title={`${urgentTasks} urgent tasks`}
+                            />
+                          )}
+                          {highTasks > 0 && (
+                            <div 
+                              className="bg-orange-500" 
+                              style={{ width: `${(highTasks / openTasks) * 100}%` }}
+                              title={`${highTasks} high priority tasks`}
+                            />
+                          )}
+                          {normalTasks > 0 && (
+                            <div 
+                              className="bg-blue-500" 
+                              style={{ width: `${(normalTasks / openTasks) * 100}%` }}
+                              title={`${normalTasks} normal priority tasks`}
+                            />
+                          )}
+                          {lowTasks > 0 && (
+                            <div 
+                              className="bg-green-500" 
+                              style={{ width: `${(lowTasks / openTasks) * 100}%` }}
+                              title={`${lowTasks} low priority tasks`}
+                            />
+                          )}
+                        </div>
+                        
+                        <div className="flex text-xs text-muted-foreground space-x-3">
+                          {urgentTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-red-500 rounded-full mr-1"></span>{urgentTasks} urgent</span>}
+                          {highTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-orange-500 rounded-full mr-1"></span>{highTasks} high</span>}
+                          {normalTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>{normalTasks} normal</span>}
+                          {lowTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>{lowTasks} low</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Show unassigned tasks */}
+                  {(() => {
+                    const unassignedTasks = allTasks?.filter((t: any) => !t.assignedTo && t.status !== "completed") || [];
+                    const totalUnassigned = unassignedTasks.length;
+                    
+                    if (totalUnassigned > 0) {
+                      const urgentTasks = unassignedTasks.filter((t: any) => t.priority === "urgent").length;
+                      const highTasks = unassignedTasks.filter((t: any) => t.priority === "high").length;
+                      const normalTasks = unassignedTasks.filter((t: any) => t.priority === "normal" || !t.priority).length;
+                      const lowTasks = unassignedTasks.filter((t: any) => t.priority === "low").length;
+                      
+                      return (
+                        <div className="space-y-1 pt-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Users className="h-6 w-6 mr-2 text-muted-foreground" />
+                              <span className="text-sm font-medium">Unassigned</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              <span className="text-sm">{totalUnassigned} tasks</span>
+                            </div>
+                          </div>
+                          
+                          <div className="h-2 flex rounded-full overflow-hidden">
+                            {urgentTasks > 0 && (
+                              <div 
+                                className="bg-red-500" 
+                                style={{ width: `${(urgentTasks / totalUnassigned) * 100}%` }}
+                                title={`${urgentTasks} urgent tasks`}
+                              />
+                            )}
+                            {highTasks > 0 && (
+                              <div 
+                                className="bg-orange-500" 
+                                style={{ width: `${(highTasks / totalUnassigned) * 100}%` }}
+                                title={`${highTasks} high priority tasks`}
+                              />
+                            )}
+                            {normalTasks > 0 && (
+                              <div 
+                                className="bg-blue-500" 
+                                style={{ width: `${(normalTasks / totalUnassigned) * 100}%` }}
+                                title={`${normalTasks} normal priority tasks`}
+                              />
+                            )}
+                            {lowTasks > 0 && (
+                              <div 
+                                className="bg-green-500" 
+                                style={{ width: `${(lowTasks / totalUnassigned) * 100}%` }}
+                                title={`${lowTasks} low priority tasks`}
+                              />
+                            )}
+                          </div>
+                          
+                          <div className="flex text-xs text-muted-foreground space-x-3">
+                            {urgentTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-red-500 rounded-full mr-1"></span>{urgentTasks} urgent</span>}
+                            {highTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-orange-500 rounded-full mr-1"></span>{highTasks} high</span>}
+                            {normalTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>{normalTasks} normal</span>}
+                            {lowTasks > 0 && <span className="flex items-center"><span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>{lowTasks} low</span>}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
+                  {(!users || users.length === 0 || !users.some((user: any) => {
+                    const userTasks = allTasks?.filter((t: any) => t.assignedTo === user.id) || [];
+                    return userTasks.length > 0;
+                  })) && allTasks?.filter((t: any) => !t.assignedTo && t.status !== "completed").length === 0 && (
+                    <div className="text-center p-4">
+                      <p className="text-muted-foreground">No active workload data to display</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Bottom Section - Recently Completed and Overdue */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Recently Completed Tasks */}
@@ -1274,6 +1448,9 @@ export default function ProjectsPage() {
                   // Priority filter
                   const matchesPriority = !priorityFilter || task.priority === priorityFilter;
                   
+                  // Task type filter
+                  const matchesTaskType = !taskTypeFilter || task.taskType === taskTypeFilter;
+                  
                   // Assignee filter
                   const matchesAssignee = !assigneeFilter ||
                     (assigneeFilter === -1 && !task.assignedTo) ||
@@ -1293,10 +1470,12 @@ export default function ProjectsPage() {
                         matchesDueDate = task.dueDate && isToday(new Date(task.dueDate));
                         break;
                       case "week":
-                        const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-                        matchesDueDate = dueDate && 
-                          dueDate >= today && 
-                          dueDate < nextWeek;
+                        if (task.dueDate) {
+                          const dueDate = new Date(task.dueDate);
+                          matchesDueDate = dueDate >= today && dueDate < nextWeek;
+                        } else {
+                          matchesDueDate = false;
+                        }
                         break;
                       case "overdue":
                         matchesDueDate = task.dueDate && 
