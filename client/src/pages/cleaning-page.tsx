@@ -223,12 +223,15 @@ export default function CleaningPage() {
                         </label>
                         <select className="w-full p-2 border border-gray-300 rounded">
                           <option value="">Select a property</option>
-                          {units && Array.isArray(units) &&
+                          {units && Array.isArray(units) ? (
                             units.map((unit: any) => (
                               <option key={unit.id} value={unit.id}>
                                 {unit.name}
                               </option>
-                            ))}
+                            ))
+                          ) : (
+                            <option disabled>Loading properties...</option>
+                          )}
                         </select>
                       </div>
                       <div>
@@ -237,14 +240,17 @@ export default function CleaningPage() {
                         </label>
                         <select className="w-full p-2 border border-gray-300 rounded">
                           <option value="">Select a cleaner</option>
-                          {users && Array.isArray(users) &&
+                          {users && Array.isArray(users) ? (
                             users
                               .filter((user: any) => user.role === "cleaner")
                               .map((user: any) => (
                                 <option key={user.id} value={user.id}>
                                   {user.name}
                                 </option>
-                              ))}
+                              ))
+                          ) : (
+                            <option disabled>Loading cleaners...</option>
+                          )}
                         </select>
                       </div>
                       <div>
