@@ -467,6 +467,10 @@ export const cleanerPerformance = pgTable("cleaner_performance", {
   flagsReceived: integer("flags_received").default(0),
   onTimePercentage: integer("on_time_percentage"), // percentage of on-time completions
   photoQualityScore: integer("photo_quality_score"), // quality of uploaded photos (1-100)
+  checklistsCompleted: integer("checklists_completed").default(0), // number of checklists fully completed
+  trendData: jsonb("trend_data"), // historical performance trend data
+  comparativeScore: integer("comparative_score"), // relative to other cleaners (percentile)
+  workloadDistribution: jsonb("workload_distribution"), // property types and frequencies
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
