@@ -466,13 +466,23 @@ export default function CleaningPage() {
 
           {/* Quality Control Tab */}
           <TabsContent value="quality-control" className="mt-4">
-            {/* Quality Control Overview Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-[#2C2E3E] mb-4 flex items-center">
-                    <CleaningServices className="h-5 w-5 mr-2 text-blue-500" />
-                    Quality Control Overview
+            {/* Tabs for different sections within Quality Control */}
+            <Tabs defaultValue="overview" className="w-full mb-6">
+              <TabsList className="w-full grid grid-cols-3 lg:w-auto lg:inline-flex">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="cleaner-performance">Cleaner Performance</TabsTrigger>
+                <TabsTrigger value="flagged-issues">Flagged Issues</TabsTrigger>
+              </TabsList>
+
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="mt-4">
+                {/* Quality Control Overview Cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <Card>
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-semibold text-[#2C2E3E] mb-4 flex items-center">
+                        <CleaningServices className="h-5 w-5 mr-2 text-blue-500" />
+                        Quality Control Overview
                   </h3>
                   <div className="space-y-6">
                     <div>
@@ -657,8 +667,59 @@ export default function CleaningPage() {
               </Card>
             </div>
           </TabsContent>
+          
+          {/* Cleaner Performance Tab */}
+          <TabsContent value="cleaner-performance" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold flex items-center">
+                  <VerifiedUser className="h-5 w-5 mr-2 text-green-500" />
+                  Cleaner Performance Metrics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CleanerPerformance />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Flagged Issues Tab */}
+          <TabsContent value="flagged-issues" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold flex items-center">
+                  <Flag className="h-5 w-5 mr-2 text-red-500" />
+                  Cleaning Issue Flags
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="open" className="w-full">
+                  <TabsList className="w-full grid grid-cols-4 mb-4">
+                    <TabsTrigger value="open">Open</TabsTrigger>
+                    <TabsTrigger value="in-progress">In Progress</TabsTrigger>
+                    <TabsTrigger value="escalated">Escalated</TabsTrigger>
+                    <TabsTrigger value="resolved">Resolved</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="open">
+                    <CleaningFlags status="open" />
+                  </TabsContent>
+                  <TabsContent value="in-progress">
+                    <CleaningFlags status="in-progress" />
+                  </TabsContent>
+                  <TabsContent value="escalated">
+                    <CleaningFlags status="escalated" />
+                  </TabsContent>
+                  <TabsContent value="resolved">
+                    <CleaningFlags status="resolved" />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </TabsContent>
 
-          {/* Cleaner Mapping Tab */}
+      {/* Cleaner Mapping Tab */}
           <TabsContent value="mapping" className="mt-4">
             <Card>
               <CardContent className="p-6">
