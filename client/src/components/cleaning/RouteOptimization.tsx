@@ -85,7 +85,7 @@ export default function RouteOptimization() {
 
   // Mutation to update route order
   const updateRouteMutation = useMutation({
-    mutationFn: async (updatedTasks: any[]) => {
+    mutationFn: async (updatedTasks: { id: number; routeOrder: number }[]) => {
       return await apiRequest("/api/cleaning-routes", "POST", { tasks: updatedTasks });
     },
     onSuccess: () => {
@@ -97,6 +97,7 @@ export default function RouteOptimization() {
       });
     },
     onError: (error) => {
+      console.error("Error updating routes:", error);
       toast({
         title: "Error updating routes",
         description: "There was a problem updating the cleaning routes.",
@@ -573,19 +574,43 @@ export default function RouteOptimization() {
                     className="text-xs"
                     onClick={() => {
                       // Create Google Maps URL with waypoints
-                      const locations = taskOrder.map(task => {
-                        const unitsList = Array.isArray(units) ? units as Unit[] : [];
-                        const unit = unitsList.find((u) => u.id === task.unitId);
-                        return encodeURIComponent(unit?.address || getUnitName(task.unitId));
-                      });
+                      if (taskOrder.length === 0) {
+                        toast({
+                          title: "No tasks to export",
+                          description: "There are no tasks available to export to Google Maps.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
                       
-                      if (locations.length > 0) {
-                        const origin = locations[0];
-                        const destination = locations[locations.length - 1];
-                        const waypoints = locations.slice(1, -1).join('|');
+                      try {
+                        const locations = taskOrder.map(task => {
+                          const unitsList = Array.isArray(units) ? units as Unit[] : [];
+                          const unit = unitsList.find((u) => u.id === task.unitId);
+                          return encodeURIComponent(unit?.address || getUnitName(task.unitId));
+                        });
                         
-                        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${waypoints}` : ''}`;
-                        window.open(url, '_blank');
+                        if (locations.length > 0) {
+                          const origin = locations[0];
+                          const destination = locations[locations.length - 1];
+                          const waypoints = locations.slice(1, -1).join('|');
+                          
+                          const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${waypoints}` : ''}`;
+                          window.open(url, '_blank');
+                          
+                          toast({
+                            title: "Route exported",
+                            description: "The route has been exported to Google Maps.",
+                            variant: "default"
+                          });
+                        }
+                      } catch (error) {
+                        console.error("Error exporting to Google Maps:", error);
+                        toast({
+                          title: "Export failed",
+                          description: "There was a problem exporting to Google Maps.",
+                          variant: "destructive"
+                        });
                       }
                     }}
                   >
