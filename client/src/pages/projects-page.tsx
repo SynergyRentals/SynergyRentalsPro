@@ -1361,6 +1361,46 @@ export default function ProjectsPage() {
                   <DropdownMenuSeparator />
                   
                   <div className="p-2">
+                    <h4 className="mb-2 text-sm font-medium">Task Type</h4>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Button 
+                        variant={taskTypeFilter === "cleaning" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setTaskTypeFilter(taskTypeFilter === "cleaning" ? null : "cleaning")}
+                      >
+                        Cleaning
+                      </Button>
+                      <Button 
+                        variant={taskTypeFilter === "maintenance" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setTaskTypeFilter(taskTypeFilter === "maintenance" ? null : "maintenance")}
+                      >
+                        Maintenance
+                      </Button>
+                      <Button 
+                        variant={taskTypeFilter === "inventory" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setTaskTypeFilter(taskTypeFilter === "inventory" ? null : "inventory")}
+                      >
+                        Inventory
+                      </Button>
+                      <Button 
+                        variant={taskTypeFilter === "admin" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setTaskTypeFilter(taskTypeFilter === "admin" ? null : "admin")}
+                      >
+                        Admin
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <div className="p-2">
                     <h4 className="mb-2 text-sm font-medium">Assigned To</h4>
                     <Select 
                       value={assigneeFilter?.toString() || ""}
@@ -1393,6 +1433,7 @@ export default function ProjectsPage() {
                         setPriorityFilter(null);
                         setAssigneeFilter(null);
                         setDueDateFilter(null);
+                        setTaskTypeFilter(null);
                       }}
                     >
                       Clear All Filters
@@ -1488,7 +1529,7 @@ export default function ProjectsPage() {
                     }
                   }
                   
-                  return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && matchesDueDate;
+                  return matchesSearch && matchesStatus && matchesPriority && matchesTaskType && matchesAssignee && matchesDueDate;
                 })
                 .sort((a: any, b: any) => {
                   // Sort by priority first, then by due date
