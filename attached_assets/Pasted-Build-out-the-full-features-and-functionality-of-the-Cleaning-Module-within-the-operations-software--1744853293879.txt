@@ -1,0 +1,31 @@
+Build out the full features and functionality of the Cleaning Module within the operations software. This module is responsible for organizing, scheduling, documenting, and validating all cleaning activity across the short-term rental portfolio, including turnover cleans, deep cleans, and special requests.
+
+Before beginning development, review the existing codebase and remove any previously created components, pages, or features that do not align with this final structure. Do not build on top of old logic. Fully delete outdated components to avoid future confusion, technical debt, or UI conflicts.
+
+The following features must be implemented:
+
+Create the Cleaning Dashboard. This view displays key performance indicators including the number of cleans scheduled for today, tomorrow, overdue cleans, the average clean time over the last seven days, and the number of cleans that have been flagged with issues. Below the KPIs, display a list of cleans for the selected day with columns for unit name, address, assigned cleaner, clean time, check-in and check-out dates, and status. Include filters for date, cleaner, clean type, and status.
+
+Build a Schedule view. This view shows a calendar with all upcoming cleans across the portfolio. Cleans should be color-coded based on clean type or status. The calendar should support views by day, week, or month. Include filters and toggles to view by unit, cleaner, or team. Eventually, this view will support route optimization and batch scheduling.
+
+Add a Checklists view. This section stores all cleaning checklist templates by unit. Each unit should support multiple checklists such as departure clean, deep clean, or mid-stay refresh. Each checklist should be broken down by room or category and allow for task check-off and photo uploads.
+
+Implement a photo documentation system for checklists. For each section of a checklist, cleaners must upload a photo that matches a reference photo from the listing. This provides visual verification that each area was cleaned and staged correctly. Cleaners cannot submit the checklist unless all photo steps are completed.
+
+Create a Cleaners view. This section lists all active cleaners with their profiles, contact information, assigned properties, recent activity, number of cleans completed, and flags received. Clicking on a cleaner shows their workload history and performance trends.
+
+Develop a Completed Cleans view. This page shows a historical log of completed cleans, including timestamp, duration, checklist summary, notes, and uploaded photos. It should be filterable by cleaner, unit, or date range.
+
+Build a Flags view. This serves as the resolution center for cleans that were flagged by the cleaner or the review team. Flags may include damages, missing items, access issues, or missed tasks. The view should display the flagged clean, the reason, the person who flagged it, and allow the operations team to mark the issue as resolved or escalate it.
+
+Add support for escalation from cleaner submissions. If a cleaner flags an issue while completing a checklist, the system should automatically generate a follow-up task routed to the appropriate team: maintenance, inventory, or internal ops.
+
+Implement a Notifications system for cleaners. Cleaners should receive alerts via Slack or SMS when they are assigned a clean, when a clean is updated or rescheduled, or when a task has been flagged that involves them. Notifications should be configurable based on urgency and time of day.
+
+Create a Settings view within the module. Here, operations managers can control default clean times, automated reminders, escalation rules, and checklist templates. Only admin-level users should have access to these settings.
+
+Ensure all views described above are accessible through the Cleaning section in the sidebar navigation. Subpages should include: dashboard, schedule, checklists, completed, flags, cleaners, and settings. Use a consistent layout wrapper for all views within this module.
+
+Fully delete any components or features that were built during earlier versions of the cleaning module that are no longer part of this final structure. This includes unfinished or experimental components, old dashboard logic, placeholder views, or incorrect page layouts.
+
+Once complete, verify that the Cleaning Module is fully integrated with the unit and reservation system. Cleans should connect to units and calendar data correctly. Ensure all features are performant, mobile responsive, and include loading states and error handling where appropriate.
