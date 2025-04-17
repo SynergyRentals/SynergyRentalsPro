@@ -8,6 +8,8 @@ import {
   CleaningChecklist, InsertCleaningChecklist,
   CleaningChecklistItem, InsertCleaningChecklistItem,
   CleaningChecklistCompletion, InsertCleaningChecklistCompletion,
+  CleaningFlag, InsertCleaningFlag,
+  CleanerPerformance, InsertCleanerPerformance,
   // New Project & Task module types
   ProjectMilestone, InsertProjectMilestone,
   ProjectTask, InsertProjectTask,
@@ -158,6 +160,21 @@ export interface IStorage {
   createCleaningChecklistCompletion(completion: InsertCleaningChecklistCompletion): Promise<CleaningChecklistCompletion>;
   updateCleaningChecklistCompletion(id: number, completion: Partial<CleaningChecklistCompletion>): Promise<CleaningChecklistCompletion | undefined>;
   getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]>;
+  
+  // Cleaning Flags
+  getCleaningFlag(id: number): Promise<CleaningFlag | undefined>;
+  createCleaningFlag(flag: InsertCleaningFlag): Promise<CleaningFlag>;
+  updateCleaningFlag(id: number, flag: Partial<CleaningFlag>): Promise<CleaningFlag | undefined>;
+  getAllCleaningFlags(): Promise<CleaningFlag[]>;
+  getCleaningFlagsByTask(taskId: number): Promise<CleaningFlag[]>;
+  getCleaningFlagsByStatus(status: string): Promise<CleaningFlag[]>;
+  
+  // Cleaner Performance Metrics
+  getCleanerPerformance(id: number): Promise<CleanerPerformance | undefined>;
+  createCleanerPerformance(performance: InsertCleanerPerformance): Promise<CleanerPerformance>;
+  updateCleanerPerformance(id: number, performance: Partial<CleanerPerformance>): Promise<CleanerPerformance | undefined>;
+  getAllCleanerPerformance(): Promise<CleanerPerformance[]>;
+  getCleanerPerformanceByUser(userId: number): Promise<CleanerPerformance[]>;
   
   // HostAI Tasks
   getHostAiTask(id: number): Promise<HostAiTask | undefined>;
