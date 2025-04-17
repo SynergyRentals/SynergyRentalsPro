@@ -995,6 +995,100 @@ export class MemStorage implements IStorage {
       .find(completion => completion.cleaningTaskId === taskId && completion.checklistItemId === itemId);
   }
   
+  // Cleaning Flags Methods
+  async getCleaningFlag(id: number): Promise<CleaningFlag | undefined> {
+    return this.cleaningFlags.get(id);
+  }
+  
+  async createCleaningFlag(insertFlag: InsertCleaningFlag): Promise<CleaningFlag> {
+    const id = this.cleaningFlagIdCounter++;
+    const createdAt = new Date();
+    const resolvedAt = null;
+    const flag: CleaningFlag = { 
+      ...insertFlag, 
+      id,
+      createdAt,
+      resolvedAt,
+      photos: insertFlag.photos || null
+    };
+    this.cleaningFlags.set(id, flag);
+    
+    // Update the cleaning task to indicate it has flagged issues
+    if (insertFlag.cleaningTaskId) {
+      const task = this.cleaningTasks.get(insertFlag.cleaningTaskId);
+      if (task) {
+        task.hasFlaggedIssues = true;
+        this.cleaningTasks.set(task.id, task);
+      }
+    }
+    
+    return flag;
+  }
+  
+  async updateCleaningFlag(id: number, flagData: Partial<CleaningFlag>): Promise<CleaningFlag | undefined> {
+    const flag = this.cleaningFlags.get(id);
+    if (!flag) return undefined;
+    
+    // If flag is being marked as resolved, set resolvedAt
+    if (flagData.status === 'resolved' && flag.status !== 'resolved') {
+      flagData.resolvedAt = new Date();
+    }
+    
+    const updatedFlag = { ...flag, ...flagData };
+    this.cleaningFlags.set(id, updatedFlag);
+    return updatedFlag;
+  }
+  
+  async getAllCleaningFlags(): Promise<CleaningFlag[]> {
+    return Array.from(this.cleaningFlags.values());
+  }
+  
+  async getCleaningFlagsByTask(taskId: number): Promise<CleaningFlag[]> {
+    return Array.from(this.cleaningFlags.values()).filter(flag => flag.cleaningTaskId === taskId);
+  }
+  
+  async getCleaningFlagsByStatus(status: string): Promise<CleaningFlag[]> {
+    return Array.from(this.cleaningFlags.values()).filter(flag => flag.status === status);
+  }
+  
+  // Cleaner Performance Methods
+  async getCleanerPerformance(id: number): Promise<CleanerPerformance | undefined> {
+    return this.cleanerPerformance.get(id);
+  }
+  
+  async createCleanerPerformance(insertPerformance: InsertCleanerPerformance): Promise<CleanerPerformance> {
+    const id = this.cleanerPerformanceIdCounter++;
+    const performance: CleanerPerformance = { 
+      ...insertPerformance, 
+      id,
+      avgScore: insertPerformance.avgScore || null,
+      avgDuration: insertPerformance.avgDuration || null,
+      flagsReceived: insertPerformance.flagsReceived || 0,
+      onTimePercentage: insertPerformance.onTimePercentage || null,
+      photoQualityScore: insertPerformance.photoQualityScore || null
+    };
+    this.cleanerPerformance.set(id, performance);
+    return performance;
+  }
+  
+  async updateCleanerPerformance(id: number, performanceData: Partial<CleanerPerformance>): Promise<CleanerPerformance | undefined> {
+    const performance = this.cleanerPerformance.get(id);
+    if (!performance) return undefined;
+    
+    const updatedPerformance = { ...performance, ...performanceData };
+    this.cleanerPerformance.set(id, updatedPerformance);
+    return updatedPerformance;
+  }
+  
+  async getAllCleanerPerformance(): Promise<CleanerPerformance[]> {
+    return Array.from(this.cleanerPerformance.values());
+  }
+  
+  async getCleanerPerformanceByUser(userId: number): Promise<CleanerPerformance[]> {
+    return Array.from(this.cleanerPerformance.values())
+      .filter(performance => performance.cleanerId === userId);
+  }
+  
   // Create activity log for user actions
   async createActivityLog(insertLog: { 
     action: string; 
