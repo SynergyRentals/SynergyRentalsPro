@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -22,9 +22,19 @@ import {
   Download,
   FilterList,
   Assignment,
+  BarChart,
+  Insights,
+  TrendingUp,
+  TrendingDown,
+  Equalizer,
+  Compare,
+  PieChart,
+  Description,
+  Home,
+  ChecklistRtl
 } from "@mui/icons-material";
 import { DateRange } from "react-day-picker";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, addMonths, differenceInDays } from "date-fns";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -40,6 +50,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { 
+  LineChart, 
+  Line, 
+  BarChart as RechartsBarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell
+} from "recharts";
 
 // Performance indicator component
 const PerformanceIndicator = ({ 
@@ -519,81 +544,217 @@ export default function CleanerPerformance() {
                 </TabsList>
                 
                 <TabsContent value="metrics" className="mt-4 space-y-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Performance Metrics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium">Average Score</span>
-                            <span className={`text-sm ${getScoreColorClass(selectedCleaner.avgScore)}`}>
-                              {selectedCleaner.avgScore !== null ? `${selectedCleaner.avgScore}%` : "N/A"}
-                            </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Performance Metrics</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Average Score</span>
+                              <span className={`text-sm ${getScoreColorClass(selectedCleaner.avgScore)}`}>
+                                {selectedCleaner.avgScore !== null ? `${selectedCleaner.avgScore}%` : "N/A"}
+                              </span>
+                            </div>
+                            <PerformanceIndicator 
+                              value={selectedCleaner.avgScore || 0} 
+                              type="positive" 
+                            />
                           </div>
-                          <PerformanceIndicator 
-                            value={selectedCleaner.avgScore || 0} 
-                            type="positive" 
-                          />
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium">Average Duration</span>
-                            <span className="text-sm">
-                              {selectedCleaner.avgDuration ? `${selectedCleaner.avgDuration} mins` : "N/A"}
-                            </span>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Average Duration</span>
+                              <span className="text-sm">
+                                {selectedCleaner.avgDuration ? `${selectedCleaner.avgDuration} mins` : "N/A"}
+                              </span>
+                            </div>
+                            <PerformanceIndicator 
+                              value={selectedCleaner.avgDuration || 0} 
+                              max={180} 
+                              type="neutral" 
+                            />
                           </div>
-                          <PerformanceIndicator 
-                            value={selectedCleaner.avgDuration || 0} 
-                            max={180} 
-                            type="neutral" 
-                          />
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium">On-Time Percentage</span>
-                            <span className="text-sm">
-                              {selectedCleaner.onTimePercentage !== null ? `${selectedCleaner.onTimePercentage}%` : "N/A"}
-                            </span>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">On-Time Percentage</span>
+                              <span className="text-sm">
+                                {selectedCleaner.onTimePercentage !== null ? `${selectedCleaner.onTimePercentage}%` : "N/A"}
+                              </span>
+                            </div>
+                            <PerformanceIndicator 
+                              value={selectedCleaner.onTimePercentage || 0} 
+                              type="positive" 
+                            />
                           </div>
-                          <PerformanceIndicator 
-                            value={selectedCleaner.onTimePercentage || 0} 
-                            type="positive" 
-                          />
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium">Flagged Issues</span>
-                            <span className="text-sm">
-                              {selectedCleaner.flagsReceived || 0}
-                            </span>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Flagged Issues</span>
+                              <span className="text-sm">
+                                {selectedCleaner.flagsReceived || 0}
+                              </span>
+                            </div>
+                            <PerformanceIndicator 
+                              value={selectedCleaner.flagsReceived || 0} 
+                              max={10} 
+                              type="negative" 
+                            />
                           </div>
-                          <PerformanceIndicator 
-                            value={selectedCleaner.flagsReceived || 0} 
-                            max={10} 
-                            type="negative" 
-                          />
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium">Photo Quality Score</span>
-                            <span className="text-sm">
-                              {selectedCleaner.photoQualityScore !== null ? `${selectedCleaner.photoQualityScore}%` : "N/A"}
-                            </span>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Photo Quality Score</span>
+                              <span className="text-sm">
+                                {selectedCleaner.photoQualityScore !== null ? `${selectedCleaner.photoQualityScore}%` : "N/A"}
+                              </span>
+                            </div>
+                            <PerformanceIndicator 
+                              value={selectedCleaner.photoQualityScore || 0} 
+                              type="positive" 
+                            />
                           </div>
-                          <PerformanceIndicator 
-                            value={selectedCleaner.photoQualityScore || 0} 
-                            type="positive" 
-                          />
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Checklists Completed</span>
+                              <span className="text-sm">
+                                {selectedCleaner.checklistsCompleted || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center mt-1">
+                              <ChecklistRtl className="h-4 w-4 mr-2 text-blue-500" />
+                              <span className="text-sm text-gray-600">{selectedCleaner.checklistsCompleted || 0} of {selectedCleaner.tasksCompleted || 0} tasks</span>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Comparative Score</span>
+                              <span className="text-sm">
+                                {selectedCleaner.comparativeScore ? `${selectedCleaner.comparativeScore}th percentile` : "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex items-center mt-1">
+                              <Compare className="h-4 w-4 mr-2 text-purple-500" />
+                              <span className="text-sm text-gray-600">
+                                {selectedCleaner.comparativeScore ? 
+                                  (selectedCleaner.comparativeScore > 75 ? "Top performer" : 
+                                   selectedCleaner.comparativeScore > 50 ? "Above average" : 
+                                   selectedCleaner.comparativeScore > 25 ? "Below average" : "Needs improvement") 
+                                  : "Not enough data"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Performance Trends</CardTitle>
+                        <CardDescription>Metrics over the past 3 months</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedCleaner.trendData ? (
+                          <ResponsiveContainer width="100%" height={250}>
+                            <LineChart
+                              data={selectedCleaner.trendData?.scores || [
+                                { month: 'Jan', score: 85, onTime: 92, flags: 1 },
+                                { month: 'Feb', score: 88, onTime: 94, flags: 0 },
+                                { month: 'Mar', score: 90, onTime: 95, flags: 0 }
+                              ]}
+                              margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="score" stroke="#8884d8" name="Cleaning Score" />
+                              <Line type="monotone" dataKey="onTime" stroke="#82ca9d" name="On-Time %" />
+                              <Line type="monotone" dataKey="flags" stroke="#ff7f0e" name="Issues" />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
+                            <TrendingUp className="h-12 w-12 mb-2 opacity-30" />
+                            <p className="text-sm">Trend data not available</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Workload Distribution</CardTitle>
+                        <CardDescription>Types of properties cleaned</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedCleaner.workloadDistribution ? (
+                          <ResponsiveContainer width="100%" height={250}>
+                            <PieChart>
+                              <Pie
+                                data={selectedCleaner.workloadDistribution?.properties || [
+                                  { name: 'Apartments', value: 60 },
+                                  { name: 'Houses', value: 30 },
+                                  { name: 'Condos', value: 10 }
+                                ]}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                paddingAngle={5}
+                                dataKey="value"
+                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {(selectedCleaner.workloadDistribution?.properties || []).map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088fe'][index % 5]} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
+                            <PieChart className="h-12 w-12 mb-2 opacity-30" />
+                            <p className="text-sm">Workload data not available</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Task Metrics</CardTitle>
+                        <CardDescription>Task completion analytics</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={250}>
+                          <RechartsBarChart
+                            data={[
+                              { name: 'Turnover', completed: selectedCleaner.tasksCompleted || 0, avg: 35 },
+                              { name: 'Deep Clean', completed: selectedCleaner.checklistsCompleted || 0, avg: 15 },
+                              { name: 'Mid-Stay', completed: selectedCleaner.flagsReceived || 0, avg: 5 }
+                            ]}
+                            margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="completed" fill="#8884d8" name="Completed" />
+                            <Bar dataKey="avg" fill="#82ca9d" name="Team Avg" />
+                          </RechartsBarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
                   
                   {selectedCleaner.notes && (
                     <Card>
