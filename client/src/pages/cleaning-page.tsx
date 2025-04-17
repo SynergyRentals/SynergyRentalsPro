@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ import {
   PhotoCamera,
   Assignment,
   MapOutlined,
+  Flag,
+  VerifiedUser,
 } from "@mui/icons-material";
 import {
   Dialog,
@@ -38,6 +40,11 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+// Import our new components for cleaning functionality
+import CleaningFlags from "@/components/cleaning/CleaningFlags";
+import CleanerPerformance from "@/components/cleaning/CleanerPerformance";
 
 export default function CleaningPage() {
   const [searchTerm, setSearchTerm] = useState("");
