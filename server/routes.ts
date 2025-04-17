@@ -1147,6 +1147,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Tasks endpoints
+  app.get("/api/project-tasks", checkAuth, async (req, res) => {
+    try {
+      const tasks = await storage.getAllProjectTasks();
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching tasks" });
+    }
+  });
+  
+  // Get tasks by priority
+  app.get("/api/project-tasks/priority/:priority", checkAuth, async (req, res) => {
+    try {
+      const priority = req.params.priority;
+      const tasks = await storage.getAllProjectTasks();
+      const filteredTasks = tasks.filter(task => task.priority === priority);
+      res.json(filteredTasks);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching tasks by priority" });
+    }
+  });
+
+  // Get tasks by status
+  app.get("/api/project-tasks/status/:status", checkAuth, async (req, res) => {
+    try {
+      const status = req.params.status;
+      const tasks = await storage.getProjectTasksByStatus(status);
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching tasks by status" });
+    }
+  });
+  
+  // Get a specific task by ID
+  app.get("/api/project-tasks/:id", checkAuth, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const task = await storage.getProjectTask(taskId);
+      
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching task" });
+    }
+  });
+  
   app.get("/api/projects/:projectId/tasks", checkAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
