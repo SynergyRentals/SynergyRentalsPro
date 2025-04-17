@@ -34,11 +34,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Loader2, Settings } from "lucide-react";
+import { Check, Loader2, Settings } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
@@ -52,6 +54,7 @@ import ChecklistTemplates from "@/components/cleaning/ChecklistTemplates";
 export default function CleaningPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("schedule");
+  const [priorityFilter, setPriorityFilter] = useState("all");
 
   // Fetch cleaning tasks
   const {
@@ -69,7 +72,24 @@ export default function CleaningPage() {
 
   // Group by status
   const scheduledTasks = Array.isArray(cleaningTasks) 
-    ? cleaningTasks.filter((task) => task.status !== "completed") 
+    ? cleaningTasks
+        .filter((task) => task.status !== "completed")
+        .sort((a, b) => {
+          // Define priority order (higher to lower)
+          const priorityOrder: Record<string, number> = { 
+            "urgent": 1, 
+            "high": 2, 
+            "normal": 3, 
+            "low": 4 
+          };
+          
+          // Get priority values with default fallback to "normal"
+          const aPriority = a.priority ? a.priority as string : "normal";
+          const bPriority = b.priority ? b.priority as string : "normal";
+          
+          // Sort by priority (higher priorities first)
+          return priorityOrder[aPriority] - priorityOrder[bPriority];
+        })
     : [];
   const completedTasks = Array.isArray(cleaningTasks)
     ? cleaningTasks.filter((task) => task.status === "completed")
@@ -237,9 +257,38 @@ export default function CleaningPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Date Range</DropdownMenuLabel>
                 <DropdownMenuItem>All Cleanings</DropdownMenuItem>
                 <DropdownMenuItem>Today's Schedule</DropdownMenuItem>
                 <DropdownMenuItem>This Week</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Priority</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setPriorityFilter("all")}>
+                  All Priorities
+                  {priorityFilter === "all" && <Check className="ml-2 h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPriorityFilter("urgent")}>
+                  <span className="h-2 w-2 rounded-full bg-red-600 mr-1.5 inline-block"></span>
+                  Urgent Only
+                  {priorityFilter === "urgent" && <Check className="ml-2 h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPriorityFilter("high")}>
+                  <span className="h-2 w-2 rounded-full bg-orange-500 mr-1.5 inline-block"></span>
+                  High Priority
+                  {priorityFilter === "high" && <Check className="ml-2 h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPriorityFilter("normal")}>
+                  <span className="h-2 w-2 rounded-full bg-blue-500 mr-1.5 inline-block"></span>
+                  Normal Priority
+                  {priorityFilter === "normal" && <Check className="ml-2 h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPriorityFilter("low")}>
+                  <span className="h-2 w-2 rounded-full bg-green-500 mr-1.5 inline-block"></span>
+                  Low Priority
+                  {priorityFilter === "low" && <Check className="ml-2 h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>View</DropdownMenuLabel>
                 <DropdownMenuItem>By Cleaner</DropdownMenuItem>
                 <DropdownMenuItem>By Property</DropdownMenuItem>
               </DropdownMenuContent>
