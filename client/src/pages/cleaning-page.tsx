@@ -141,6 +141,42 @@ export default function CleaningPage() {
       </Badge>
     );
   };
+  
+  // Get priority badge
+  const getPriorityBadge = (task: any) => {
+    const priority = task.priority || "normal";
+    
+    switch (priority) {
+      case "urgent":
+        return (
+          <Badge className="bg-red-100 text-red-800 border-0">
+            <span className="h-2 w-2 rounded-full bg-red-600 mr-1.5 inline-block"></span>
+            Urgent
+          </Badge>
+        );
+      case "high":
+        return (
+          <Badge className="bg-orange-100 text-orange-800 border-0">
+            <span className="h-2 w-2 rounded-full bg-orange-500 mr-1.5 inline-block"></span>
+            High
+          </Badge>
+        );
+      case "low":
+        return (
+          <Badge className="bg-green-100 text-green-800 border-0">
+            <span className="h-2 w-2 rounded-full bg-green-500 mr-1.5 inline-block"></span>
+            Low
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-blue-100 text-blue-800 border-0">
+            <span className="h-2 w-2 rounded-full bg-blue-500 mr-1.5 inline-block"></span>
+            Normal
+          </Badge>
+        );
+    }
+  };
 
   if (isLoading) {
     return (
@@ -328,6 +364,7 @@ export default function CleaningPage() {
                       <TableHead>Assigned To</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Priority</TableHead>
                       <TableHead>Checklist</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -357,6 +394,7 @@ export default function CleaningPage() {
                             </div>
                           </TableCell>
                           <TableCell>{getStatusBadge(task)}</TableCell>
+                          <TableCell>{getPriorityBadge(task)}</TableCell>
                           <TableCell>
                             <Button variant="outline" size="sm">
                               <Assignment className="h-4 w-4 mr-1" />
@@ -380,7 +418,7 @@ export default function CleaningPage() {
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="text-center py-8 text-[#9EA2B1]"
                         >
                           No scheduled cleanings found
