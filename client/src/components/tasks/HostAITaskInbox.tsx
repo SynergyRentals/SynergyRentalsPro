@@ -60,9 +60,16 @@ export function HostAITaskInbox({ autopilotEnabled = false }: HostAITaskInboxPro
     queryKey: ["/api/hostai/tasks"],
     select: (data) => {
       // Filter to only show unprocessed tasks
+      console.log("HostAI Tasks Response:", data);
       return Array.isArray(data) 
         ? data.filter((task: HostAITask) => task.status === "new")
         : [];
+    },
+    // Added specific error handling for this query
+    retry: 1,
+    retryDelay: 1000,
+    onError: (err) => {
+      console.error("Error fetching HostAI tasks:", err);
     }
   });
 

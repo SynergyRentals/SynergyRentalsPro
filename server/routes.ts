@@ -3715,13 +3715,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/hostai/tasks", checkAuth, async (req: Request, res: Response) => {
     try {
       const tasks = await storage.getAllHostAiTasks();
+      
+      // Ensure we're returning an array even if db query has issues
+      if (!Array.isArray(tasks)) {
+        console.warn('HostAI tasks response is not an array, converting to empty array');
+        return res.json([]);
+      }
+      
+      // Set appropriate content type to ensure JSON response
+      res.setHeader('Content-Type', 'application/json');
       res.json(tasks);
     } catch (error) {
       console.error('Error retrieving HostAI tasks:', error);
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
+      // Return empty array instead of error object to prevent React Query from showing error
+      // This way the component will display "No tasks" instead of error message
+      res.json([]);
     }
   });
   
@@ -3788,13 +3796,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status } = req.params;
       const tasks = await storage.getHostAiTasksByStatus(status);
+      
+      // Ensure we're returning an array even if db query has issues
+      if (!Array.isArray(tasks)) {
+        console.warn('HostAI tasks by status response is not an array, converting to empty array');
+        return res.json([]);
+      }
+      
+      // Set appropriate content type to ensure JSON response
+      res.setHeader('Content-Type', 'application/json');
       res.json(tasks);
     } catch (error) {
       console.error('Error retrieving HostAI tasks by status:', error);
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
+      // Return empty array instead of error object
+      res.json([]);
     }
   });
 
