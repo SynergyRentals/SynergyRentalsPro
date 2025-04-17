@@ -25,21 +25,18 @@ import {
   Assignment,
   DragIndicator,
   Camera,
-  Room,
   CheckCircle,
   Home,
   Kitchen,
-  Bathroom,
-  Bedroom,
-  Weekend,
-  Dining,
-  Balcony,
-  Wash,
-  Stars,
-  Visibility,
   Search,
-  FilterList
+  FilterList,
+  Visibility
 } from "@mui/icons-material";
+import HotelIcon from '@mui/icons-material/Hotel';
+import WeekendIcon from '@mui/icons-material/Weekend';
+import DiningIcon from '@mui/icons-material/Dining';
+import BalconyIcon from '@mui/icons-material/Balcony';
+import LocalLaundryServiceIcon from '@mui/icons-material/LocalLaundryService';
 import { Loader2 } from "lucide-react";
 
 // Types for checklist data
@@ -487,19 +484,19 @@ export default function ChecklistTemplates() {
   const getRoomIcon = (room: string) => {
     switch (room) {
       case "living_room":
-        return <Weekend className="h-5 w-5 mr-2" />;
+        return <WeekendIcon className="h-5 w-5 mr-2" />;
       case "kitchen":
         return <Kitchen className="h-5 w-5 mr-2" />;
       case "bathroom":
-        return <Bathroom className="h-5 w-5 mr-2" />;
+        return <Home className="h-5 w-5 mr-2" />;
       case "bedroom":
-        return <Bedroom className="h-5 w-5 mr-2" />;
+        return <HotelIcon className="h-5 w-5 mr-2" />;
       case "dining_room":
-        return <Dining className="h-5 w-5 mr-2" />;
+        return <DiningIcon className="h-5 w-5 mr-2" />;
       case "balcony":
-        return <Balcony className="h-5 w-5 mr-2" />;
+        return <BalconyIcon className="h-5 w-5 mr-2" />;
       case "laundry":
-        return <Wash className="h-5 w-5 mr-2" />;
+        return <LocalLaundryServiceIcon className="h-5 w-5 mr-2" />;
       default:
         return <Home className="h-5 w-5 mr-2" />;
     }

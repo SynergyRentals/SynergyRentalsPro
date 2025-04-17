@@ -168,6 +168,7 @@ export interface IStorage {
   getCleaningChecklistItem(id: number): Promise<CleaningChecklistItem | undefined>;
   createCleaningChecklistItem(item: InsertCleaningChecklistItem): Promise<CleaningChecklistItem>;
   updateCleaningChecklistItem(id: number, item: Partial<CleaningChecklistItem>): Promise<CleaningChecklistItem | undefined>;
+  reorderCleaningChecklistItems(items: { id: number, order: number }[]): Promise<boolean>;
   getCleaningChecklistItemsByChecklist(checklistId: number): Promise<CleaningChecklistItem[]>;
   
   // Cleaning Checklist Completions

@@ -1813,6 +1813,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+  
+  app.post("/api/cleaning-checklist-items/reorder", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const { items } = req.body;
+      if (!items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Invalid request body. Expected array of items with id and order." });
+      }
+      
+      const result = await storage.reorderCleaningChecklistItems(items);
+      if (!result) {
+        return res.status(400).json({ message: "Failed to reorder items" });
+      }
+      
+      res.json({ success: true, message: "Items reordered successfully" });
+    } catch (error) {
+      console.error("Error reordering checklist items:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   // Checklist Completions
   app.get("/api/cleaning-checklist-completions", checkAuth, async (req, res) => {
