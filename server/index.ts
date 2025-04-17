@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import { setupRoutes } from "./routes-new";
+import { registerRoutes } from "./routes"; // Import the original routes
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { setupAuth } from "./auth";
@@ -55,7 +56,11 @@ app.use((req, res, next) => {
   // Set up authentication
   setupAuth(app);
   
-  // Set up new routes
+  // Set up both original and new routes
+  // First set up original routes which has the HostAI endpoints
+  await registerRoutes(app);
+  
+  // Then set up new routes
   setupRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
