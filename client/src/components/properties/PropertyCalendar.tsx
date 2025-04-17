@@ -129,21 +129,8 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                     {week.map((day, dayIndex) => {
                       const dayEvents = getEventsForDay(day);
                       const hasEvents = dayEvents.length > 0;
-                      const isTransitionDay = hasSameDayTransition(day);
-                      const checkIns = getCheckInsForDay(day);
-                      const checkOuts = getCheckOutsForDay(day);
-                      
-                      // Calculate if this day is within an event (not just start/end)
-                      const isWithinEventRange = processedEvents.some(event => 
-                        isWithinInterval(day, {
-                          start: addDays(event.start as Date, 1), // Day after check-in
-                          end: addDays(event.end as Date, -2)     // Day before check-out
-                        })
-                      );
-                      
-                      // Check if this day is the first or last day of an event
-                      const isCheckInDay = checkIns.length > 0;
-                      const isCheckOutDay = checkOuts.length > 0;
+                      const isCheckInDay = getCheckInsForDay(day).length > 0;
+                      const isCheckOutDay = getCheckOutsForDay(day).length > 0;
                       
                       return (
                         <div 
@@ -159,53 +146,102 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                           {/* Reservation indicators */}
                           <div className="mt-2">
                             {hasEvents && (
-                              <div className="relative space-y-1">
+                              <div className="relative">
+                                {/* First render connecting bars */}
                                 {dayEvents.map((event, eventIndex) => {
-                                  const isFirstEvent = eventIndex === 0;
                                   const isFirstDay = isSameDay(day, event.start as Date);
                                   const isLastDay = isSameDay(day, event.end as Date);
                                   const isWithinEvent = !isFirstDay && !isLastDay;
                                   
-                                  // Use different colors for alternating events on the same day
-                                  const useAltColors = isTransitionDay && !isFirstEvent;
+                                  // Bar color is always yellow
+                                  const barColorClass = "bg-yellow-400";
                                   
-                                  // Dot colors - blue for primary, yellow for secondary
-                                  const dotColorClass = useAltColors ? "bg-yellow-400" : "bg-blue-500";
+                                  // Calculate positioning based on number of events
+                                  const eventHeight = 20; // pixels
+                                  const topPosition = eventIndex * (eventHeight + 2); // Add small gap between events
                                   
-                                  // Bar colors - yellow for primary, blue for secondary
-                                  const barColorClass = useAltColors ? "bg-blue-500" : "bg-yellow-400";
+                                  if ((isWithinEvent || isFirstDay || isLastDay)) {
+                                    // Determine width and position of connecting bar
+                                    const leftPosition = isFirstDay ? '50%' : '0%';
+                                    const rightPosition = isLastDay ? '50%' : '0%';
+                                    
+                                    return (
+                                      <div 
+                                        key={`bar-${event.uid}-${eventIndex}`}
+                                        className={`${barColorClass} absolute opacity-60 z-10`} 
+                                        style={{
+                                          top: `${topPosition}px`,
+                                          left: leftPosition,
+                                          right: rightPosition,
+                                          height: `${eventHeight}px`,
+                                          width: isFirstDay && isLastDay ? 
+                                            '0' : // No connecting bar needed for 1-day stays
+                                            isFirstDay ? 'calc(50% + 1px)' : // From middle to end
+                                              isLastDay ? 'calc(50% + 1px)' : // From start to middle
+                                                '100%' // Full width for middle days
+                                        }}
+                                      />
+                                    );
+                                  }
+                                  return null;
+                                })}
+                                
+                                {/* Then render dots on top of bars */}
+                                {dayEvents.map((event, eventIndex) => {
+                                  const isFirstDay = isSameDay(day, event.start as Date);
+                                  const isLastDay = isSameDay(day, event.end as Date);
+                                  
+                                  // For dots, we use blue
+                                  const dotColorClass = "bg-blue-500";
+                                  
+                                  // Calculate same positioning as bars
+                                  const eventHeight = 20;
+                                  const topPosition = eventIndex * (eventHeight + 2);
+                                  
+                                  // Calculate side positioning for same-day transitions
+                                  const dotLeftPos = isCheckInDay && isCheckOutDay ? 
+                                    (eventIndex % 2 === 0 ? '35%' : '65%') : // Offset for clarity
+                                    '50%';
                                   
                                   return (
-                                    <TooltipProvider key={event.uid + '-' + eventIndex}>
+                                    <TooltipProvider key={`event-${event.uid}-${eventIndex}`}>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <div className="reservation-indicator relative">
-                                            {/* Connect bars for reservation duration */}
-                                            {(isWithinEvent || isFirstDay) && (
-                                              <div 
-                                                className={`${barColorClass} h-4 absolute top-0 opacity-40 z-10`} 
-                                                style={{
-                                                  left: isFirstDay ? '50%' : '0',
-                                                  right: '0',
-                                                  width: isFirstDay ? '50%' : '100%'
-                                                }}
-                                              ></div>
-                                            )}
-                                            
-                                            {/* Check-in dot (always on first day) */}
+                                          <div className="reservation-indicator">
+                                            {/* Check-in dot */}
                                             {isFirstDay && (
                                               <div 
-                                                className={`${dotColorClass} h-4 w-4 rounded-full opacity-80 absolute top-0 left-1/2 transform -translate-x-1/2 z-20
-                                                  ${isTransitionDay && !isFirstEvent ? 'rounded-l-full rounded-r-none' : ''}`}
-                                              ></div>
+                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
+                                                style={{
+                                                  top: `${topPosition}px`,
+                                                  left: dotLeftPos,
+                                                  transform: 'translate(-50%, 0)',
+                                                  marginTop: `${(eventHeight - 5) / 2}px`, // Center the dot
+                                                }}
+                                              />
                                             )}
                                             
-                                            {/* Check-out dot (always on last day - meaning the morning after the last night) */}
-                                            {isLastDay && (
+                                            {/* Check-out dot */}
+                                            {isLastDay && !isFirstDay && (
                                               <div 
-                                                className={`${dotColorClass} h-4 w-4 rounded-full opacity-80 absolute top-0 left-1/2 transform -translate-x-1/2 z-20
-                                                  ${isTransitionDay && isFirstEvent ? 'rounded-r-full rounded-l-none' : ''}`}
-                                              ></div>
+                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
+                                                style={{
+                                                  top: `${topPosition}px`,
+                                                  left: dotLeftPos,
+                                                  transform: 'translate(-50%, 0)',
+                                                  marginTop: `${(eventHeight - 5) / 2}px`, // Center the dot
+                                                }}
+                                              />
+                                            )}
+                                            
+                                            {/* For same-day check-in/check-out on the same reservation */}
+                                            {isFirstDay && isLastDay && (
+                                              <div className="w-full h-full absolute" 
+                                                style={{
+                                                  top: `${topPosition}px`,
+                                                  height: `${eventHeight}px`,
+                                                }} 
+                                              />
                                             )}
                                           </div>
                                         </TooltipTrigger>
