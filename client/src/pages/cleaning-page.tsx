@@ -460,6 +460,7 @@ export default function CleaningPage() {
 
           {/* Quality Control Tab */}
           <TabsContent value="quality-control" className="mt-4">
+            {/* Quality Control Overview Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card>
                 <CardContent className="p-6">
@@ -598,6 +599,54 @@ export default function CleaningPage() {
                       <Button variant="outline">View All Inspections</Button>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Advanced Quality Control Section */}
+            <div className="mt-8 space-y-6">
+              {/* Cleaning Flags Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold flex items-center">
+                    <Flag className="h-5 w-5 mr-2 text-red-500" />
+                    Cleaning Issue Flags
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="open" className="w-full">
+                    <TabsList className="w-full grid grid-cols-4 mb-4">
+                      <TabsTrigger value="open">Open</TabsTrigger>
+                      <TabsTrigger value="in-progress">In Progress</TabsTrigger>
+                      <TabsTrigger value="escalated">Escalated</TabsTrigger>
+                      <TabsTrigger value="resolved">Resolved</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="open">
+                      <CleaningFlags status="open" />
+                    </TabsContent>
+                    <TabsContent value="in-progress">
+                      <CleaningFlags status="in-progress" />
+                    </TabsContent>
+                    <TabsContent value="escalated">
+                      <CleaningFlags status="escalated" />
+                    </TabsContent>
+                    <TabsContent value="resolved">
+                      <CleaningFlags status="resolved" />
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+              
+              {/* Cleaner Performance Metrics */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold flex items-center">
+                    <VerifiedUser className="h-5 w-5 mr-2 text-green-500" />
+                    Cleaner Performance Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CleanerPerformance />
                 </CardContent>
               </Card>
             </div>
