@@ -1,0 +1,59 @@
+Build out a Projects and Tasks Dashboard within the operations software. This dashboard will serve as the central control panel for all active, scheduled, and completed projects and tasks across the company. The purpose of this dashboard is to give operations and management teams a high-level view of what is happening across properties, which tasks are urgent, and which projects are ongoing or blocked.
+
+The dashboard should be built at the route for the Projects and Tasks module homepage and should become the default landing view when users click on the Projects and Tasks tab in the navigation.
+
+The Projects and Tasks Dashboard should include the following sections:
+
+A high-level summary at the top with key metrics, including:
+
+Total active projects
+
+Total open tasks
+
+Number of overdue tasks
+
+Number of tasks due today
+
+Number of tasks marked as high priority
+
+A project progress overview that shows each active project with:
+
+Project name
+
+Current status (planning, in progress, blocked, complete)
+
+Number of tasks completed versus total tasks
+
+Assigned team or owner
+
+Visual progress bar based on task completion percentage
+
+A task board or summary section divided into columns by urgency level:
+
+High priority
+
+Medium priority
+
+Low priority Each column should display task cards with the task title, unit or property name, assigned team or user, and current status. Clicking a task should take the user to the task detail view.
+
+A list of recently completed tasks showing:
+
+Task title
+
+Completion time
+
+Completed by
+
+Linked project (if applicable)
+
+A section highlighting overdue or stalled tasks, with filters for:
+
+Assigned team
+
+Task type (cleaning, maintenance, inventory, admin)
+
+Property or unit
+
+Ensure that the dashboard layout is clean, responsive, and optimized for both desktop and mobile views. Use existing layout conventions and design patterns from the rest of the software for consistency. Incorporate loading states and error handling in case any data sources fail to load.
+
+This dashboard should serve as the real-time control center for the Projects and Tasks module. All data displayed should come from existing task and project records in the system. Once complete, confirm that this dashboard is connected to the correct data sources and fully replaces any placeholder landing page for the Projects and Tasks module.
