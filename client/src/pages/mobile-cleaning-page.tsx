@@ -7,8 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Search,
   Person,
@@ -53,6 +61,8 @@ export default function MobileCleaningPage() {
   const [flagPriority, setFlagPriority] = useState("normal");
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const [completionNotes, setCompletionNotes] = useState("");
+  // Priority filter - default to showing all priorities
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "urgent" | "high" | "normal" | "low">("all");
 
   const queryClient = useQueryClient();
 
@@ -372,8 +382,58 @@ export default function MobileCleaningPage() {
     );
   }
 
-  // Determine what tasks to display based on active tab
-  const displayedTasks = activeTab === "assigned" ? assignedTasks : completedTasks;
+  // Helper function to get priority badge
+  const getPriorityBadge = (priority: string | null | undefined) => {
+    if (!priority) return null;
+    
+    switch (priority.toLowerCase()) {
+      case "urgent":
+        return <span className="h-2 w-2 rounded-full bg-red-600 inline-block mr-1"></span>;
+      case "high":
+        return <span className="h-2 w-2 rounded-full bg-orange-500 inline-block mr-1"></span>;
+      case "normal":
+        return <span className="h-2 w-2 rounded-full bg-blue-500 inline-block mr-1"></span>;
+      case "low":
+        return <span className="h-2 w-2 rounded-full bg-green-500 inline-block mr-1"></span>;
+      default:
+        return null;
+    }
+  };
+
+  // Apply priority filter to tasks
+  const filterTasksByPriority = (tasks: any[]) => {
+    if (priorityFilter === "all") return tasks;
+    
+    return tasks.filter((task) => {
+      // Convert task priority to lowercase and handle null/undefined
+      const taskPriority = task.priority?.toLowerCase() || "normal";
+      return taskPriority === priorityFilter;
+    });
+  };
+
+  // Apply search term filtering
+  const filterTasksBySearchTerm = (tasks: any[]) => {
+    if (!searchTerm) return tasks;
+    
+    const term = searchTerm.toLowerCase();
+    return tasks.filter((task) => {
+      // Search in unit name if available
+      const unit = units?.find((u: any) => u.id === task.unitId);
+      const unitName = unit ? unit.name.toLowerCase() : "";
+      
+      // Search in task fields
+      return (
+        unitName.includes(term) ||
+        (task.notes && task.notes.toLowerCase().includes(term)) ||
+        (task.cleaningType && task.cleaningType.toLowerCase().includes(term))
+      );
+    });
+  };
+  
+  // Determine what tasks to display based on active tab and apply filters
+  const filteredAssignedTasks = filterTasksByPriority(filterTasksBySearchTerm(assignedTasks));
+  const filteredCompletedTasks = filterTasksByPriority(filterTasksBySearchTerm(completedTasks));
+  const displayedTasks = activeTab === "assigned" ? filteredAssignedTasks : filteredCompletedTasks;
 
   return (
     <Layout>
@@ -398,9 +458,40 @@ export default function MobileCleaningPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon">
-            <FilterList className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <FilterList className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Priority</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => setPriorityFilter("all")}>
+                All Priorities
+                {priorityFilter === "all" && <Check className="ml-2 h-4 w-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setPriorityFilter("urgent")}>
+                <span className="h-2 w-2 rounded-full bg-red-600 mr-1.5 inline-block"></span>
+                Urgent Only
+                {priorityFilter === "urgent" && <Check className="ml-2 h-4 w-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setPriorityFilter("high")}>
+                <span className="h-2 w-2 rounded-full bg-orange-500 mr-1.5 inline-block"></span>
+                High Priority
+                {priorityFilter === "high" && <Check className="ml-2 h-4 w-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setPriorityFilter("normal")}>
+                <span className="h-2 w-2 rounded-full bg-blue-500 mr-1.5 inline-block"></span>
+                Normal Priority
+                {priorityFilter === "normal" && <Check className="ml-2 h-4 w-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setPriorityFilter("low")}>
+                <span className="h-2 w-2 rounded-full bg-green-500 mr-1.5 inline-block"></span>
+                Low Priority
+                {priorityFilter === "low" && <Check className="ml-2 h-4 w-4" />}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Tabs for different views */}
@@ -439,7 +530,8 @@ export default function MobileCleaningPage() {
                       </div>
                       
                       <div className="mt-3 flex items-center justify-between">
-                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded flex items-center">
+                          {getPriorityBadge(task.priority)}
                           {task.cleaningType || "Standard"}
                         </span>
                         <span className="text-xs text-[#9EA2B1]">
@@ -509,7 +601,8 @@ export default function MobileCleaningPage() {
                       </div>
                       
                       <div className="mt-3 flex items-center justify-between">
-                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded flex items-center">
+                          {getPriorityBadge(task.priority)}
                           {task.cleaningType || "Standard"}
                         </span>
                         <span className="text-xs text-[#9EA2B1]">
@@ -579,9 +672,12 @@ export default function MobileCleaningPage() {
                       : `${selectedTask.estimatedDuration || "N/A"} mins (est.)`}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-[#9EA2B1]">Priority:</span>
-                  <span className="capitalize">{selectedTask.priority || "Normal"}</span>
+                  <span className="capitalize flex items-center">
+                    {getPriorityBadge(selectedTask.priority)}
+                    {selectedTask.priority || "Normal"}
+                  </span>
                 </div>
                 {selectedTask.notes && (
                   <div className="pt-2">
