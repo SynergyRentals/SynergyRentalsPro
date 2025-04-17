@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { motion } from "framer-motion";
 import {
   Map,
   MapPin,
@@ -21,7 +22,9 @@ import {
   RefreshCw,
   Send,
   AlertCircle,
-  Loader2
+  Loader2,
+  ChevronRight,
+  ChevronLeft
 } from "lucide-react";
 import {
   Sheet,
@@ -453,11 +456,43 @@ export default function MobileRouteOptimization() {
             const isCheckedIn = checkInStatus[task.id] || false;
             
             return (
-              <Card 
+              <motion.div 
                 key={task.id} 
-                className={`${isActive ? 'border-blue-500 bg-blue-50' : ''}`}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <CardContent className="p-4">
+                <motion.div
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={(e, info) => {
+                    if (info.offset.x > 100) {
+                      // Swiped right - quick check-in
+                      handleCheckIn(task.id);
+                    } else if (info.offset.x < -100) {
+                      // Swiped left - show details
+                      setSelectedTask(task);
+                    }
+                  }}
+                >
+                  <div className="relative overflow-hidden">
+                    {/* Left action hint */}
+                    <div className="absolute inset-y-0 left-0 w-16 flex items-center justify-center text-green-500 opacity-0 swipe-hint-left">
+                      <CheckCircle className="h-6 w-6" />
+                    </div>
+                    
+                    {/* Right action hint */}
+                    <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center text-blue-500 opacity-0 swipe-hint-right">
+                      <ChevronRight className="h-6 w-6" />
+                    </div>
+                    
+                    <Card 
+                      className={`${isActive ? 'border-blue-500 bg-blue-50' : ''}`}
+                    >
+                      <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center">
                       <div className="bg-gray-100 w-7 h-7 rounded-full flex items-center justify-center mr-3 text-gray-700 font-medium text-sm">
@@ -518,7 +553,7 @@ export default function MobileRouteOptimization() {
                     
                     <div>
                       {isCheckedIn ? (
-                        <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Checked In {arrivalTimes[task.id]}
                         </Badge>
@@ -688,6 +723,9 @@ export default function MobileRouteOptimization() {
                   </Sheet>
                 </CardContent>
               </Card>
+                </div>
+              </motion.div>
+            </motion.div>
             );
           })
         )}
