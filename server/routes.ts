@@ -1853,6 +1853,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Cleaning Flags Routes
+  app.get("/api/cleaning-flags", checkAuth, async (req, res) => {
+    try {
+      const taskId = req.query.taskId ? parseInt(req.query.taskId as string) : undefined;
+      const status = req.query.status as string | undefined;
+      
+      if (taskId) {
+        const flags = await storage.getCleaningFlagsByTask(taskId);
+        return res.json(flags);
+      } else if (status) {
+        const flags = await storage.getCleaningFlagsByStatus(status);
+        return res.json(flags);
+      } else {
+        const flags = await storage.getAllCleaningFlags();
+        return res.json(flags);
+      }
+    } catch (error) {
+      console.error("[API Error]", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/cleaning-flags/:id", checkAuth, async (req, res) => {
+    try {
+      const flag = await storage.getCleaningFlag(parseInt(req.params.id));
+      if (!flag) {
+        return res.status(404).json({ message: "Cleaning flag not found" });
+      }
+      res.json(flag);
+    } catch (error) {
+      console.error("[API Error]", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/cleaning-flags", checkAuth, async (req, res) => {
+    try {
+      const validatedData = insertCleaningFlagSchema.parse(req.body);
+      
+      // Set the reporter to the current user if not specified
+      if (!validatedData.reportedBy && req.user) {
+        validatedData.reportedBy = req.user.id;
+      }
+      
+      const flag = await storage.createCleaningFlag(validatedData);
+      
+      // Add activity log entry
+      if (req.user) {
+        await storage.createLog({
+          action: "create_cleaning_flag",
+          userId: req.user.id,
+          targetTable: "cleaning_flags",
+          targetId: flag.id,
+          notes: `Created flag for cleaning task #${flag.cleaningTaskId}: ${flag.description.substring(0, 30)}...`
+        });
+      }
+      
+      res.status(201).json(flag);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors });
+      } else {
+        console.error("[API Error]", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/cleaning-flags/:id", checkRole(["admin", "ops", "cleaner"]), async (req, res) => {
+    try {
+      const flag = await storage.updateCleaningFlag(parseInt(req.params.id), req.body);
+      if (!flag) {
+        return res.status(404).json({ message: "Cleaning flag not found" });
+      }
+      
+      // Add activity log for status changes
+      if (req.body.status && req.user) {
+        await storage.createLog({
+          action: "update_cleaning_flag",
+          userId: req.user.id,
+          targetTable: "cleaning_flags",
+          targetId: flag.id,
+          notes: `Updated flag status to: ${req.body.status}`
+        });
+      }
+      
+      res.json(flag);
+    } catch (error) {
+      console.error("[API Error]", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Cleaner Performance Routes
+  app.get("/api/cleaner-performance", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const cleanerId = req.query.cleanerId ? parseInt(req.query.cleanerId as string) : undefined;
+      
+      if (cleanerId) {
+        const performance = await storage.getCleanerPerformanceByUser(cleanerId);
+        return res.json(performance);
+      } else {
+        const allPerformance = await storage.getAllCleanerPerformance();
+        return res.json(allPerformance);
+      }
+    } catch (error) {
+      console.error("[API Error]", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/cleaner-performance/:id", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const performance = await storage.getCleanerPerformance(parseInt(req.params.id));
+      if (!performance) {
+        return res.status(404).json({ message: "Performance record not found" });
+      }
+      res.json(performance);
+    } catch (error) {
+      console.error("[API Error]", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/cleaner-performance", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const validatedData = insertCleanerPerformanceSchema.parse(req.body);
+      const performance = await storage.createCleanerPerformance(validatedData);
+      
+      res.status(201).json(performance);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors });
+      } else {
+        console.error("[API Error]", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/cleaner-performance/:id", checkRole(["admin", "ops"]), async (req, res) => {
+    try {
+      const performance = await storage.updateCleanerPerformance(parseInt(req.params.id), req.body);
+      if (!performance) {
+        return res.status(404).json({ message: "Performance record not found" });
+      }
+      
+      res.json(performance);
+    } catch (error) {
+      console.error("[API Error]", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
   // Mobile Cleaning Staff API Routes
   
   // Get all cleaning tasks assigned to the current user
