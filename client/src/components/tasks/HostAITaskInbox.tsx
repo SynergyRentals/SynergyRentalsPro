@@ -353,13 +353,13 @@ export function HostAITaskInbox({ autopilotEnabled = false }: HostAITaskInboxPro
           ))}
         </div>
       ) : error ? (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
+        <div className="p-4 border border-red-300 rounded-md bg-red-50">
+          <AlertTriangle className="h-4 w-4 text-red-500" />
+          <h4 className="text-red-600 font-medium mt-2">Error</h4>
+          <p className="text-red-600 text-sm mt-1">
             There was an error loading the HostAI tasks. Please try again.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       ) : !hasUnprocessedTasks ? (
         <div className="text-center py-12">
           <div className="mx-auto max-w-md">
