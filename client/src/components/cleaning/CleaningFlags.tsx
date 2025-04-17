@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,10 +64,19 @@ export default function CleaningFlags({ status }: CleaningFlagsProps) {
   // Mutation to update a flag (resolve, escalate, etc.)
   const updateFlagMutation = useMutation({
     mutationFn: async (updates: any) => {
-      return apiRequest(`/api/cleaning-flags/${updates.id}`, {
+      const response = await fetch(`/api/cleaning-flags/${updates.id}`, {
         method: "PATCH",
-        data: updates,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
       });
+      
+      if (!response.ok) {
+        throw new Error("Failed to update cleaning flag");
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cleaning-flags"] });

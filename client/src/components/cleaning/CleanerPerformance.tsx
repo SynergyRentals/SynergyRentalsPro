@@ -30,6 +30,13 @@ export default function CleanerPerformance() {
     error 
   } = useQuery({
     queryKey: ["/api/cleaner-performance"],
+    queryFn: async () => {
+      const response = await fetch("/api/cleaner-performance");
+      if (!response.ok) {
+        throw new Error("Failed to fetch cleaner performance data");
+      }
+      return response.json();
+    }
   });
   
   // Fetch users (to get cleaner names)
@@ -37,11 +44,18 @@ export default function CleanerPerformance() {
     data: users
   } = useQuery({
     queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await fetch("/api/users");
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+      return response.json();
+    }
   });
   
   // Helper to get cleaner name by id
   const getCleanerName = (cleanerId: number) => {
-    if (!users) return "Unknown Cleaner";
+    if (!users || !Array.isArray(users)) return "Unknown Cleaner";
     const user = users.find((user: any) => user.id === cleanerId);
     return user ? user.name : `Cleaner #${cleanerId}`;
   };
@@ -222,7 +236,7 @@ export default function CleanerPerformance() {
                   <SelectItem value="last90">Last 90 days</SelectItem>
                 </SelectContent>
               </Select>
-              {users && users.length > 0 && (
+              {users && Array.isArray(users) && users.length > 0 && (
                 <Select 
                   value={selectedCleanerId ? String(selectedCleanerId) : "all"} 
                   onValueChange={(val) => setSelectedCleanerId(val === "all" ? null : Number(val))}
