@@ -1769,6 +1769,36 @@ export class DatabaseStorage implements IStorage {
     return updatedCleaningTask;
   }
   
+  async updateCleaningTaskRouteOrder(id: number, routeOrder: number): Promise<CleaningTask | undefined> {
+    const [updatedCleaningTask] = await db.update(schema.cleaningTasks)
+      .set({ routeOrder })
+      .where(eq(schema.cleaningTasks.id, id))
+      .returning();
+    return updatedCleaningTask;
+  }
+  
+  async updateMultipleCleaningTaskRoutes(tasks: {id: number, routeOrder: number}[]): Promise<{success: boolean, updatedCount: number}> {
+    let updatedCount = 0;
+    
+    try {
+      for (const task of tasks) {
+        const [updatedTask] = await db.update(schema.cleaningTasks)
+          .set({ routeOrder: task.routeOrder })
+          .where(eq(schema.cleaningTasks.id, task.id))
+          .returning();
+        
+        if (updatedTask) {
+          updatedCount++;
+        }
+      }
+      
+      return { success: true, updatedCount };
+    } catch (error) {
+      console.error("Error updating cleaning task routes:", error);
+      return { success: false, updatedCount };
+    }
+  }
+  
   async getAllCleaningTasks(): Promise<CleaningTask[]> {
     return await db.select().from(schema.cleaningTasks);
   }
