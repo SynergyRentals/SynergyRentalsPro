@@ -244,8 +244,175 @@ export default function CleanerPerformance() {
     );
   }
   
+  // Calculate aggregate metrics from performance data
+  const getTeamMetrics = () => {
+    if (!performanceData || !Array.isArray(performanceData) || performanceData.length === 0) {
+      return {
+        totalTasks: 0,
+        avgScore: 0,
+        avgOnTime: 0,
+        totalFlags: 0,
+        totalCleaners: 0,
+        highPerformers: 0
+      };
+    }
+    
+    const totalTasks = performanceData.reduce((sum, p) => sum + (p.tasksCompleted || 0), 0);
+    const avgScore = Math.round(performanceData.reduce((sum, p) => sum + (p.avgScore || 0), 0) / performanceData.length);
+    const avgOnTime = Math.round(performanceData.reduce((sum, p) => sum + (p.onTimePercentage || 0), 0) / performanceData.length);
+    const totalFlags = performanceData.reduce((sum, p) => sum + (p.flagsReceived || 0), 0);
+    const totalCleaners = performanceData.length;
+    const highPerformers = performanceData.filter(p => (p.avgScore || 0) >= 90).length;
+    
+    return {
+      totalTasks,
+      avgScore,
+      avgOnTime,
+      totalFlags,
+      totalCleaners,
+      highPerformers
+    };
+  };
+  
+  const teamMetrics = getTeamMetrics();
+
   return (
     <div className="space-y-6">
+      {/* Dashboard Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="col-span-1 md:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center">
+              <Insights className="h-5 w-5 mr-2 text-blue-500" />
+              Team Performance Overview
+            </CardTitle>
+            <CardDescription>
+              {dateRange?.from && dateRange?.to ? (
+                `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
+              ) : (
+                "All time performance metrics"
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex flex-col p-3 bg-slate-50 rounded-lg">
+                <span className="text-sm text-gray-500">Total Tasks</span>
+                <div className="flex items-center mt-1">
+                  <Assignment className="h-5 w-5 mr-2 text-blue-500" />
+                  <span className="text-2xl font-semibold">{teamMetrics.totalTasks}</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col p-3 bg-slate-50 rounded-lg">
+                <span className="text-sm text-gray-500">Avg Quality</span>
+                <div className="flex items-center mt-1">
+                  <AutoAwesome className="h-5 w-5 mr-2 text-amber-500" />
+                  <span className="text-2xl font-semibold">{teamMetrics.avgScore}%</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col p-3 bg-slate-50 rounded-lg">
+                <span className="text-sm text-gray-500">On-Time Rate</span>
+                <div className="flex items-center mt-1">
+                  <Schedule className="h-5 w-5 mr-2 text-green-500" />
+                  <span className="text-2xl font-semibold">{teamMetrics.avgOnTime}%</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col p-3 bg-slate-50 rounded-lg">
+                <span className="text-sm text-gray-500">Total Issues</span>
+                <div className="flex items-center mt-1">
+                  <Flag className="h-5 w-5 mr-2 text-red-500" />
+                  <span className="text-2xl font-semibold">{teamMetrics.totalFlags}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-sm text-gray-600">Active Cleaners</span>
+                  <div className="flex items-center mt-1">
+                    <Person className="h-5 w-5 mr-2 text-blue-500" />
+                    <span className="text-xl font-medium">{teamMetrics.totalCleaners}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <span className="text-sm text-gray-600">Top Performers</span>
+                  <div className="flex items-center mt-1">
+                    <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
+                    <span className="text-xl font-medium">{teamMetrics.highPerformers}</span>
+                    <span className="text-sm ml-1 text-gray-500">
+                      ({Math.round((teamMetrics.highPerformers / Math.max(1, teamMetrics.totalCleaners)) * 100)}%)
+                    </span>
+                  </div>
+                </div>
+                
+                <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Report
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center">
+              <CalendarMonth className="h-5 w-5 mr-2 text-blue-500" />
+              Performance Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <DateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+                className="w-full"
+              />
+              
+              <div className="flex justify-between mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setDateRange({
+                    from: startOfMonth(new Date()),
+                    to: new Date()
+                  })}
+                >
+                  This Month
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setDateRange({
+                    from: startOfMonth(subMonths(new Date(), 1)),
+                    to: endOfMonth(subMonths(new Date(), 1))
+                  })}
+                >
+                  Last Month
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setDateRange({
+                    from: subMonths(new Date(), 3),
+                    to: new Date()
+                  })}
+                >
+                  Quarter
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
       {/* Actions and Filters */}
       <div className="flex flex-col md:flex-row gap-4 justify-between">
         <div className="flex items-center space-x-2">
@@ -297,23 +464,53 @@ export default function CleanerPerformance() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>High Performers</DropdownMenuItem>
-              <DropdownMenuItem>Needs Improvement</DropdownMenuItem>
-              <DropdownMenuItem>New Cleaners</DropdownMenuItem>
-              <DropdownMenuItem>Flagged Issues</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm("Top Performer")}>
+                High Performers
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm("Needs Improvement")}>
+                Needs Improvement
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm("New")}>
+                New Cleaners
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm("Flagged")}>
+                Flagged Issues
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
         
         <div className="flex items-center space-x-2">
-          <DateRangePicker
-            value={dateRange}
-            onChange={setDateRange}
-          />
-          
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => {
+            // Generate CSV data
+            const csvContent = [
+              ['Name', 'Tasks Completed', 'Avg Score', 'Flagged Issues', 'On-Time %', 'Checklists Completed'].join(','),
+              ...filteredPerformanceData.map(item => {
+                const cleanerInfo = getCleanerInfo(item.cleanerId);
+                return [
+                  cleanerInfo.name,
+                  item.tasksCompleted || 0,
+                  item.avgScore !== null ? `${item.avgScore}%` : 'N/A',
+                  item.flagsReceived || 0,
+                  item.onTimePercentage !== null ? `${item.onTimePercentage}%` : 'N/A',
+                  item.checklistsCompleted || 0
+                ].join(',');
+              })
+            ].join('\n');
+            
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `cleaner-performance-report-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}>
             <Download className="h-4 w-4 mr-2" />
-            Export
+            Export Data
           </Button>
         </div>
       </div>
