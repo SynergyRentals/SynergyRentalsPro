@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Map } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
@@ -32,6 +32,8 @@ import {
   LocationOn,
   Visibility,
   PhotoCamera,
+  MapOutlined,
+  Route,
 } from "@mui/icons-material";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -46,8 +48,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
-// Import our enhanced photo documentation component
+// Import our enhanced components
 import PhotoDocumentation from "@/components/cleaning/PhotoDocumentation";
+import MobileRouteOptimization from "@/components/cleaning/MobileRouteOptimization";
 
 // Mobile-optimized cleaning page
 export default function MobileCleaningPage() {
@@ -63,6 +66,13 @@ export default function MobileCleaningPage() {
   const [completionNotes, setCompletionNotes] = useState("");
   // Priority filter - default to showing all priorities
   const [priorityFilter, setPriorityFilter] = useState<"all" | "urgent" | "high" | "normal" | "low">("all");
+  // URL params for task selection
+  const [searchParams] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search);
+    }
+    return new URLSearchParams();
+  });
 
   const queryClient = useQueryClient();
 
@@ -496,9 +506,13 @@ export default function MobileCleaningPage() {
 
         {/* Tabs for different views */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="assigned">Assigned</TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsTrigger value="route">
+              <MapOutlined className="h-4 w-4 mr-1" />
+              Route
+            </TabsTrigger>
           </TabsList>
 
           {/* Assigned Tasks Tab */}
@@ -631,6 +645,11 @@ export default function MobileCleaningPage() {
                 </p>
               </div>
             )}
+          </TabsContent>
+          
+          {/* Route Tab */}
+          <TabsContent value="route" className="mt-2">
+            <MobileRouteOptimization />
           </TabsContent>
         </Tabs>
       </div>
