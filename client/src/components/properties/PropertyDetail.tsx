@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "../../lib/queryClient";
+import PropertyCalendar from "./PropertyCalendar";
 
 import {
   Tabs,
@@ -355,36 +356,10 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : (calendarEvents && Array.isArray(calendarEvents) && calendarEvents.length > 0) ? (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Start Date</TableHead>
-                        <TableHead>End Date</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {calendarEvents.map((event: CalendarEvent) => (
-                        <TableRow key={event.uid}>
-                          <TableCell>
-                            {format(new Date(event.start), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(event.end), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell>{event.title}</TableCell>
-                          <TableCell>
-                            <Badge variant={event.status === "confirmed" ? "default" : "outline"}>
-                              {event.status || "confirmed"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <PropertyCalendar 
+                  events={calendarEvents} 
+                  isLoading={isLoadingCalendar} 
+                />
               ) : (
                 <div className="text-center py-6">
                   <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground" />
