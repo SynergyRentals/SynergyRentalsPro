@@ -38,14 +38,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Link } from "wouter";
 
 // Import our new components for cleaning functionality
 import CleaningFlags from "@/components/cleaning/CleaningFlags";
 import CleanerPerformance from "@/components/cleaning/CleanerPerformance";
 import ChecklistBuilder from "@/components/cleaning/ChecklistBuilder";
+import ChecklistTemplates from "@/components/cleaning/ChecklistTemplates";
 
 export default function CleaningPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -165,11 +167,18 @@ export default function CleaningPage() {
       <div className="space-y-6 pb-8">
         {/* Page Title and Actions */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-[#2C2E3E]">Cleaning</h1>
-            <p className="text-[#9EA2B1]">
-              Manage cleaning schedules and quality control
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-[#2C2E3E]">Cleaning</h1>
+              <p className="text-[#9EA2B1]">
+                Manage cleaning schedules and quality control
+              </p>
+            </div>
+            <Link href="/cleaning-settings">
+              <Button variant="outline" size="icon" className="h-9 w-9">
+                <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
           </div>
 
           <div className="flex items-center mt-3 md:mt-0 space-x-2">
