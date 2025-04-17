@@ -1727,6 +1727,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cleaning Route Optimization
+  app.post("/api/cleaning-routes", checkAuth, async (req, res) => {
+    try {
+      const { tasks } = req.body;
+      
+      if (!Array.isArray(tasks)) {
+        return res.status(400).json({ message: "Invalid request. 'tasks' should be an array of objects with id and routeOrder." });
+      }
+      
+      const result = await storage.updateMultipleCleaningTaskRoutes(tasks);
+      
+      if (!result.success) {
+        return res.status(500).json({ message: "Failed to update route orders" });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully updated ${result.updatedCount} cleaning task routes` 
+      });
+    } catch (error) {
+      console.error("Error updating cleaning routes:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/cleaning-routes/:id", checkAuth, async (req, res) => {
+    try {
+      const { routeOrder } = req.body;
+      
+      if (typeof routeOrder !== 'number') {
+        return res.status(400).json({ message: "Invalid request. 'routeOrder' should be a number." });
+      }
+      
+      const taskId = parseInt(req.params.id);
+      const updatedTask = await storage.updateCleaningTaskRouteOrder(taskId, routeOrder);
+      
+      if (!updatedTask) {
+        return res.status(404).json({ message: "Cleaning task not found" });
+      }
+      
+      res.json(updatedTask);
+    } catch (error) {
+      console.error("Error updating cleaning route order:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Cleaning Checklists
   app.get("/api/cleaning-checklists", checkAuth, async (req, res) => {
     const checklists = await storage.getAllCleaningChecklists();
