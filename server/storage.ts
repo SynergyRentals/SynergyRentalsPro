@@ -1284,6 +1284,55 @@ export class MemStorage implements IStorage {
   async getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]> {
     return Array.from(this.hostAiAutopilotLogs.values()).filter(log => log.taskId === taskId);
   }
+  
+  // AI Planner Interaction Methods
+  async getAiPlannerInteraction(id: number): Promise<AiPlannerInteraction | undefined> {
+    return this.aiPlannerInteractions.get(id);
+  }
+  
+  async createAiPlannerInteraction(interaction: InsertAiPlannerInteraction): Promise<AiPlannerInteraction> {
+    const id = this.aiPlannerInteractionIdCounter++;
+    const createdAt = new Date();
+    const newInteraction: AiPlannerInteraction = {
+      ...interaction,
+      id,
+      createdAt,
+      updatedAt: createdAt
+    };
+    this.aiPlannerInteractions.set(id, newInteraction);
+    return newInteraction;
+  }
+  
+  async updateAiPlannerInteraction(id: number, interactionData: Partial<AiPlannerInteraction>): Promise<AiPlannerInteraction | undefined> {
+    const interaction = this.aiPlannerInteractions.get(id);
+    if (!interaction) return undefined;
+    
+    const updatedAt = new Date();
+    const updatedInteraction = {
+      ...interaction,
+      ...interactionData,
+      updatedAt
+    };
+    this.aiPlannerInteractions.set(id, updatedInteraction);
+    return updatedInteraction;
+  }
+  
+  async getAiPlannerInteractionsByUser(userId: number): Promise<AiPlannerInteraction[]> {
+    return Array.from(this.aiPlannerInteractions.values())
+      .filter(interaction => interaction.userId === userId)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+  
+  async getAiPlannerInteractionsByStatus(status: string): Promise<AiPlannerInteraction[]> {
+    return Array.from(this.aiPlannerInteractions.values())
+      .filter(interaction => interaction.status === status)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+  
+  async getAllAiPlannerInteractions(): Promise<AiPlannerInteraction[]> {
+    return Array.from(this.aiPlannerInteractions.values())
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
 }
 
 export class DatabaseStorage implements IStorage {
