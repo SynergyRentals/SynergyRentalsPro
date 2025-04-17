@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { setupAuth } from "./auth";
 import { createServer } from "http";
+import { setupApiMiddleware, apiResponseMiddleware } from "./lib/apiMiddleware";
 
 const app = express();
 app.use(express.json());
