@@ -1,77 +1,159 @@
-.task-card-container {
+/* 
+ * Swipe Hint Animations for Mobile Cleaning Tasks
+ * These styles provide visual feedback for swipe gestures
+ */
+
+.swipe-container {
   position: relative;
-  width: 100%;
   overflow: hidden;
-  margin-bottom: 0.75rem;
+  touch-action: pan-y;
 }
 
-.task-card-wrapper {
-  position: relative;
-  width: 100%;
-  overflow: visible;
-}
-
-.swipe-hint-left {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 72px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: rgba(16, 185, 129, 0.1);
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: -1;
-  color: #10b981;
-}
-
+.swipe-hint-left,
 .swipe-hint-right {
   position: absolute;
   top: 0;
-  right: 0;
   height: 100%;
-  width: 72px;
+  width: 20px;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.swipe-hint-left {
+  left: 0;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.3), transparent);
+}
+
+.swipe-hint-right {
+  right: 0;
+  background: linear-gradient(to left, rgba(34, 197, 94, 0.3), transparent);
+}
+
+.swipe-container:active .swipe-hint-left,
+.swipe-container:active .swipe-hint-right {
+  opacity: 1;
+}
+
+.swipe-action-indicator {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
-  justify-content: center;
   align-items: center;
-  background-color: rgba(59, 130, 246, 0.1);
-  border-top-right-radius: 8px;
-  border-bottom-right-radius: 8px;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
   opacity: 0;
   transition: opacity 0.2s ease;
-  z-index: -1;
-  color: #3b82f6;
+  pointer-events: none;
+  z-index: 5;
 }
 
-.task-card-wrapper:active .swipe-hint-left,
-.task-card-wrapper:active .swipe-hint-right {
+.swipe-action-left {
+  left: 0;
+  background-color: rgba(59, 130, 246, 0.8);
+}
+
+.swipe-action-right {
+  right: 0;
+  background-color: rgba(34, 197, 94, 0.8);
+}
+
+/* Task item animations */
+.task-item-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.task-item-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.task-item-exit {
   opacity: 1;
 }
 
-/* Show indicators when being dragged */
-.task-card-wrapper[data-dragging="true"] .swipe-hint-left,
-.task-card-wrapper[data-dragging="true"] .swipe-hint-right {
-  opacity: 1;
+.task-item-exit-active {
+  opacity: 0;
+  transform: translateX(-100%);
+  transition: opacity 0.3s, transform 0.3s;
 }
 
-.task-card {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+/* Pulse animation for urgent tasks */
+@keyframes pulse-urgent {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
 }
 
-.task-card:active {
-  transform: scale(0.98);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+.pulse-urgent {
+  animation: pulse-urgent 2s infinite;
 }
 
-.swipe-hint-text {
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
+/* Pull-to-refresh animation */
+.ptr-element {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  color: #000;
+  z-index: 10;
+  text-align: center;
+  height: 50px;
+}
+
+.ptr-element .ptr-icon {
+  display: block;
+  font-size: 30px;
+  transition: all 0.25s ease;
+  margin: 0 auto;
+}
+
+.ptr-refresh .ptr-icon {
+  transform: rotate(180deg);
+}
+
+.ptr-loading .ptr-icon {
+  animation: rotate 0.5s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Offline indicator */
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #f97316;
+  color: white;
+  text-align: center;
+  padding: 4px 0;
+  font-size: 12px;
   font-weight: 500;
+  z-index: 50;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+.offline-indicator.visible {
+  transform: translateY(0);
 }

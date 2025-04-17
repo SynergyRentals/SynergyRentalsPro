@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { SwipeableTaskCard } from "./SwipeableTaskCard";
+import SwipeableTaskCard from "./SwipeableTaskCard";
 import {
   Map,
   MapPin,
