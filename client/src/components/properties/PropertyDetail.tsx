@@ -16,7 +16,8 @@ import {
   Bath, 
   Clipboard, 
   Eye, 
-  RefreshCw 
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "../../lib/queryClient";
@@ -154,14 +155,31 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
     },
   });
   
-  // Refresh calendar data manually
+  // Refresh calendar data manually using dedicated refresh endpoint
   const handleRefreshCalendar = async () => {
     setRefreshingCalendar(true);
     try {
+      // Call the dedicated refresh endpoint instead of just refetching
+      const response = await fetch(`/api/properties/${id}/refresh-calendar`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error refreshing calendar: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Refetch to get the latest data after cache is cleared
       await refetchCalendar();
+      
       toast({
         title: "Calendar refreshed",
-        description: "The calendar data has been updated",
+        description: `Successfully refreshed calendar with ${result.eventsCount} events`,
       });
     } catch (error) {
       toast({
