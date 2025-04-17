@@ -64,7 +64,6 @@ async function createHostAIAutopilotTables() {
     } catch (error) {
       console.log('Could not create default settings:', error.message);
     }
-    console.log('Default autopilot settings created for admin user');
 
   } catch (error) {
     console.error('Error creating HostAI autopilot tables:', error);

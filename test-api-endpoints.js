@@ -2,8 +2,8 @@
  * Integration tests for API endpoints
  * Runs through critical API endpoints to verify they return the expected format and status codes
  */
-const axios = require('axios');
-const assert = require('assert').strict;
+import axios from 'axios';
+import assert from 'assert';
 
 // Base URL for the API
 const baseUrl = 'http://localhost:5000';
@@ -46,7 +46,7 @@ async function apiRequest(method, path, data = null) {
 async function login() {
   const response = await apiRequest('POST', '/api/auth/login', {
     username: 'admin',
-    password: 'admin'
+    password: 'password'
   });
   
   assert.equal(response.status, 200, 'Login should return 200 status code');

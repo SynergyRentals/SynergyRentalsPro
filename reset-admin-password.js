@@ -1,7 +1,7 @@
 // Import crypto and Node.js utilities
-const { scrypt, randomBytes } = require('crypto');
-const { promisify } = require('util');
-const { Pool } = require('@neondatabase/serverless');
+import { scrypt, randomBytes } from 'crypto';
+import { promisify } from 'util';
+import { Pool } from '@neondatabase/serverless';
 
 // Create promise-based version of scrypt
 const scryptAsync = promisify(scrypt);
