@@ -217,13 +217,32 @@ const AiAssistant: React.FC = () => {
     
     setIsSubmitting(true);
     try {
-      // Create the interaction
+      // First create a record of the interaction through the API
       const newInteraction = await createInteraction.mutateAsync(prompt);
       
-      // Simulate the AI response
-      await simulateAiResponse(newInteraction);
+      // If WebSocket is connected, send the request through WebSocket
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && currentUser) {
+        socketRef.current.send(JSON.stringify({
+          type: 'ai_request',
+          prompt,
+          userId: currentUser.id,
+          interactionId: newInteraction.id
+        }));
+        
+        // The response will come back through the WebSocket
+        console.log('Sent AI request through WebSocket');
+      } else {
+        // Fallback to simulate AI response if WebSocket is not available
+        console.log('WebSocket not available, using simulated response');
+        await simulateAiResponse(newInteraction);
+      }
     } catch (error) {
       console.error('Error submitting prompt:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to process your request. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -239,9 +258,24 @@ const AiAssistant: React.FC = () => {
   return (
     <Card className="w-full h-full flex flex-col">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <BrainCircuit className="h-6 w-6 text-primary" />
-          <CardTitle>AI Assistant</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BrainCircuit className="h-6 w-6 text-primary" />
+            <CardTitle>AI Assistant</CardTitle>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {wsConnected ? (
+              <>
+                <Wifi className="h-4 w-4 text-green-500" />
+                <span>Connected</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-4 w-4 text-amber-500" />
+                <span>Offline</span>
+              </>
+            )}
+          </div>
         </div>
         <CardDescription>
           Get help with planning, organizing, and optimizing your projects and tasks
