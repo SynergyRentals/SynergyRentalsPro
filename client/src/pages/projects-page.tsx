@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, Calendar, Check, MoreVertical, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -144,7 +144,7 @@ export default function ProjectsPage() {
   });
 
   // Reset form when editing project changes
-  useState(() => {
+  useEffect(() => {
     if (editingProject) {
       form.reset(editingProject);
     } else {
@@ -158,7 +158,7 @@ export default function ProjectsPage() {
         budgetEstimate: null,
       });
     }
-  });
+  }, [editingProject, form]);
 
   // Handle project creation/update
   const onSubmit = (values: ProjectFormValues) => {
