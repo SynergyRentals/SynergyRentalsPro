@@ -153,6 +153,8 @@ export interface IStorage {
   getCleaningTask(id: number): Promise<CleaningTask | undefined>;
   createCleaningTask(task: InsertCleaningTask): Promise<CleaningTask>;
   updateCleaningTask(id: number, task: Partial<CleaningTask>): Promise<CleaningTask | undefined>;
+  updateCleaningTaskRouteOrder(id: number, routeOrder: number): Promise<CleaningTask | undefined>;
+  updateMultipleCleaningTaskRoutes(tasks: {id: number, routeOrder: number}[]): Promise<{success: boolean, updatedCount: number}>;
   getAllCleaningTasks(): Promise<CleaningTask[]>;
   getCleaningTasksByUnit(unitId: number): Promise<CleaningTask[]>;
   getCleaningTasksByAssignee(userId: number): Promise<CleaningTask[]>;
@@ -878,6 +880,30 @@ export class MemStorage implements IStorage {
     const updatedCleaningTask = { ...cleaningTask, ...cleaningTaskData };
     this.cleaningTasks.set(id, updatedCleaningTask);
     return updatedCleaningTask;
+  }
+
+  async updateCleaningTaskRouteOrder(id: number, routeOrder: number): Promise<CleaningTask | undefined> {
+    const cleaningTask = this.cleaningTasks.get(id);
+    if (!cleaningTask) return undefined;
+    
+    const updatedCleaningTask = { ...cleaningTask, routeOrder };
+    this.cleaningTasks.set(id, updatedCleaningTask);
+    return updatedCleaningTask;
+  }
+
+  async updateMultipleCleaningTaskRoutes(tasks: {id: number, routeOrder: number}[]): Promise<{success: boolean, updatedCount: number}> {
+    let updatedCount = 0;
+    
+    for (const task of tasks) {
+      const cleaningTask = this.cleaningTasks.get(task.id);
+      if (cleaningTask) {
+        const updatedCleaningTask = { ...cleaningTask, routeOrder: task.routeOrder };
+        this.cleaningTasks.set(task.id, updatedCleaningTask);
+        updatedCount++;
+      }
+    }
+    
+    return { success: true, updatedCount };
   }
   
   async getAllCleaningTasks(): Promise<CleaningTask[]> {
