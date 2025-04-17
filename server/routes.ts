@@ -4552,6 +4552,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { confidence, urgency, team };
   }
   
+  // AI Planner Interaction routes
+  app.get("/api/ai-planner/interactions", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const interactions = await storage.getAllAiPlannerInteractions();
+      res.json(interactions);
+    } catch (error) {
+      console.error('Error fetching AI Planner interactions:', error);
+      res.status(500).json({ error: 'Failed to retrieve AI Planner interactions' });
+    }
+  });
+  
+  app.get("/api/ai-planner/interactions/:id", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const interaction = await storage.getAiPlannerInteraction(id);
+      
+      if (!interaction) {
+        return res.status(404).json({ error: 'AI Planner interaction not found' });
+      }
+      
+      res.json(interaction);
+    } catch (error) {
+      console.error('Error fetching AI Planner interaction:', error);
+      res.status(500).json({ error: 'Failed to retrieve AI Planner interaction' });
+    }
+  });
+  
+  app.get("/api/ai-planner/interactions/user/:userId", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const interactions = await storage.getAiPlannerInteractionsByUser(userId);
+      res.json(interactions);
+    } catch (error) {
+      console.error('Error fetching AI Planner interactions by user:', error);
+      res.status(500).json({ error: 'Failed to retrieve AI Planner interactions by user' });
+    }
+  });
+  
+  app.get("/api/ai-planner/interactions/status/:status", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const status = req.params.status;
+      const interactions = await storage.getAiPlannerInteractionsByStatus(status);
+      res.json(interactions);
+    } catch (error) {
+      console.error('Error fetching AI Planner interactions by status:', error);
+      res.status(500).json({ error: 'Failed to retrieve AI Planner interactions by status' });
+    }
+  });
+  
+  app.post("/api/ai-planner/interactions", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+      
+      // Add the user ID to the interaction data
+      const interactionData = {
+        ...req.body,
+        userId
+      };
+      
+      const insertInteraction = schema.insertAiPlannerInteractionSchema.parse(interactionData);
+      const interaction = await storage.createAiPlannerInteraction(insertInteraction);
+      res.status(201).json(interaction);
+    } catch (error) {
+      console.error('Error creating AI Planner interaction:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to create AI Planner interaction' });
+    }
+  });
+  
+  app.patch("/api/ai-planner/interactions/:id", checkAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+      
+      // Check if the interaction exists and belongs to the user
+      const existingInteraction = await storage.getAiPlannerInteraction(id);
+      if (!existingInteraction) {
+        return res.status(404).json({ error: 'AI Planner interaction not found' });
+      }
+      
+      // Allow admins to update any interaction, but regular users can only update their own
+      if (existingInteraction.userId !== userId && req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Not authorized to update this interaction' });
+      }
+      
+      const interactionData = req.body;
+      const updatedInteraction = await storage.updateAiPlannerInteraction(id, interactionData);
+      
+      if (!updatedInteraction) {
+        return res.status(404).json({ error: 'AI Planner interaction not found' });
+      }
+      
+      res.json(updatedInteraction);
+    } catch (error) {
+      console.error('Error updating AI Planner interaction:', error);
+      res.status(500).json({ error: 'Failed to update AI Planner interaction' });
+    }
+  });
+  
   // Create HTTP server
   const httpServer = createServer(app);
 
