@@ -57,6 +57,9 @@ app.use((req, res, next) => {
   // Set up authentication
   setupAuth(app);
   
+  // Add API response middleware to ensure consistent responses
+  app.use('/api', apiResponseMiddleware);
+  
   // Set up both original and new routes
   // First set up original routes which has the HostAI endpoints
   await registerRoutes(app);
@@ -64,10 +67,13 @@ app.use((req, res, next) => {
   // Then set up new routes
   setupRoutes(app);
 
+  // Apply API error handling middleware after routes
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    // Ensure content-type is set to application/json
+    res.setHeader('Content-Type', 'application/json');
     res.status(status).json({ message });
     throw err;
   });

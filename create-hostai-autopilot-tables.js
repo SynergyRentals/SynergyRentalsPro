@@ -1,5 +1,7 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+import pg from 'pg';
+import 'dotenv/config';
+
+const { Pool } = pg;
 
 /**
  * This script creates the missing host_ai_autopilot_settings table in the database.
@@ -23,6 +25,17 @@ async function createHostAIAutopilotTables() {
       );
     `);
     console.log('host_ai_autopilot_settings table created successfully');
+    
+    // Add unique constraint on user_id if it doesn't exist
+    try {
+      await pool.query(`
+        ALTER TABLE host_ai_autopilot_settings ADD CONSTRAINT host_ai_autopilot_settings_user_id_key UNIQUE (user_id);
+      `);
+      console.log('Added unique constraint on user_id');
+    } catch (error) {
+      // Constraint might already exist - that's ok
+      console.log('Unique constraint may already exist (this is OK):', error.message);
+    }
 
     // Check if host_ai_autopilot_log table exists and create if needed
     await pool.query(`
@@ -41,11 +54,16 @@ async function createHostAIAutopilotTables() {
     console.log('host_ai_autopilot_log table created successfully');
 
     // Create default autopilot settings for admin user (id=1)
-    await pool.query(`
-      INSERT INTO host_ai_autopilot_settings (user_id, enabled, confidence_threshold)
-      VALUES (1, false, 0.85)
-      ON CONFLICT (user_id) DO NOTHING;
-    `);
+    try {
+      await pool.query(`
+        INSERT INTO host_ai_autopilot_settings (user_id, enabled, confidence_threshold)
+        VALUES (1, false, 0.85)
+        ON CONFLICT (user_id) DO NOTHING;
+      `);
+      console.log('Default autopilot settings created for admin user');
+    } catch (error) {
+      console.log('Could not create default settings:', error.message);
+    }
     console.log('Default autopilot settings created for admin user');
 
   } catch (error) {
