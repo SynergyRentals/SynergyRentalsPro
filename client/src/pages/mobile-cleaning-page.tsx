@@ -1,834 +1,913 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Layout from "@/components/layout/Layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import {
+  Search,
+  Person,
+  Home,
+  CheckCircle,
+  Schedule,
+  Assignment,
+  Camera,
+  Cancel,
+  FilterList,
+  CalendarMonth,
+  Flag,
+  LocationOn,
+  Visibility,
+  PhotoCamera,
+} from "@mui/icons-material";
+import { toast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { QrReader } from "@/components/ui/qr-scanner";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { 
-  Home, CheckCircle, Clock, Camera, Wrench, ClipboardList, User, 
-  AlertTriangle, Flag, UploadCloud, X, Loader2 
-} from "lucide-react";
-import { format } from "date-fns";
 
-// Define types for our cleaning tasks and checklists
-interface CleaningTask {
-  id: number;
-  unitId: number;
-  status: string;
-  scheduledFor: Date;
-  assignedTo: number | null;
-  assignedBy: number | null;
-  completedAt: Date | null;
-  verifiedAt: Date | null;
-  verifiedBy: number | null;
-  cleaningType: string;
-  estimatedDuration: number;
-  actualDuration: number | null;
-  notes: string | null;
-  photos: string[] | null;
-  checklistTemplateId: number | null;
-  score: number | null;
-  isInspection: boolean;
-  createdAt: Date;
-}
-
-interface ChecklistItem {
-  id: number;
-  checklistId: number;
-  description: string;
-  room: string;
-  order: number;
-  requiresPhoto: boolean | null;
-  isRequired: boolean | null;
-  notes: string | null;
-  completed?: boolean;
-}
-
-interface ChecklistCompletion {
-  id: number;
-  cleaningTaskId: number;
-  checklistItemId: number;
-  completed: boolean;
-  completedAt: Date | null;
-  completedBy: number | null;
-  notes: string | null;
-  photoUrl: string | null;
-}
-
-interface CleaningFlag {
-  id: number;
-  cleaningTaskId: number;
-  reportedBy: number;
-  assignedTo: number | null;
-  status: string;
-  priority: string;
-  flagType: string;
-  description: string;
-  photos: string[] | null;
-  createdAt: Date;
-  resolvedAt: Date | null;
-  resolvedBy: number | null;
-  escalatedTo: string | null;
-  resolution: string | null;
-}
-
-interface Unit {
-  id: number;
-  name: string;
-  address: string;
-  notes: string | null;
-  leaseUrl: string | null;
-  wifiInfo: string | null;
-  tags: string[] | null;
-  active: boolean;
-}
-
-interface CleaningFlag {
-  id: number;
-  cleaningTaskId: number;
-  reportedBy: number;
-  assignedTo: number | null;
-  status: string;
-  priority: string;
-  flagType: string;
-  description: string;
-  photos: string[] | null;
-  createdAt: Date;
-  resolvedAt: Date | null;
-  resolvedBy: number | null;
-  escalatedTo: string | null;
-  resolution: string | null;
-}
-
+// Mobile-optimized cleaning page
 export default function MobileCleaningPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("assigned");
-  const [scanning, setScanning] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [notes, setNotes] = useState<Record<number, string>>({});
-  const [completedItems, setCompletedItems] = useState<Record<number, boolean>>({});
-  const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [showTaskDetails, setShowTaskDetails] = useState(false);
+  const [showTaskCompletion, setShowTaskCompletion] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [flagDescription, setFlagDescription] = useState("");
-  const [flagType, setFlagType] = useState("cleanliness");
-  const [flagPriority, setFlagPriority] = useState("medium");
+  const [flagPriority, setFlagPriority] = useState("normal");
+  const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [completionNotes, setCompletionNotes] = useState("");
 
-  // Fetch assigned cleaning tasks
-  const { 
-    data: cleaningTasksData, 
-    isLoading: isTasksLoading, 
-    error: tasksError 
+  const queryClient = useQueryClient();
+
+  // Fetch cleaning tasks
+  const {
+    data: tasks,
+    isLoading,
+    error,
   } = useQuery({
-    queryKey: ["/api/cleaning/assigned"],
+    queryKey: ["/api/cleaning-tasks"],
+  });
+
+  // Fetch units for reference
+  const { data: units } = useQuery({
+    queryKey: ["/api/units"],
+  });
+
+  // Fetch users for reference (cleaners)
+  const { data: users, data: currentUser } = useQuery({
+    queryKey: ["/api/user"],
+  });
+
+  // Fetch checklist items for the selected task
+  const { data: checklistItems, isLoading: isLoadingChecklist } = useQuery({
+    queryKey: ["/api/cleaning-checklist-items", selectedTask?.checklistTemplateId],
     queryFn: async () => {
-      const response = await fetch("/api/cleaning/assigned");
+      if (!selectedTask?.checklistTemplateId) return [];
+      
+      const response = await fetch(`/api/cleaning-checklist-items?checklistId=${selectedTask.checklistTemplateId}`);
       if (!response.ok) {
-        throw new Error("Failed to fetch assigned cleaning tasks");
+        throw new Error("Failed to fetch checklist items");
       }
       return response.json();
     },
+    enabled: !!selectedTask?.checklistTemplateId,
   });
 
-  // Fetch checklist for a specific unit
+  // Fetch checklist completions for the selected task
   const { 
-    data: checklistData, 
-    isLoading: isChecklistLoading, 
-    error: checklistError 
+    data: checklistCompletions,
+    isLoading: isLoadingCompletions, 
   } = useQuery({
-    queryKey: ["/api/cleaning/checklist", selectedTaskId],
+    queryKey: ["/api/cleaning-checklist-completions", selectedTask?.id],
     queryFn: async () => {
-      if (!selectedTaskId) return null;
-      const response = await fetch(`/api/cleaning/checklist/${selectedTaskId}`);
+      if (!selectedTask?.id) return [];
+      
+      const response = await fetch(`/api/cleaning-checklist-completions?taskId=${selectedTask.id}`);
       if (!response.ok) {
-        throw new Error("Failed to fetch cleaning checklist");
+        throw new Error("Failed to fetch checklist completions");
       }
       return response.json();
     },
-    enabled: !!selectedTaskId, // Only run query if taskId is selected
+    enabled: !!selectedTask?.id,
   });
 
-  // Mutation to mark a checklist item as complete
-  const completeItemMutation = useMutation({
-    mutationFn: async ({ 
-      taskId, 
-      itemId, 
-      completed, 
-      notes 
-    }: { 
-      taskId: number; 
-      itemId: number; 
-      completed: boolean; 
-      notes: string; 
-    }) => {
-      const res = await apiRequest("POST", "/api/cleaning/checklist-item/complete", {
-        taskId,
-        itemId,
-        completed,
-        notes,
-        completedBy: user?.id,
+  // Mutation to update task status
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
+      const response = await fetch(`/api/cleaning-tasks/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
       });
-      return res.json();
+
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+
+      return response.json();
     },
     onSuccess: () => {
-      // Invalidate and refetch checklist data
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/checklist", selectedTaskId] });
-    },
-    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning-tasks"] });
       toast({
-        title: "Error completing checklist item",
+        title: "Task updated",
+        description: "The cleaning task has been updated successfully.",
+      });
+      setShowTaskCompletion(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update task",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  // Mutation to mark a task as complete
-  const completeTaskMutation = useMutation({
-    mutationFn: async ({ taskId }: { taskId: number }) => {
-      const res = await apiRequest("POST", `/api/cleaning/complete/${taskId}`, {
-        completedBy: user?.id,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      // Invalidate and refetch tasks data
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/assigned"] });
-      toast({
-        title: "Success!",
-        description: "Cleaning task marked as complete",
-      });
-      setSelectedTaskId(null); // Go back to task list
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error completing task",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Mutation to create a cleaning flag
+  // Mutation to create a flag
   const createFlagMutation = useMutation({
-    mutationFn: async (data: {
-      cleaningTaskId: number;
-      flagType: string;
-      priority: string;
-      description: string;
-    }) => {
-      const res = await apiRequest("POST", "/api/cleaning/flags", {
-        ...data,
-        reportedBy: user?.id,
-        status: "open",
+    mutationFn: async (data: any) => {
+      const response = await fetch("/api/cleaning-flags", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
       });
-      return res.json();
+
+      if (!response.ok) {
+        throw new Error("Failed to create flag");
+      }
+
+      return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Flag Reported",
-        description: "Cleaning issue has been reported successfully",
-      });
-      setFlagDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning-tasks"] });
+      setShowFlagDialog(false);
       setFlagDescription("");
-      
-      // Invalidate and refetch tasks data
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/assigned"] });
-    },
-    onError: (error: Error) => {
+      setFlagPriority("normal");
       toast({
-        title: "Error Reporting Flag",
+        title: "Issue flagged",
+        description: "The cleaning issue has been flagged for review.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to flag issue",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  // Handle QR code scan result
-  const handleScanResult = (result: string) => {
-    try {
-      // Expected format: "synergy-rentals:unit:123"
-      const parts = result.split(":");
-      if (parts[0] === "synergy-rentals" && parts[1] === "unit") {
-        const unitId = parseInt(parts[2], 10);
-        
-        // Find the task for this unit
-        const matchingTask = cleaningTasksData?.tasks.find(
-          (task: CleaningTask) => task.unitId === unitId && task.status === "scheduled"
-        );
-        
-        if (matchingTask) {
-          setSelectedTaskId(matchingTask.id);
-          toast({
-            title: "Unit Identified",
-            description: `Starting cleaning for unit #${unitId}`,
-          });
-        } else {
-          toast({
-            title: "No Task Found",
-            description: "No scheduled cleaning task found for this unit",
-            variant: "destructive",
-          });
-        }
-      } else {
-        toast({
-          title: "Invalid QR Code",
-          description: "This QR code is not for a Synergy Rentals unit",
-          variant: "destructive",
-        });
+  // Mutation to complete checklist items
+  const completeChecklistItemMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch("/api/cleaning-checklist-completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to complete checklist item");
       }
-    } catch (error) {
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/cleaning-checklist-completions", selectedTask?.id] 
+      });
+    },
+    onError: (error) => {
       toast({
-        title: "Error Scanning QR Code",
-        description: "Could not process the scanned QR code",
+        title: "Failed to update checklist",
+        description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  // Filter tasks based on active tab and current user
+  const cleaningTasks = tasks || [];
+  const currentUserId = currentUser?.id;
+  
+  const assignedTasks = Array.isArray(cleaningTasks)
+    ? cleaningTasks.filter(
+        (task) => 
+          task.assignedTo === currentUserId && 
+          task.status !== "completed"
+      )
+    : [];
+    
+  const completedTasks = Array.isArray(cleaningTasks)
+    ? cleaningTasks.filter(
+        (task) => 
+          task.assignedTo === currentUserId && 
+          task.status === "completed"
+      )
+    : [];
+
+  // Helper function to get unit name
+  const getUnitName = (unitId: number) => {
+    if (!units || !Array.isArray(units)) return `Unit #${unitId}`;
+    const unit = units.find((u: any) => u.id === unitId);
+    return unit ? unit.name : `Unit #${unitId}`;
+  };
+
+  // Format date
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "Not scheduled";
+    return format(new Date(dateString), "MMM dd, yyyy - h:mm a");
+  };
+
+  // Get status badge
+  const getStatusBadge = (task: any) => {
+    if (task.status === "completed") {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-0">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Completed
+        </Badge>
+      );
     }
     
-    setScanning(false);
+    if (task.status === "in-progress") {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-0">
+          <Schedule className="h-3 w-3 mr-1" />
+          In Progress
+        </Badge>
+      );
+    }
+    
+    if (!task.scheduledFor || new Date(task.scheduledFor) > new Date()) {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-0">
+          <Schedule className="h-3 w-3 mr-1" />
+          Scheduled
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge className="bg-red-100 text-red-800 border-0">
+        <Cancel className="h-3 w-3 mr-1" />
+        Overdue
+      </Badge>
+    );
   };
 
-  // Calculate completion percentage
-  const calculateCompletion = () => {
-    if (!checklistData?.items || checklistData.items.length === 0) return 0;
-    
-    const totalItems = checklistData.items.length;
-    const completedCount = checklistData.items.filter(
-      (item: ChecklistItem & { completion?: ChecklistCompletion }) => 
-        item.completion?.completed || completedItems[item.id]
-    ).length;
-    
-    return Math.round((completedCount / totalItems) * 100);
+  // Handle start cleaning action
+  const handleStartCleaning = (task: any) => {
+    updateTaskMutation.mutate({
+      id: task.id,
+      updates: {
+        status: "in-progress",
+      },
+    });
   };
 
-  // Handle checklist item completion toggle
-  const handleItemToggle = (itemId: number, checked: boolean) => {
-    setCompletedItems(prev => ({
-      ...prev,
-      [itemId]: checked
-    }));
+  // Handle completing a task
+  const handleCompleteTask = () => {
+    if (!selectedTask) return;
     
-    // Submit the completion immediately
-    if (selectedTaskId) {
-      completeItemMutation.mutate({
-        taskId: selectedTaskId,
-        itemId,
-        completed: checked,
-        notes: notes[itemId] || ""
+    updateTaskMutation.mutate({
+      id: selectedTask.id,
+      updates: {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+        notes: completionNotes || selectedTask.notes,
+        photos: photoUrls.length > 0 ? photoUrls : selectedTask.photos,
+      },
+    });
+  };
+
+  // Handle flag issue
+  const handleFlagIssue = () => {
+    if (!selectedTask || !flagDescription) return;
+    
+    createFlagMutation.mutate({
+      cleaningTaskId: selectedTask.id,
+      description: flagDescription,
+      flagType: "cleaner-reported",
+      priority: flagPriority,
+      reportedBy: currentUserId,
+      status: "open",
+      photos: photoUrls,
+    });
+  };
+
+  // Handle uploading photos
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // This is a mock implementation - in a real app, you would upload to a server
+    if (e.target.files && e.target.files.length > 0) {
+      // Mock successful upload with placeholder URLs
+      const newUrls = Array.from(e.target.files).map(
+        (_, index) => `https://placehold.co/400x300?text=Cleaning+Photo+${index + 1}`
+      );
+      setPhotoUrls([...photoUrls, ...newUrls]);
+      
+      toast({
+        title: "Photos uploaded",
+        description: `${e.target.files.length} photos have been uploaded.`,
       });
     }
   };
 
-  // Handle notes change for an item
-  const handleNotesChange = (itemId: number, text: string) => {
-    setNotes(prev => ({
-      ...prev,
-      [itemId]: text
-    }));
-  };
-
-  // Handle task completion button
-  const handleCompleteTask = () => {
-    if (selectedTaskId) {
-      // Check if all required items are completed
-      const requiredItems = checklistData?.items.filter(
-        (item: ChecklistItem) => item.isRequired
-      );
-      
-      const allRequiredCompleted = requiredItems?.every(
-        (item: ChecklistItem & { completion?: ChecklistCompletion }) => 
-          item.completion?.completed || completedItems[item.id]
-      );
-      
-      if (!allRequiredCompleted) {
-        toast({
-          title: "Cannot Complete Task",
-          description: "All required checklist items must be completed first",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      completeTaskMutation.mutate({ taskId: selectedTaskId });
-    }
-  };
-
-  // Console debug helper
-  useEffect(() => {
-    console.log("Cleaning Tasks Response:", cleaningTasksData);
-  }, [cleaningTasksData]);
-
-  // Reset states when changing task
-  useEffect(() => {
-    if (selectedTaskId) {
-      setCompletedItems({});
-      setNotes({});
-    }
-  }, [selectedTaskId]);
-
-  // Main render
-  if (isTasksLoading) {
-    return (
-      <div className="container flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Clock className="mx-auto h-12 w-12 animate-spin text-primary" />
-          <p className="mt-4 text-lg">Loading your cleaning tasks...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (tasksError) {
-    return (
-      <div className="container py-8">
-        <Alert variant="destructive">
-          <AlertTitle>Error loading tasks</AlertTitle>
-          <AlertDescription>
-            {tasksError instanceof Error ? tasksError.message : "An unknown error occurred"}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  const tasks = cleaningTasksData?.tasks || [];
-
-  // If a task is selected, show the checklist
-  if (selectedTaskId) {
-    const selectedTask = tasks.find((task: CleaningTask) => task.id === selectedTaskId);
+  // Handle checklist item completion
+  const handleChecklistItemComplete = (itemId: number, completed: boolean) => {
+    if (!selectedTask) return;
     
+    completeChecklistItemMutation.mutate({
+      cleaningTaskId: selectedTask.id,
+      checklistItemId: itemId,
+      completedBy: currentUserId,
+      completed: completed,
+      completedAt: completed ? new Date().toISOString() : null,
+    });
+  };
+
+  // Show loading state
+  if (isLoading) {
     return (
-      <div className="container max-w-md mx-auto py-4 px-4">
-        <div className="flex items-center mb-4 gap-2">
-          <Button variant="outline" size="icon" onClick={() => setSelectedTaskId(null)}>
-            <Home className="h-4 w-4" />
-          </Button>
-          <h1 className="text-xl font-bold">
-            Cleaning Task #{selectedTaskId}
-          </h1>
+      <Layout>
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-[#2C2E3E]" />
         </div>
-        
-        {selectedTask && (
-          <Card className="mb-4">
-            <CardHeader>
+      </Layout>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Layout>
+        <div className="text-center py-10">
+          <p className="text-red-500">Error loading cleaning data</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Determine what tasks to display based on active tab
+  const displayedTasks = activeTab === "assigned" ? assignedTasks : completedTasks;
+
+  return (
+    <Layout>
+      <div className="space-y-4 pb-6">
+        {/* Mobile Header */}
+        <div className="flex flex-col">
+          <h1 className="text-xl font-bold text-[#2C2E3E]">Cleaning Tasks</h1>
+          <p className="text-[#9EA2B1] text-sm">
+            {activeTab === "assigned" ? "Tasks assigned to you" : "Your completed tasks"}
+          </p>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="flex items-center space-x-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search tasks..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="icon">
+            <FilterList className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Tabs for different views */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="assigned">Assigned</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
+
+          {/* Assigned Tasks Tab */}
+          <TabsContent value="assigned" className="mt-2">
+            {displayedTasks.length > 0 ? (
+              <div className="space-y-3">
+                {displayedTasks.map((task) => (
+                  <Card
+                    key={task.id}
+                    className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => {
+                      setSelectedTask(task);
+                      setShowTaskDetails(true);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium flex items-center">
+                            <Home className="h-4 w-4 mr-1.5 text-[#9EA2B1]" />
+                            {getUnitName(task.unitId)}
+                          </h3>
+                          <p className="text-sm text-[#9EA2B1] mt-1 flex items-center">
+                            <CalendarMonth className="h-3.5 w-3.5 mr-1" />
+                            {formatDate(task.scheduledFor)}
+                          </p>
+                        </div>
+                        <div>{getStatusBadge(task)}</div>
+                      </div>
+                      
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                          {task.cleaningType || "Standard"}
+                        </span>
+                        <span className="text-xs text-[#9EA2B1]">
+                          Est. time: {task.estimatedDuration || "N/A"} mins
+                        </span>
+                      </div>
+
+                      {task.hasFlaggedIssues && (
+                        <div className="mt-2">
+                          <Badge variant="destructive" className="text-xs">
+                            <Flag className="h-3 w-3 mr-1" />
+                            Has flagged issues
+                          </Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-[#9EA2B1]">
+                <Assignment className="h-12 w-12 mx-auto mb-2 text-[#C5C9D6]" />
+                <p>No assigned cleaning tasks</p>
+                <p className="text-sm mt-1">
+                  You don't have any cleaning tasks assigned to you
+                </p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Completed Tasks Tab */}
+          <TabsContent value="completed" className="mt-2">
+            {displayedTasks.length > 0 ? (
+              <div className="space-y-3">
+                {displayedTasks.map((task) => (
+                  <Card
+                    key={task.id}
+                    className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => {
+                      setSelectedTask(task);
+                      setShowTaskDetails(true);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium flex items-center">
+                            <Home className="h-4 w-4 mr-1.5 text-[#9EA2B1]" />
+                            {getUnitName(task.unitId)}
+                          </h3>
+                          <p className="text-sm text-[#9EA2B1] mt-1 flex items-center">
+                            <CheckCircle className="h-3.5 w-3.5 mr-1 text-green-600" />
+                            {formatDate(task.completedAt)}
+                          </p>
+                        </div>
+                        <div>
+                          {task.score ? (
+                            <Badge className="bg-green-100 text-green-800 border-0">
+                              {task.score}% Score
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-0">
+                              Pending QC
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                          {task.cleaningType || "Standard"}
+                        </span>
+                        <span className="text-xs text-[#9EA2B1]">
+                          {task.actualDuration ? `${task.actualDuration} mins` : "Duration N/A"}
+                        </span>
+                      </div>
+
+                      {task.photos && (
+                        <div className="mt-2 flex space-x-1">
+                          <Camera className="h-4 w-4 text-[#9EA2B1]" />
+                          <span className="text-xs text-[#9EA2B1]">
+                            {Array.isArray(task.photos) ? task.photos.length : 0} photos
+                          </span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-[#9EA2B1]">
+                <CheckCircle className="h-12 w-12 mx-auto mb-2 text-[#C5C9D6]" />
+                <p>No completed tasks</p>
+                <p className="text-sm mt-1">
+                  You haven't completed any cleaning tasks yet
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Task Details Dialog */}
+      <Dialog open={showTaskDetails} onOpenChange={setShowTaskDetails}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Task Details</DialogTitle>
+          </DialogHeader>
+          
+          {selectedTask && (
+            <div className="py-4 space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle>{`Unit #${selectedTask.unitId}`}</CardTitle>
-                  <CardDescription>
-                    Scheduled: {format(new Date(selectedTask.scheduledFor), "MMM d, yyyy h:mm a")}
-                  </CardDescription>
+                  <h3 className="font-medium flex items-center">
+                    <Home className="h-4 w-4 mr-1.5 text-[#9EA2B1]" />
+                    {getUnitName(selectedTask.unitId)}
+                  </h3>
+                  <p className="text-sm text-[#9EA2B1] mt-1">
+                    {selectedTask.status === "completed"
+                      ? `Completed: ${formatDate(selectedTask.completedAt)}`
+                      : `Scheduled: ${formatDate(selectedTask.scheduledFor)}`}
+                  </p>
                 </div>
-                <Badge variant={selectedTask.cleaningType === "deep-clean" ? "destructive" : "default"}>
-                  {selectedTask.cleaningType}
-                </Badge>
+                <div>{getStatusBadge(selectedTask)}</div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-2">
-                <p className="text-sm">Completion:</p>
-                <p className="text-sm font-bold">{calculateCompletion()}%</p>
-              </div>
-              <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-primary h-full" 
-                  style={{ width: `${calculateCompletion()}%` }}
-                ></div>
-              </div>
-              {selectedTask.notes && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium mb-1">Notes:</p>
-                  <p className="text-sm">{selectedTask.notes}</p>
+
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between">
+                  <span className="text-[#9EA2B1]">Cleaning Type:</span>
+                  <span>{selectedTask.cleaningType || "Standard"}</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-        
-        {isChecklistLoading ? (
-          <div className="text-center py-8">
-            <Clock className="mx-auto h-8 w-8 animate-spin text-primary" />
-            <p className="mt-2">Loading checklist...</p>
-          </div>
-        ) : checklistError ? (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Error loading checklist</AlertTitle>
-            <AlertDescription>
-              {checklistError instanceof Error ? checklistError.message : "An unknown error occurred"}
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <>
-            <ScrollArea className="h-[calc(100vh-230px)]">
-              {checklistData?.items?.length > 0 ? (
-                checklistData.items
-                  .sort((a: ChecklistItem, b: ChecklistItem) => a.order - b.order)
-                  .reduce((acc: Record<string, ChecklistItem[]>, item: ChecklistItem) => {
-                    if (!acc[item.room]) {
-                      acc[item.room] = [];
-                    }
-                    acc[item.room].push(item);
-                    return acc;
-                  }, {})
-                  .map((roomGroup: Record<string, ChecklistItem[]>) => {
-                    const roomName = Object.keys(roomGroup)[0];
-                    const items = roomGroup[roomName];
-                    
-                    return (
-                      <div key={roomName} className="mb-6">
-                        <h3 className="font-medium text-lg mb-2">{roomName}</h3>
-                        {items.map((item: ChecklistItem & { completion?: ChecklistCompletion }) => {
-                          const isCompleted = item.completion?.completed || completedItems[item.id] || false;
-                          
-                          return (
-                            <Card key={item.id} className={`mb-3 ${isCompleted ? "border-primary" : ""}`}>
-                              <CardContent className="p-4">
-                                <div className="flex items-start gap-2">
-                                  <Checkbox 
-                                    id={`item-${item.id}`}
-                                    checked={isCompleted}
-                                    onCheckedChange={(checked) => handleItemToggle(item.id, checked === true)}
-                                    className="mt-1"
-                                  />
-                                  <div className="flex-1">
-                                    <Label 
-                                      htmlFor={`item-${item.id}`}
-                                      className={`${isCompleted ? "line-through text-muted-foreground" : ""} ${item.isRequired ? "font-medium" : ""}`}
-                                    >
-                                      {item.description}
-                                      {item.isRequired && <span className="text-destructive ml-1">*</span>}
-                                    </Label>
-                                    
-                                    {(isCompleted || notes[item.id]) && (
-                                      <Textarea
-                                        placeholder="Add notes (optional)"
-                                        className="mt-2 min-h-[70px]"
-                                        value={notes[item.id] || item.completion?.notes || ""}
-                                        onChange={(e) => handleNotesChange(item.id, e.target.value)}
-                                      />
-                                    )}
-                                    
-                                    {item.requiresPhoto && (
-                                      <div className="mt-2 flex justify-end">
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline"
-                                          className="flex items-center gap-1 text-xs"
-                                          disabled={!isCompleted}
-                                        >
-                                          <Camera className="h-3 w-3" />
-                                          Add Photo
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    );
-                  })
-              ) : (
-                <div className="text-center py-8">
-                  <ClipboardList className="mx-auto h-8 w-8 text-muted-foreground" />
-                  <p className="mt-2 text-muted-foreground">No checklist items found for this unit</p>
+                <div className="flex justify-between">
+                  <span className="text-[#9EA2B1]">Duration:</span>
+                  <span>
+                    {selectedTask.actualDuration
+                      ? `${selectedTask.actualDuration} mins (actual)`
+                      : `${selectedTask.estimatedDuration || "N/A"} mins (est.)`}
+                  </span>
                 </div>
-              )}
-            </ScrollArea>
-            
-            <div className="mt-4 sticky bottom-0 bg-background pb-4 pt-2 border-t">
-              <Button 
-                className="w-full" 
-                size="lg"
-                onClick={handleCompleteTask}
-                disabled={completeTaskMutation.isPending || calculateCompletion() < 100}
-              >
-                {completeTaskMutation.isPending ? (
+                <div className="flex justify-between">
+                  <span className="text-[#9EA2B1]">Priority:</span>
+                  <span className="capitalize">{selectedTask.priority || "Normal"}</span>
+                </div>
+                {selectedTask.notes && (
+                  <div className="pt-2">
+                    <span className="text-[#9EA2B1] block mb-1">Notes:</span>
+                    <p className="text-sm border p-2 rounded-md bg-gray-50">
+                      {selectedTask.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Task Actions */}
+              <div className="pt-2 space-y-3">
+                {selectedTask.status !== "completed" && (
                   <>
-                    <Clock className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Mark Cleaning Complete
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        setShowTaskDetails(false);
+                        handleStartCleaning(selectedTask);
+                      }}
+                      disabled={selectedTask.status === "in-progress"}
+                    >
+                      {selectedTask.status === "in-progress" ? (
+                        <>
+                          <Schedule className="h-4 w-4 mr-2" />
+                          In Progress
+                        </>
+                      ) : (
+                        <>
+                          <Assignment className="h-4 w-4 mr-2" />
+                          Start Cleaning
+                        </>
+                      )}
+                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowTaskDetails(false);
+                          setShowFlagDialog(true);
+                        }}
+                      >
+                        <Flag className="h-4 w-4 mr-2" />
+                        Flag Issue
+                      </Button>
+                      <Button
+                        variant="default"
+                        onClick={() => {
+                          setShowTaskDetails(false);
+                          setShowTaskCompletion(true);
+                        }}
+                        disabled={selectedTask.status !== "in-progress"}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Complete
+                      </Button>
+                    </div>
                   </>
                 )}
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
 
-  // QR Code Scanner view
-  if (scanning) {
-    return (
-      <div className="container max-w-md mx-auto py-4 px-4">
-        <Button 
-          variant="outline" 
-          className="mb-4" 
-          onClick={() => setScanning(false)}
-        >
-          Cancel Scanning
-        </Button>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Scan Unit QR Code</CardTitle>
-            <CardDescription>
-              Scan the QR code posted at the unit entrance
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <QrReader
-              onResult={handleScanResult}
-              constraints={{ facingMode: "environment" }}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Default view: list of tasks
-  return (
-    <div className="container max-w-md mx-auto py-4 px-4">
-      <h1 className="text-2xl font-bold mb-6">Cleaning Tasks</h1>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="assigned">Assigned</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="assigned">
-          {tasks.filter((task: CleaningTask) => task.status === "scheduled").length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <ClipboardList className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">No assigned cleaning tasks</p>
-              </CardContent>
-            </Card>
-          ) : (
-            tasks
-              .filter((task: CleaningTask) => task.status === "scheduled")
-              .map((task: CleaningTask) => (
-                <Card key={task.id} className="mb-4">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <CardTitle>{`Unit #${task.unitId}`}</CardTitle>
-                      <Badge variant={task.cleaningType === "deep-clean" ? "destructive" : "default"}>
-                        {task.cleaningType}
-                      </Badge>
+                {selectedTask.status === "completed" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline">
+                        <Visibility className="h-4 w-4 mr-2" />
+                        View Checklist
+                      </Button>
+                      <Button variant="outline">
+                        <PhotoCamera className="h-4 w-4 mr-2" />
+                        View Photos
+                      </Button>
                     </div>
-                    <CardDescription>
-                      Scheduled for: {format(new Date(task.scheduledFor), "MMM d, yyyy h:mm a")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {task.notes && <p className="text-sm mb-2">{task.notes}</p>}
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>Estimated time: {task.estimatedDuration} mins</span>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => setScanning(true)}
-                    >
-                      Scan QR
-                    </Button>
-                    <Button 
-                      className="flex-1"
-                      onClick={() => setSelectedTaskId(task.id)}
-                    >
-                      Start Cleaning
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="text-amber-500 hover:text-amber-600"
-                      onClick={() => {
-                        setSelectedTaskId(task.id);
-                        setFlagDialogOpen(true);
-                      }}
-                    >
-                      <Flag className="h-4 w-4" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))
-          )}
-        </TabsContent>
-        
-        <TabsContent value="completed">
-          {tasks.filter((task: CleaningTask) => task.status === "completed").length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <CheckCircle className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">No completed cleaning tasks</p>
-              </CardContent>
-            </Card>
-          ) : (
-            tasks
-              .filter((task: CleaningTask) => task.status === "completed")
-              .sort((a: CleaningTask, b: CleaningTask) => 
-                new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
-              )
-              .map((task: CleaningTask) => (
-                <Card key={task.id} className="mb-4">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <CardTitle>{`Unit #${task.unitId}`}</CardTitle>
-                      <Badge variant="success">Completed</Badge>
-                    </div>
-                    <CardDescription>
-                      Completed: {task.completedAt ? format(new Date(task.completedAt), "MMM d, yyyy h:mm a") : "N/A"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        Duration: {task.actualDuration || task.estimatedDuration} mins
-                      </span>
-                    </div>
-                    {task.score && (
-                      <div className="mt-2 flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                        <span>Score: {task.score}/100</span>
-                      </div>
+                    {selectedTask.hasFlaggedIssues && (
+                      <Button
+                        variant="destructive"
+                        className="w-full"
+                      >
+                        <Flag className="h-4 w-4 mr-2" />
+                        View Flagged Issues
+                      </Button>
                     )}
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full text-amber-500 hover:text-amber-600 flex items-center gap-1"
-                      onClick={() => {
-                        setSelectedTaskId(task.id);
-                        setFlagDialogOpen(true);
-                      }}
-                    >
-                      <Flag className="h-4 w-4" />
-                      Report Issue
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))
+                  </>
+                )}
+              </div>
+            </div>
           )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Flag Dialog */}
-      <Dialog open={flagDialogOpen} onOpenChange={setFlagDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Report Cleaning Issue</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-3">
-            <div className="space-y-2">
-              <Label htmlFor="flag-type">Issue Type</Label>
-              <select
-                id="flag-type"
-                className="w-full p-2 border rounded-md"
-                value={flagType}
-                onChange={e => setFlagType(e.target.value)}
-              >
-                <option value="cleanliness">Cleanliness Issue</option>
-                <option value="damage">Damage or Breakage</option>
-                <option value="missing">Missing Item</option>
-                <option value="maintenance">Maintenance Needed</option>
-                <option value="other">Other Issue</option>
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="flag-priority">Priority</Label>
-              <select
-                id="flag-priority"
-                className="w-full p-2 border rounded-md"
-                value={flagPriority}
-                onChange={e => setFlagPriority(e.target.value)}
-              >
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="flag-description">Description</Label>
-              <Textarea
-                id="flag-description"
-                placeholder="Describe the issue in detail"
-                className="min-h-[100px]"
-                value={flagDescription}
-                onChange={e => setFlagDescription(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setFlagDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => {
-                if (!selectedTaskId) {
-                  toast({
-                    title: "Error",
-                    description: "No task selected",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                if (!flagDescription.trim()) {
-                  toast({
-                    title: "Error",
-                    description: "Please describe the issue",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                createFlagMutation.mutate({
-                  cleaningTaskId: selectedTaskId,
-                  flagType,
-                  priority: flagPriority,
-                  description: flagDescription,
-                });
-              }}
-              disabled={createFlagMutation.isPending}
-            >
-              {createFlagMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit Report"
-              )}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Task Completion Dialog */}
+      <Dialog open={showTaskCompletion} onOpenChange={setShowTaskCompletion}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Cleaning Task</DialogTitle>
+          </DialogHeader>
+          
+          {selectedTask && (
+            <div className="py-4 space-y-4">
+              <div>
+                <h3 className="font-medium">{getUnitName(selectedTask.unitId)}</h3>
+                <p className="text-sm text-[#9EA2B1]">
+                  {selectedTask.cleaningType || "Standard"} Cleaning
+                </p>
+              </div>
+
+              {/* Checklist Section */}
+              {selectedTask.checklistTemplateId && checklistItems && (
+                <div className="border rounded-md p-3 space-y-2">
+                  <h4 className="font-medium flex items-center">
+                    <Assignment className="h-4 w-4 mr-1.5" />
+                    Checklist
+                  </h4>
+                  
+                  {isLoadingChecklist ? (
+                    <div className="flex justify-center py-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-[#9EA2B1]" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {Array.isArray(checklistItems) && checklistItems.map((item: any) => {
+                        const completion = Array.isArray(checklistCompletions) && 
+                          checklistCompletions.find((c: any) => c.checklistItemId === item.id);
+                        
+                        return (
+                          <div 
+                            key={item.id} 
+                            className="flex items-start border-b pb-2"
+                          >
+                            <Checkbox 
+                              id={`item-${item.id}`}
+                              checked={completion?.completed || false}
+                              onCheckedChange={(checked) => 
+                                handleChecklistItemComplete(item.id, !!checked)
+                              }
+                              className="mt-1"
+                            />
+                            <div className="ml-2">
+                              <Label 
+                                htmlFor={`item-${item.id}`}
+                                className={`text-sm ${completion?.completed ? 'line-through text-[#9EA2B1]' : ''}`}
+                              >
+                                {item.description}
+                              </Label>
+                              <p className="text-xs text-[#9EA2B1]">
+                                {item.room}
+                                {item.requiresPhoto && ' • Photo required'}
+                                {item.isRequired && ' • Required'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completion Notes */}
+              <div>
+                <Label htmlFor="completion-notes" className="block mb-1">
+                  Completion Notes
+                </Label>
+                <Textarea
+                  id="completion-notes"
+                  placeholder="Add any notes about this cleaning task..."
+                  value={completionNotes}
+                  onChange={(e) => setCompletionNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              {/* Photo Upload */}
+              <div>
+                <Label className="block mb-1">
+                  Upload Photos
+                </Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {photoUrls.map((url, index) => (
+                    <div key={index} className="w-16 h-16 rounded bg-gray-100 relative">
+                      <img
+                        src={url}
+                        className="w-full h-full object-cover rounded"
+                        alt={`Uploaded ${index + 1}`}
+                      />
+                    </div>
+                  ))}
+                  
+                  <label htmlFor="photo-upload" className="w-16 h-16 flex items-center justify-center rounded border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-50">
+                    <Camera className="h-6 w-6 text-gray-400" />
+                    <input
+                      id="photo-upload"
+                      type="file"
+                      className="hidden"
+                      multiple
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-[#9EA2B1]">
+                  Upload photos of the completed cleaning
+                </p>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button variant="outline" onClick={() => setShowTaskCompletion(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCompleteTask}
+                  disabled={updateTaskMutation.isPending}
+                >
+                  {updateTaskMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Mark as Completed
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Flag Issue Dialog */}
+      <Dialog open={showFlagDialog} onOpenChange={setShowFlagDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Flag Cleaning Issue</DialogTitle>
+          </DialogHeader>
+          
+          {selectedTask && (
+            <div className="py-4 space-y-4">
+              <div>
+                <h3 className="font-medium">{getUnitName(selectedTask.unitId)}</h3>
+                <p className="text-sm text-[#9EA2B1]">
+                  Report an issue with this cleaning task
+                </p>
+              </div>
+
+              {/* Issue Description */}
+              <div>
+                <Label htmlFor="flag-description" className="block mb-1">
+                  Issue Description
+                </Label>
+                <Textarea
+                  id="flag-description"
+                  placeholder="Describe the issue you encountered..."
+                  value={flagDescription}
+                  onChange={(e) => setFlagDescription(e.target.value)}
+                  rows={4}
+                />
+              </div>
+
+              {/* Priority Selection */}
+              <div>
+                <Label htmlFor="flag-priority" className="block mb-1">
+                  Priority
+                </Label>
+                <select
+                  id="flag-priority"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  value={flagPriority}
+                  onChange={(e) => setFlagPriority(e.target.value)}
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              {/* Photo Upload */}
+              <div>
+                <Label className="block mb-1">
+                  Upload Photos
+                </Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {photoUrls.map((url, index) => (
+                    <div key={index} className="w-16 h-16 rounded bg-gray-100 relative">
+                      <img
+                        src={url}
+                        className="w-full h-full object-cover rounded"
+                        alt={`Uploaded ${index + 1}`}
+                      />
+                    </div>
+                  ))}
+                  
+                  <label htmlFor="flag-photo-upload" className="w-16 h-16 flex items-center justify-center rounded border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-50">
+                    <Camera className="h-6 w-6 text-gray-400" />
+                    <input
+                      id="flag-photo-upload"
+                      type="file"
+                      className="hidden"
+                      multiple
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-[#9EA2B1]">
+                  Upload photos showing the issue
+                </p>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button variant="outline" onClick={() => setShowFlagDialog(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleFlagIssue}
+                  disabled={!flagDescription || createFlagMutation.isPending}
+                >
+                  {createFlagMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Flag className="h-4 w-4 mr-2" />
+                  )}
+                  Flag Issue
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Layout>
   );
 }
