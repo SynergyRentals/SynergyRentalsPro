@@ -509,8 +509,9 @@ export default function RouteOptimization() {
                           <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 5 }}>
                             {taskOrder.map((task, index) => {
                               if (index < taskOrder.length - 1) {
-                                const currentUnit = units.find((u: any) => u.id === task.unitId);
-                                const nextUnit = units.find((u: any) => u.id === taskOrder[index + 1].unitId);
+                                const unitsList = Array.isArray(units) ? units as Unit[] : [];
+                                const currentUnit = unitsList.find((u) => u.id === task.unitId);
+                                const nextUnit = unitsList.find((u) => u.id === taskOrder[index + 1].unitId);
                                 
                                 // Calculate positions or use random relative positions if no coordinates
                                 const x1 = currentUnit?.latitude 
@@ -573,7 +574,8 @@ export default function RouteOptimization() {
                     onClick={() => {
                       // Create Google Maps URL with waypoints
                       const locations = taskOrder.map(task => {
-                        const unit = units.find((u: any) => u.id === task.unitId);
+                        const unitsList = Array.isArray(units) ? units as Unit[] : [];
+                        const unit = unitsList.find((u) => u.id === task.unitId);
                         return encodeURIComponent(unit?.address || getUnitName(task.unitId));
                       });
                       
