@@ -14,7 +14,11 @@ import { QrReader } from "@/components/ui/qr-scanner";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Home, CheckCircle, Clock, Camera, Wrench, ClipboardList, User } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { 
+  Home, CheckCircle, Clock, Camera, Wrench, ClipboardList, User, 
+  AlertTriangle, Flag, UploadCloud, X, Loader2 
+} from "lucide-react";
 import { format } from "date-fns";
 
 // Define types for our cleaning tasks and checklists
@@ -73,6 +77,23 @@ interface Unit {
   active: boolean;
 }
 
+interface CleaningFlag {
+  id: number;
+  cleaningTaskId: number;
+  reportedBy: number;
+  assignedTo: number | null;
+  status: string;
+  priority: string;
+  flagType: string;
+  description: string;
+  photos: string[] | null;
+  createdAt: Date;
+  resolvedAt: Date | null;
+  resolvedBy: number | null;
+  escalatedTo: string | null;
+  resolution: string | null;
+}
+
 export default function MobileCleaningPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -81,6 +102,10 @@ export default function MobileCleaningPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [completedItems, setCompletedItems] = useState<Record<number, boolean>>({});
+  const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+  const [flagDescription, setFlagDescription] = useState("");
+  const [flagType, setFlagType] = useState("cleanliness");
+  const [flagPriority, setFlagPriority] = useState("medium");
 
   // Fetch assigned cleaning tasks
   const { 
@@ -171,6 +196,41 @@ export default function MobileCleaningPage() {
     onError: (error: Error) => {
       toast({
         title: "Error completing task",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutation to create a cleaning flag
+  const createFlagMutation = useMutation({
+    mutationFn: async (data: {
+      cleaningTaskId: number;
+      flagType: string;
+      priority: string;
+      description: string;
+    }) => {
+      const res = await apiRequest("POST", "/api/cleaning/flags", {
+        ...data,
+        reportedBy: user?.id,
+        status: "open",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag Reported",
+        description: "Cleaning issue has been reported successfully",
+      });
+      setFlagDialogOpen(false);
+      setFlagDescription("");
+      
+      // Invalidate and refetch tasks data
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/assigned"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error Reporting Flag",
         description: error.message,
         variant: "destructive",
       });
