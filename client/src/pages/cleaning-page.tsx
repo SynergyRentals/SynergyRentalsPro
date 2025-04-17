@@ -45,6 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 // Import our new components for cleaning functionality
 import CleaningFlags from "@/components/cleaning/CleaningFlags";
 import CleanerPerformance from "@/components/cleaning/CleanerPerformance";
+import ChecklistBuilder from "@/components/cleaning/ChecklistBuilder";
 
 export default function CleaningPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -468,10 +469,11 @@ export default function CleaningPage() {
           <TabsContent value="quality-control" className="mt-4">
             {/* Tabs for different sections within Quality Control */}
             <Tabs defaultValue="overview" className="w-full mb-6">
-              <TabsList className="w-full grid grid-cols-3 lg:w-auto lg:inline-flex">
+              <TabsList className="w-full grid grid-cols-4 lg:w-auto lg:inline-flex">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="cleaner-performance">Cleaner Performance</TabsTrigger>
                 <TabsTrigger value="flagged-issues">Flagged Issues</TabsTrigger>
+                <TabsTrigger value="checklist-templates">Checklist Templates</TabsTrigger>
               </TabsList>
 
               {/* Overview Tab */}
@@ -713,6 +715,21 @@ export default function CleaningPage() {
                     <CleaningFlags status="resolved" />
                   </TabsContent>
                 </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Checklist Templates Tab */}
+          <TabsContent value="checklist-templates" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold flex items-center">
+                  <Assignment className="h-5 w-5 mr-2 text-blue-500" />
+                  Cleaning Checklist Builder
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChecklistBuilder />
               </CardContent>
             </Card>
           </TabsContent>
