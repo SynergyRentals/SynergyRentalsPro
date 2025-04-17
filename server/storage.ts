@@ -16,6 +16,8 @@ import {
   TaskComment, InsertTaskComment,
   ProjectFile, InsertProjectFile,
   AiGeneratedPlan, InsertAiGeneratedPlan,
+  // AI Planner interaction types
+  AiPlannerInteraction, InsertAiPlannerInteraction,
   // HostAI integration
   HostAiTask, InsertHostAiTask,
   // HostAI Autopilot features
@@ -212,6 +214,14 @@ export interface IStorage {
   createHostAiAutopilotLog(log: InsertHostAiAutopilotLog): Promise<typeof hostAiAutopilotLog.$inferSelect>;
   getHostAiAutopilotLogsByTask(taskId: number): Promise<typeof hostAiAutopilotLog.$inferSelect[]>;
   getAllHostAiAutopilotLogs(): Promise<typeof hostAiAutopilotLog.$inferSelect[]>;
+  
+  // AI Planner interactions
+  getAiPlannerInteraction(id: number): Promise<AiPlannerInteraction | undefined>;
+  createAiPlannerInteraction(interaction: InsertAiPlannerInteraction): Promise<AiPlannerInteraction>;
+  updateAiPlannerInteraction(id: number, interaction: Partial<AiPlannerInteraction>): Promise<AiPlannerInteraction | undefined>;
+  getAiPlannerInteractionsByUser(userId: number): Promise<AiPlannerInteraction[]>;
+  getAiPlannerInteractionsByStatus(status: string): Promise<AiPlannerInteraction[]>;
+  getAllAiPlannerInteractions(): Promise<AiPlannerInteraction[]>;
   
   // Session store
   sessionStore: session.Store;

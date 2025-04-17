@@ -1,0 +1,63 @@
+Build an AI Assistant feature within the Projects and Tasks module of the operations software. The purpose of this assistant is to help plan, optimize, and support task and project execution across scheduling, team assignment, material coordination, and problem solving.
+
+The AI Assistant should be accessible via a dedicated tab or button labeled “AI Planner” within the Projects and Tasks module. The assistant will work in an interactive, prompt-based format where a user can describe the project or task they are trying to execute, and the AI will generate a structured plan that the user can review, edit, and approve.
+
+The following features must be implemented:
+
+A text input field where the user can describe the goal or objective of the project or task. This input can include location, timeframe, resource constraints, or general instructions.
+
+After the user submits the input, the AI should generate a draft plan that includes:
+
+A suggested project or task title
+
+Estimated timeline or deadline
+
+Suggested team or role assignments
+
+List of necessary materials, tools, or steps
+
+Subtasks if applicable
+
+Recommended start and end dates
+
+The generated plan should appear in a preview pane where the user can:
+
+Edit any field manually before confirming
+
+Approve the entire plan and convert it into an active project or task
+
+Request revisions or re-run the AI with adjusted instructions
+
+The assistant should intelligently consider:
+
+Unit availability or reservation schedules (if linked to properties)
+
+Team workload and recent activity
+
+Inventory levels or previously flagged material shortages
+
+Weather or location-based scheduling blockers (planned for future versions)
+
+Include a sidebar or expandable area that allows the user to reference:
+
+Recent completed tasks
+
+Historical project templates
+
+Active inventory or team availability indicators (optional for future)
+
+Store every AI interaction and decision for visibility and accountability. This includes:
+
+Original user prompt
+
+AI-generated plan
+
+Edits made before confirmation
+
+Final approved output
+
+The assistant should use a conversational interface style, but the output must be structured and actionable. It is not just a chatbot—it is a planning assistant tied into operations.
+
+Include built-in logic to detect incomplete instructions and prompt the user for clarification before generating a plan.
+
+This assistant is part of the core functionality of the Projects and Tasks module. It should be built in a scalable and modular way so it can later support additional AI agents such as task troubleshooting, resource forecasting, or historical pattern analysis. Ensure all data is stored securely and connected to the project and task databases. Add loading states and clear user feedback for every step of the interaction.

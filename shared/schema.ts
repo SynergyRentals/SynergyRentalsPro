@@ -301,6 +301,31 @@ export const insertAiGeneratedPlanSchema = createInsertSchema(aiGeneratedPlans).
   usedInProject: true,
 });
 
+// AI Planner interactions
+export const aiPlannerInteractions = pgTable("ai_planner_interactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  prompt: text("prompt").notNull(),
+  rawAiResponse: jsonb("raw_ai_response").notNull(),
+  generatedPlan: jsonb("generated_plan").notNull(),
+  editedPlan: jsonb("edited_plan"),
+  finalPlan: jsonb("final_plan"),
+  status: text("status").notNull().default("draft"), // draft, revised, approved, implemented
+  convertedToProjectId: integer("converted_to_project_id").references(() => projects.id),
+  convertedToTaskId: integer("converted_to_task_id").references(() => projectTasks.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  feedback: text("feedback"),
+  context: jsonb("context"), // Stores context like unit availability, team workload, etc.
+});
+
+export const insertAiPlannerInteractionSchema = createInsertSchema(aiPlannerInteractions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+});
+
 // Documents
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
@@ -853,3 +878,6 @@ export type InsertInsightLog = z.infer<typeof insertInsightLogSchema>;
 
 export type HostAiTask = typeof hostAiTasks.$inferSelect;
 export type InsertHostAiTask = z.infer<typeof insertHostAiTaskSchema>;
+
+export type AiPlannerInteraction = typeof aiPlannerInteractions.$inferSelect;
+export type InsertAiPlannerInteraction = z.infer<typeof insertAiPlannerInteractionSchema>;
