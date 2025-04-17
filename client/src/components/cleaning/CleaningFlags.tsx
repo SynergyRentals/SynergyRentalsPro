@@ -185,12 +185,12 @@ export default function CleaningFlags({ status }: CleaningFlagsProps) {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select value={statusFilter || ""} onValueChange={(val) => setStatusFilter(val || null)}>
+          <Select value={statusFilter || "all"} onValueChange={(val) => setStatusFilter(val === "all" ? null : val)}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="open">Open</SelectItem>
               <SelectItem value="in-progress">In Progress</SelectItem>
               <SelectItem value="escalated">Escalated</SelectItem>
