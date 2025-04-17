@@ -180,12 +180,17 @@ export default function CleanerPerformance() {
   
   // Handle opening cleaner details
   const viewCleanerDetails = (cleanerId: number) => {
+    // Check if performanceData exists before filtering
+    if (!performanceData || !Array.isArray(performanceData)) {
+      return;
+    }
+    
     // Filter performance data for this cleaner
     const cleanerPerformance = performanceData.filter(
       (performance: any) => performance.cleanerId === cleanerId
     );
     
-    if (cleanerPerformance.length) {
+    if (cleanerPerformance && cleanerPerformance.length) {
       setViewingCleanerDetails({
         cleanerId,
         name: getCleanerName(cleanerId),
