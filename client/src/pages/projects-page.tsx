@@ -14,7 +14,9 @@ import {
   ArrowUpRight,
   ArrowRight,
   Users,
-  ClipboardList 
+  ClipboardList,
+  Filter as FilterIcon,
+  BarChart
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -32,7 +34,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -116,6 +118,12 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<any>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [taskDetailsOpen, setTaskDetailsOpen] = useState(false);
+  
+  // Advanced filtering
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<number | null>(null);
+  const [dueDateFilter, setDueDateFilter] = useState<string | null>(null); // "today", "week", "overdue"
 
   // Fetch projects
   const { data: projects, isLoading: projectsLoading, error: projectsError } = useQuery({
@@ -1027,20 +1035,203 @@ export default function ProjectsPage() {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="mt-6">
-          <div className="flex justify-between items-center space-x-4 mb-6">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search tasks..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 space-x-0 md:space-x-4 mb-6">
+            <div className="w-full md:w-auto flex-1">
+              <div className="relative w-full">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search tasks..."
+                  className="pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
-            <Button onClick={() => window.location.href = "/projects/new-task"}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
+            
+            <div className="w-full md:w-auto flex gap-3 flex-wrap justify-end">
+              {/* Advanced Filtering */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-1 min-w-[120px]">
+                    <FilterIcon className="h-4 w-4 mr-1" />
+                    Filter
+                    {(statusFilter || priorityFilter || assigneeFilter || dueDateFilter) && (
+                      <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center">
+                        {[statusFilter, priorityFilter, assigneeFilter, dueDateFilter].filter(Boolean).length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Filter Tasks</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  <div className="p-2">
+                    <h4 className="mb-2 text-sm font-medium">Status</h4>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Button 
+                        variant={statusFilter === "in-progress" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setStatusFilter(statusFilter === "in-progress" ? null : "in-progress")}
+                      >
+                        In Progress
+                      </Button>
+                      <Button 
+                        variant={statusFilter === "blocked" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setStatusFilter(statusFilter === "blocked" ? null : "blocked")}
+                      >
+                        Blocked
+                      </Button>
+                      <Button 
+                        variant={statusFilter === "planning" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setStatusFilter(statusFilter === "planning" ? null : "planning")}
+                      >
+                        Planning
+                      </Button>
+                      <Button 
+                        variant={statusFilter === "completed" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setStatusFilter(statusFilter === "completed" ? null : "completed")}
+                      >
+                        Completed
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <div className="p-2">
+                    <h4 className="mb-2 text-sm font-medium">Priority</h4>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Button 
+                        variant={priorityFilter === "urgent" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setPriorityFilter(priorityFilter === "urgent" ? null : "urgent")}
+                      >
+                        Urgent
+                      </Button>
+                      <Button 
+                        variant={priorityFilter === "high" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setPriorityFilter(priorityFilter === "high" ? null : "high")}
+                      >
+                        High
+                      </Button>
+                      <Button 
+                        variant={priorityFilter === "normal" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setPriorityFilter(priorityFilter === "normal" ? null : "normal")}
+                      >
+                        Normal
+                      </Button>
+                      <Button 
+                        variant={priorityFilter === "low" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setPriorityFilter(priorityFilter === "low" ? null : "low")}
+                      >
+                        Low
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <div className="p-2">
+                    <h4 className="mb-2 text-sm font-medium">Due Date</h4>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Button 
+                        variant={dueDateFilter === "today" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setDueDateFilter(dueDateFilter === "today" ? null : "today")}
+                      >
+                        Today
+                      </Button>
+                      <Button 
+                        variant={dueDateFilter === "week" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setDueDateFilter(dueDateFilter === "week" ? null : "week")}
+                      >
+                        This Week
+                      </Button>
+                      <Button 
+                        variant={dueDateFilter === "overdue" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setDueDateFilter(dueDateFilter === "overdue" ? null : "overdue")}
+                      >
+                        Overdue
+                      </Button>
+                      <Button 
+                        variant={dueDateFilter === "none" ? "default" : "outline"} 
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setDueDateFilter(dueDateFilter === "none" ? null : "none")}
+                      >
+                        No Date
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <div className="p-2">
+                    <h4 className="mb-2 text-sm font-medium">Assigned To</h4>
+                    <Select 
+                      value={assigneeFilter?.toString() || ""}
+                      onValueChange={(value) => setAssigneeFilter(value ? parseInt(value) : null)}
+                    >
+                      <SelectTrigger className="w-full h-8 text-xs">
+                        <SelectValue placeholder="Select person" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Any Assignee</SelectItem>
+                        {users?.map((user: any) => (
+                          <SelectItem key={user.id} value={user.id.toString()}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="-1">Unassigned</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <div className="p-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => {
+                        setStatusFilter(null);
+                        setPriorityFilter(null);
+                        setAssigneeFilter(null);
+                        setDueDateFilter(null);
+                      }}
+                    >
+                      Clear All Filters
+                    </Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Button onClick={() => window.location.href = "/projects/new-task"}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </div>
           </div>
           
           {tasksLoading ? (
@@ -1072,9 +1263,53 @@ export default function ProjectsPage() {
             <div className="space-y-3">
               {allTasks
                 .filter((task: any) => {
-                  return searchQuery === "" || 
+                  // Text search filter
+                  const matchesSearch = searchQuery === "" || 
                     task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     (task.notes && task.notes.toLowerCase().includes(searchQuery.toLowerCase()));
+                  
+                  // Status filter
+                  const matchesStatus = !statusFilter || task.status === statusFilter;
+                  
+                  // Priority filter
+                  const matchesPriority = !priorityFilter || task.priority === priorityFilter;
+                  
+                  // Assignee filter
+                  const matchesAssignee = !assigneeFilter ||
+                    (assigneeFilter === -1 && !task.assignedTo) ||
+                    task.assignedTo === assigneeFilter;
+                  
+                  // Due date filter
+                  let matchesDueDate = true;
+                  if (dueDateFilter) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    const nextWeek = new Date(today);
+                    nextWeek.setDate(today.getDate() + 7);
+                    
+                    switch (dueDateFilter) {
+                      case "today":
+                        matchesDueDate = task.dueDate && isToday(new Date(task.dueDate));
+                        break;
+                      case "week":
+                        const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+                        matchesDueDate = dueDate && 
+                          dueDate >= today && 
+                          dueDate < nextWeek;
+                        break;
+                      case "overdue":
+                        matchesDueDate = task.dueDate && 
+                          isPast(new Date(task.dueDate)) && 
+                          !isToday(new Date(task.dueDate));
+                        break;
+                      case "none":
+                        matchesDueDate = !task.dueDate;
+                        break;
+                    }
+                  }
+                  
+                  return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && matchesDueDate;
                 })
                 .sort((a: any, b: any) => {
                   // Sort by priority first, then by due date
