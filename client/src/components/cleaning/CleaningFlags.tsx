@@ -29,9 +29,13 @@ import {
 } from "lucide-react";
 
 // Cleaning Flag component displays all cleaning flags with filtering capabilities
-export default function CleaningFlags() {
+interface CleaningFlagsProps {
+  status?: string;
+}
+
+export default function CleaningFlags({ status }: CleaningFlagsProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(status || null);
   const [selectedFlag, setSelectedFlag] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isResolveDialogOpen, setIsResolveDialogOpen] = useState(false);
