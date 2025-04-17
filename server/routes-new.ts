@@ -74,11 +74,39 @@ export function setupRoutes(app: Express) {
 
   router.get("/properties/:id/calendar", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const events = await PropertyService.getPropertyCalendar(parseInt(req.params.id));
+      const refresh = req.query.refresh === 'true';
+      const events = await PropertyService.getPropertyCalendar(parseInt(req.params.id), refresh);
       res.json(events);
     } catch (error) {
       console.error(`Error fetching calendar for property ${req.params.id}:`, error);
       res.status(500).json({ message: "Failed to fetch property calendar" });
+    }
+  });
+  
+  // Endpoint to explicitly refresh the calendar data
+  router.post("/properties/:id/refresh-calendar", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await PropertyService.getPropertyById(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      
+      if (!property.icalUrl) {
+        return res.status(400).json({ message: "Property does not have an iCal URL configured" });
+      }
+      
+      // Force refresh by passing true
+      const events = await PropertyService.getPropertyCalendar(propertyId, true);
+      res.json({ 
+        success: true, 
+        message: "Calendar data refreshed successfully", 
+        eventsCount: events.length 
+      });
+    } catch (error) {
+      console.error(`Error refreshing calendar for property ${req.params.id}:`, error);
+      res.status(500).json({ message: "Failed to refresh property calendar" });
     }
   });
 

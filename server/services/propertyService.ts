@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { properties } from "../../shared/schema-new";
 import { eq } from "drizzle-orm";
-import { processIcalURL } from "./icalService";
+import { processIcalURL, clearIcalCache } from "./icalService";
 
 // Get all properties
 export async function getAllProperties() {
@@ -85,13 +85,19 @@ export async function deleteProperty(id: number) {
 }
 
 // Get property calendar
-export async function getPropertyCalendar(id: number) {
+export async function getPropertyCalendar(id: number, refresh: boolean = false) {
   try {
     // Fetch the property to get the iCal URL
     const property = await getPropertyById(id);
     
     if (!property || !property.icalUrl) {
       return []; // Return empty array if property has no iCal URL
+    }
+    
+    // Clear cache if refresh is requested
+    if (refresh && property.icalUrl) {
+      console.log(`Refreshing iCal cache for property ${id} with URL: ${property.icalUrl}`);
+      clearIcalCache(property.icalUrl);
     }
     
     // Process the iCal URL and return events
