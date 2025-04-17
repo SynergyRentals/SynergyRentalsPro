@@ -7,6 +7,7 @@ import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
 import GuestsPage from "@/pages/guests-page";
 import CleaningPage from "@/pages/cleaning-page";
+import CleaningSettingsPage from "@/pages/cleaning-settings-page";
 import MobileCleaningPage from "@/pages/mobile-cleaning-page";
 import MaintenancePage from "@/pages/maintenance-page";
 import InventoryPage from "@/pages/inventory-page";
@@ -36,6 +37,7 @@ function Router() {
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/guests" component={GuestsPage} />
       <ProtectedRoute path="/cleaning" component={CleaningPage} />
+      <ProtectedRoute path="/cleaning-settings" component={CleaningSettingsPage} />
       <ProtectedRoute path="/mobile-cleaning" component={MobileCleaningPage} />
       <ProtectedRoute path="/maintenance" component={MaintenancePage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />
