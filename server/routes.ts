@@ -3714,22 +3714,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all HostAI tasks
   app.get("/api/hostai/tasks", checkAuth, async (req: Request, res: Response) => {
     try {
+      console.log("HostAI tasks endpoint called - starting database query...");
       const tasks = await storage.getAllHostAiTasks();
       
       // Ensure we're returning an array even if db query has issues
       if (!Array.isArray(tasks)) {
         console.warn('HostAI tasks response is not an array, converting to empty array');
-        return res.json([]);
+        // Force JSON content type before sending response
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(JSON.stringify([]));
       }
       
-      // Set appropriate content type to ensure JSON response
+      console.log(`Retrieved ${tasks.length} tasks from database`);
+      
+      // Force JSON content type
       res.setHeader('Content-Type', 'application/json');
-      res.json(tasks);
+      
+      // Use send with stringified JSON instead of res.json to ensure proper content type
+      return res.send(JSON.stringify(tasks));
     } catch (error) {
       console.error('Error retrieving HostAI tasks:', error);
-      // Return empty array instead of error object to prevent React Query from showing error
-      // This way the component will display "No tasks" instead of error message
-      res.json([]);
+      // Force JSON content type before sending error response
+      res.setHeader('Content-Type', 'application/json');
+      // Return empty array instead of error object
+      return res.send(JSON.stringify([]));
     }
   });
   
@@ -3794,49 +3802,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get HostAI tasks by status
   app.get("/api/hostai/tasks/status/:status", checkAuth, async (req: Request, res: Response) => {
     try {
+      console.log(`HostAI tasks by status endpoint called - status: ${req.params.status}`);
       const { status } = req.params;
       const tasks = await storage.getHostAiTasksByStatus(status);
       
       // Ensure we're returning an array even if db query has issues
       if (!Array.isArray(tasks)) {
         console.warn('HostAI tasks by status response is not an array, converting to empty array');
-        return res.json([]);
+        // Force JSON content type before sending response
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(JSON.stringify([]));
       }
       
-      // Set appropriate content type to ensure JSON response
+      console.log(`Retrieved ${tasks.length} tasks with status ${status} from database`);
+      
+      // Force JSON content type
       res.setHeader('Content-Type', 'application/json');
-      res.json(tasks);
+      
+      // Use send with stringified JSON instead of res.json to ensure proper content type
+      return res.send(JSON.stringify(tasks));
     } catch (error) {
       console.error('Error retrieving HostAI tasks by status:', error);
+      // Force JSON content type before sending error response
+      res.setHeader('Content-Type', 'application/json');
       // Return empty array instead of error object
-      res.json([]);
+      return res.send(JSON.stringify([]));
     }
   });
 
   // HostAI Autopilot Settings Endpoints
   app.get("/api/settings/hostai-autopilot", checkAuth, async (req: Request, res: Response) => {
     try {
+      console.log("Fetching HostAI autopilot settings...");
       // Default to user ID 1 if user is not available (for development/testing)
       const userId = req.user?.id || 1;
       const settings = await storage.getHostAiAutopilotSettings(userId);
       
       // If no settings exist yet, return default settings
       if (!settings) {
-        res.json({ 
+        const defaultSettings = { 
           enabled: false, 
           confidenceThreshold: 0.85,
           userId
-        });
-        return;
+        };
+        
+        console.log("No settings found, returning defaults:", defaultSettings);
+        
+        // Force JSON content type
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(JSON.stringify(defaultSettings));
       }
       
-      res.json(settings);
+      console.log("Retrieved settings:", settings);
+      
+      // Force JSON content type
+      res.setHeader('Content-Type', 'application/json');
+      return res.send(JSON.stringify(settings));
     } catch (error) {
       console.error("Error fetching autopilot settings:", error);
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
+      
+      // Force JSON content type even for errors
+      res.setHeader('Content-Type', 'application/json');
+      
+      // Return a default structure instead of error
+      return res.send(JSON.stringify({
+        enabled: false,
+        confidenceThreshold: 0.85,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }));
     }
   });
 
@@ -3900,23 +3933,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HostAI Autopilot Log Endpoints
   app.get("/api/hostai/autopilot-log", checkAuth, async (req: Request, res: Response) => {
     try {
+      console.log("Fetching HostAI autopilot logs...");
       // Get optional task ID from query param
       const taskId = req.query.taskId ? parseInt(req.query.taskId as string) : undefined;
       
       let logs;
       if (taskId) {
+        console.log(`Fetching logs for task ID: ${taskId}`);
         logs = await storage.getHostAiAutopilotLogsByTask(taskId);
       } else {
+        console.log("Fetching all logs");
         logs = await storage.getAllHostAiAutopilotLogs();
       }
       
-      res.json(logs);
+      // Ensure logs is always an array
+      if (!Array.isArray(logs)) {
+        console.warn("Logs from database is not an array, converting to empty array");
+        logs = [];
+      }
+      
+      console.log(`Retrieved ${logs.length} logs`);
+      
+      // Force JSON content type
+      res.setHeader('Content-Type', 'application/json');
+      return res.send(JSON.stringify(logs));
     } catch (error) {
       console.error("Error fetching autopilot logs:", error);
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
+      
+      // Force JSON content type even for errors
+      res.setHeader('Content-Type', 'application/json');
+      
+      // Return empty array for errors to avoid breaking the UI
+      return res.send(JSON.stringify([]));
     }
   });
 
