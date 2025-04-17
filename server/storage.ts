@@ -197,6 +197,8 @@ export class MemStorage implements IStorage {
   private cleaningChecklists: Map<number, CleaningChecklist>;
   private cleaningChecklistItems: Map<number, CleaningChecklistItem>;
   private cleaningChecklistCompletions: Map<number, CleaningChecklistCompletion>;
+  private cleaningFlags: Map<number, CleaningFlag>;
+  private cleanerPerformance: Map<number, CleanerPerformance>;
   // New Project Task module maps
   private projectMilestones: Map<number, ProjectMilestone>;
   private projectTasks: Map<number, ProjectTask>;
@@ -226,6 +228,8 @@ export class MemStorage implements IStorage {
   private cleaningChecklistIdCounter: number;
   private cleaningChecklistItemIdCounter: number;
   private cleaningChecklistCompletionIdCounter: number;
+  private cleaningFlagIdCounter: number;
+  private cleanerPerformanceIdCounter: number;
   // New Project Task module counters
   private projectMilestoneIdCounter: number;
   private projectTaskIdCounter: number;
@@ -253,6 +257,8 @@ export class MemStorage implements IStorage {
     this.cleaningChecklists = new Map();
     this.cleaningChecklistItems = new Map();
     this.cleaningChecklistCompletions = new Map();
+    this.cleaningFlags = new Map();
+    this.cleanerPerformance = new Map();
     // Initialize Project Task module maps
     this.projectMilestones = new Map();
     this.projectTasks = new Map();
@@ -279,6 +285,8 @@ export class MemStorage implements IStorage {
     this.cleaningChecklistIdCounter = 1;
     this.cleaningChecklistItemIdCounter = 1;
     this.cleaningChecklistCompletionIdCounter = 1;
+    this.cleaningFlagIdCounter = 1;
+    this.cleanerPerformanceIdCounter = 1;
     // Initialize Project Task module counters
     this.projectMilestoneIdCounter = 1;
     this.projectTaskIdCounter = 1;

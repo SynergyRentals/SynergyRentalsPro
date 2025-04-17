@@ -339,14 +339,14 @@ export const insertLogSchema = createInsertSchema(logs).omit({
 export const cleaningTasks = pgTable("cleaning_tasks", {
   id: serial("id").primaryKey(),
   unitId: integer("unit_id").notNull(),
-  status: text("status").notNull().default("scheduled"), // scheduled, in-progress, completed, verified
+  status: text("status").notNull().default("scheduled"), // scheduled, in-progress, completed, verified, flagged
   scheduledFor: timestamp("scheduled_for").notNull(),
   assignedTo: integer("assigned_to"), // user_id of cleaner
   assignedBy: integer("assigned_by"), // user_id of manager
   completedAt: timestamp("completed_at"),
   verifiedAt: timestamp("verified_at"),
   verifiedBy: integer("verified_by"), // user_id of verifier
-  cleaningType: text("cleaning_type").notNull().default("turnover"), // turnover, deep-clean, maintenance
+  cleaningType: text("cleaning_type").notNull().default("turnover"), // turnover, deep-clean, mid-stay, maintenance
   estimatedDuration: integer("estimated_duration"), // in minutes
   actualDuration: integer("actual_duration"), // in minutes
   notes: text("notes"),
@@ -355,6 +355,11 @@ export const cleaningTasks = pgTable("cleaning_tasks", {
   score: integer("score"), // cleanliness score (1-100)
   isInspection: boolean("is_inspection").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  routeOrder: integer("route_order"), // order in the cleaning route
+  priority: text("priority").default("normal"), // low, normal, high, urgent
+  checkInDate: timestamp("check_in_date"), // guest check-in date
+  checkOutDate: timestamp("check_out_date"), // guest check-out date
+  hasFlaggedIssues: boolean("has_flagged_issues").default(false), // indicates if there are flagged issues
 });
 
 export const insertCleaningTaskSchema = createInsertSchema(cleaningTasks)
@@ -415,6 +420,7 @@ export const cleaningChecklistCompletions = pgTable("cleaning_checklist_completi
   completedAt: timestamp("completed_at"),
   completedBy: integer("completed_by"), // user_id
   photoUrl: text("photo_url"),
+  referencePhotoUrl: text("reference_photo_url"), // reference photo for comparison
   notes: text("notes"),
 });
 
@@ -422,6 +428,52 @@ export const insertCleaningChecklistCompletionSchema = createInsertSchema(cleani
   id: true,
   completed: true,
   completedAt: true,
+});
+
+// Cleaning Flags (issues reported during cleaning)
+export const cleaningFlags = pgTable("cleaning_flags", {
+  id: serial("id").primaryKey(),
+  cleaningTaskId: integer("cleaning_task_id").notNull(),
+  reportedBy: integer("reported_by").notNull(), // user_id who reported the issue
+  flagType: text("flag_type").notNull(), // damage, missing-item, access-issue, cleaning-issue, etc.
+  description: text("description").notNull(),
+  status: text("status").notNull().default("open"), // open, in-progress, resolved, escalated
+  priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
+  photos: text("photos").array(),
+  escalatedTo: text("escalated_to"), // maintenance, inventory, ops
+  assignedTo: integer("assigned_to"), // user_id of person handling the issue
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: integer("resolved_by"), // user_id of person who resolved the issue
+  resolution: text("resolution"), // description of how the issue was resolved
+});
+
+export const insertCleaningFlagSchema = createInsertSchema(cleaningFlags).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+  status: true,
+});
+
+// Cleaner Performance Metrics
+export const cleanerPerformance = pgTable("cleaner_performance", {
+  id: serial("id").primaryKey(),
+  cleanerId: integer("cleaner_id").notNull().references(() => users.id),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  tasksCompleted: integer("tasks_completed").notNull().default(0),
+  avgScore: integer("avg_score"), // average quality score (1-100)
+  avgDuration: integer("avg_duration"), // average duration in minutes
+  flagsReceived: integer("flags_received").default(0),
+  onTimePercentage: integer("on_time_percentage"), // percentage of on-time completions
+  photoQualityScore: integer("photo_quality_score"), // quality of uploaded photos (1-100)
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCleanerPerformanceSchema = createInsertSchema(cleanerPerformance).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Guesty Properties
@@ -644,6 +696,12 @@ export type InsertCleaningChecklistItem = z.infer<typeof insertCleaningChecklist
 
 export type CleaningChecklistCompletion = typeof cleaningChecklistCompletions.$inferSelect;
 export type InsertCleaningChecklistCompletion = z.infer<typeof insertCleaningChecklistCompletionSchema>;
+
+export type CleaningFlag = typeof cleaningFlags.$inferSelect;
+export type InsertCleaningFlag = z.infer<typeof insertCleaningFlagSchema>;
+
+export type CleanerPerformance = typeof cleanerPerformance.$inferSelect;
+export type InsertCleanerPerformance = z.infer<typeof insertCleanerPerformanceSchema>;
 
 export type GuestyProperty = typeof guestyProperties.$inferSelect;
 export type InsertGuestyProperty = z.infer<typeof insertGuestyPropertySchema>;
