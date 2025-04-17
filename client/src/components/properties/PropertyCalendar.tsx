@@ -62,9 +62,11 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
   };
 
   // Find check-out events for a day (events that end on this day)
+  // Note: In iCal standard, the end date is the day AFTER the checkout day
+  // So we need to subtract one day to get the actual checkout date
   const getCheckOutsForDay = (day: Date) => {
     return processedEvents.filter(event => 
-      isSameDay(day, event.end as Date)
+      isSameDay(day, addDays(event.end as Date, -1))
     );
   };
 
@@ -150,7 +152,8 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                 {/* First render connecting bars */}
                                 {dayEvents.map((event, eventIndex) => {
                                   const isFirstDay = isSameDay(day, event.start as Date);
-                                  const isLastDay = isSameDay(day, event.end as Date);
+                                  const actualCheckoutDay = addDays(event.end as Date, -1);
+                                  const isLastDay = isSameDay(day, actualCheckoutDay);
                                   const isWithinEvent = !isFirstDay && !isLastDay;
                                   
                                   // Bar color is always yellow
@@ -189,7 +192,8 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                 {/* Then render dots on top of bars */}
                                 {dayEvents.map((event, eventIndex) => {
                                   const isFirstDay = isSameDay(day, event.start as Date);
-                                  const isLastDay = isSameDay(day, event.end as Date);
+                                  const actualCheckoutDay = addDays(event.end as Date, -1);
+                                  const isLastDay = isSameDay(day, actualCheckoutDay);
                                   
                                   // For dots, we use blue
                                   const dotColorClass = "bg-blue-500";
@@ -249,7 +253,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                           <div>
                                             <p className="font-medium">{event.title}</p>
                                             <p className="text-xs">
-                                              {format(event.start as Date, 'MMM d, yyyy')} - {format(event.end as Date, 'MMM d, yyyy')}
+                                              {format(event.start as Date, 'MMM d, yyyy')} - {format(addDays(event.end as Date, -1), 'MMM d, yyyy')}
                                             </p>
                                             <p className="text-xs">ID: {event.uid.substring(0, 8)}...</p>
                                             {event.status && (
