@@ -70,10 +70,16 @@ export default function CleaningPage() {
   // Use all cleaning tasks from API endpoint (they're already filtered)
   const cleaningTasks = tasks || [];
 
-  // Group by status
+  // Group by status and filter by priority
   const scheduledTasks = Array.isArray(cleaningTasks) 
     ? cleaningTasks
         .filter((task) => task.status !== "completed")
+        // Apply priority filter if set to anything other than "all"
+        .filter((task) => {
+          if (priorityFilter === "all") return true;
+          const taskPriority = task.priority ? task.priority as string : "normal";
+          return taskPriority === priorityFilter;
+        })
         .sort((a, b) => {
           // Define priority order (higher to lower)
           const priorityOrder: Record<string, number> = { 
