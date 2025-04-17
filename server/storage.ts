@@ -40,6 +40,21 @@ export interface IStorage {
   updateUser(id: number, user: Partial<User>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   
+  // Cleaning Flags
+  getCleaningFlag(id: number): Promise<CleaningFlag | undefined>;
+  createCleaningFlag(flag: InsertCleaningFlag): Promise<CleaningFlag>;
+  updateCleaningFlag(id: number, flag: Partial<CleaningFlag>): Promise<CleaningFlag | undefined>;
+  getAllCleaningFlags(): Promise<CleaningFlag[]>;
+  getCleaningFlagsByTask(taskId: number): Promise<CleaningFlag[]>;
+  getCleaningFlagsByStatus(status: string): Promise<CleaningFlag[]>;
+  
+  // Cleaner Performance
+  getCleanerPerformance(id: number): Promise<CleanerPerformance | undefined>;
+  createCleanerPerformance(performance: InsertCleanerPerformance): Promise<CleanerPerformance>;
+  updateCleanerPerformance(id: number, performance: Partial<CleanerPerformance>): Promise<CleanerPerformance | undefined>;
+  getAllCleanerPerformance(): Promise<CleanerPerformance[]>;
+  getCleanerPerformanceByUser(userId: number): Promise<CleanerPerformance[]>;
+  
   // Units
   getUnit(id: number): Promise<Unit | undefined>;
   createUnit(unit: InsertUnit): Promise<Unit>;
@@ -1803,6 +1818,96 @@ export class DatabaseStorage implements IStorage {
   
   async getCleaningChecklistCompletionsByTask(taskId: number): Promise<CleaningChecklistCompletion[]> {
     return await db.select().from(schema.cleaningChecklistCompletions).where(eq(schema.cleaningChecklistCompletions.cleaningTaskId, taskId));
+  }
+  
+  // Cleaning Flags Methods
+  async getCleaningFlag(id: number): Promise<CleaningFlag | undefined> {
+    const [flag] = await db.select().from(schema.cleaningFlags).where(eq(schema.cleaningFlags.id, id));
+    return flag;
+  }
+  
+  async createCleaningFlag(insertFlag: InsertCleaningFlag): Promise<CleaningFlag> {
+    const [flag] = await db.insert(schema.cleaningFlags).values({
+      ...insertFlag,
+      createdAt: new Date(),
+      resolvedAt: null,
+      photos: insertFlag.photos || null
+    }).returning();
+    
+    // Update the cleaning task to indicate it has flagged issues
+    if (insertFlag.cleaningTaskId) {
+      await db.update(schema.cleaningTasks)
+        .set({ hasFlaggedIssues: true })
+        .where(eq(schema.cleaningTasks.id, insertFlag.cleaningTaskId));
+    }
+    
+    return flag;
+  }
+  
+  async updateCleaningFlag(id: number, flagData: Partial<CleaningFlag>): Promise<CleaningFlag | undefined> {
+    // If flag is being marked as resolved, set resolvedAt
+    if (flagData.status === 'resolved') {
+      const [flag] = await db.select().from(schema.cleaningFlags).where(eq(schema.cleaningFlags.id, id));
+      if (flag && flag.status !== 'resolved') {
+        flagData.resolvedAt = new Date();
+      }
+    }
+    
+    const [updatedFlag] = await db.update(schema.cleaningFlags)
+      .set(flagData)
+      .where(eq(schema.cleaningFlags.id, id))
+      .returning();
+    return updatedFlag;
+  }
+  
+  async getAllCleaningFlags(): Promise<CleaningFlag[]> {
+    return await db.select().from(schema.cleaningFlags);
+  }
+  
+  async getCleaningFlagsByTask(taskId: number): Promise<CleaningFlag[]> {
+    return await db.select().from(schema.cleaningFlags)
+      .where(eq(schema.cleaningFlags.cleaningTaskId, taskId));
+  }
+  
+  async getCleaningFlagsByStatus(status: string): Promise<CleaningFlag[]> {
+    return await db.select().from(schema.cleaningFlags)
+      .where(eq(schema.cleaningFlags.status, status));
+  }
+  
+  // Cleaner Performance Methods
+  async getCleanerPerformance(id: number): Promise<CleanerPerformance | undefined> {
+    const [performance] = await db.select().from(schema.cleanerPerformance).where(eq(schema.cleanerPerformance.id, id));
+    return performance;
+  }
+  
+  async createCleanerPerformance(insertPerformance: InsertCleanerPerformance): Promise<CleanerPerformance> {
+    const [performance] = await db.insert(schema.cleanerPerformance).values({
+      ...insertPerformance,
+      tasksCompleted: insertPerformance.tasksCompleted || 0,
+      avgScore: insertPerformance.avgScore || null,
+      avgDuration: insertPerformance.avgDuration || null,
+      flagsReceived: insertPerformance.flagsReceived || 0,
+      onTimePercentage: insertPerformance.onTimePercentage || null,
+      photoQualityScore: insertPerformance.photoQualityScore || null
+    }).returning();
+    return performance;
+  }
+  
+  async updateCleanerPerformance(id: number, performanceData: Partial<CleanerPerformance>): Promise<CleanerPerformance | undefined> {
+    const [updatedPerformance] = await db.update(schema.cleanerPerformance)
+      .set(performanceData)
+      .where(eq(schema.cleanerPerformance.id, id))
+      .returning();
+    return updatedPerformance;
+  }
+  
+  async getAllCleanerPerformance(): Promise<CleanerPerformance[]> {
+    return await db.select().from(schema.cleanerPerformance);
+  }
+  
+  async getCleanerPerformanceByUser(userId: number): Promise<CleanerPerformance[]> {
+    return await db.select().from(schema.cleanerPerformance)
+      .where(eq(schema.cleanerPerformance.cleanerId, userId));
   }
   
   // HostAI Task Methods
