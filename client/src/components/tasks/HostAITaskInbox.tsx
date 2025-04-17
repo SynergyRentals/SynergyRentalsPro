@@ -13,7 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Import the SchedulingCard component
 import { SchedulingCard } from "@/components/tasks/SchedulingCard";

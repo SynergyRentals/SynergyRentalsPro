@@ -53,7 +53,7 @@ export default function HostAIInboxPage() {
 
   // Update autopilot enabled state when settings data is loaded
   useEffect(() => {
-    if (settings && 'enabled' in settings) {
+    if (settings && typeof settings === 'object' && settings !== null && 'enabled' in settings) {
       setAutopilotEnabled(settings.enabled);
     }
   }, [settings]);
