@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
+import { SwipeableTaskCard } from "./SwipeableTaskCard";
 import {
   Map,
   MapPin,
@@ -456,276 +457,241 @@ export default function MobileRouteOptimization() {
             const isCheckedIn = checkInStatus[task.id] || false;
             
             return (
-              <motion.div 
-                key={task.id} 
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                whileTap={{ scale: 0.98 }}
+              <SwipeableTaskCard
+                key={task.id}
+                isActive={isActive}
+                onSwipeRight={() => handleCheckIn(task.id)}
+                onSwipeLeft={() => setSelectedTask(task)}
               >
-                <motion.div
-                  drag="x"
-                  dragConstraints={{ left: 0, right: 0 }}
-                  dragElastic={0.2}
-                  onDragEnd={(e, info) => {
-                    if (info.offset.x > 100) {
-                      // Swiped right - quick check-in
-                      handleCheckIn(task.id);
-                    } else if (info.offset.x < -100) {
-                      // Swiped left - show details
-                      setSelectedTask(task);
-                    }
-                  }}
-                >
-                  <div className="relative overflow-hidden">
-                    {/* Left action hint */}
-                    <div className="absolute inset-y-0 left-0 w-16 flex items-center justify-center text-green-500 opacity-0 swipe-hint-left">
-                      <CheckCircle className="h-6 w-6" />
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center">
+                    <div className="bg-gray-100 w-7 h-7 rounded-full flex items-center justify-center mr-3 text-gray-700 font-medium text-sm">
+                      {(task.routeOrder || index) + 1}
                     </div>
-                    
-                    {/* Right action hint */}
-                    <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center text-blue-500 opacity-0 swipe-hint-right">
-                      <ChevronRight className="h-6 w-6" />
-                    </div>
-                    
-                    <Card 
-                      className={`${isActive ? 'border-blue-500 bg-blue-50' : ''}`}
-                    >
-                      <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center">
-                      <div className="bg-gray-100 w-7 h-7 rounded-full flex items-center justify-center mr-3 text-gray-700 font-medium text-sm">
-                        {(task.routeOrder || index) + 1}
-                      </div>
-                      <div>
-                        <div className="font-medium">{unit?.name || `Property #${task.unitId}`}</div>
-                        <div className="text-sm text-gray-500">
-                          {unit?.address || "Address unknown"}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setSelectedTask(task)}>
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onSelect={() => startNavigation(unit?.address || "")}
-                          disabled={!unit?.address}
-                        >
-                          Navigate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onSelect={() => handleCheckIn(task.id)}
-                          disabled={isCheckedIn}
-                        >
-                          Check In
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mt-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                        <span className="text-sm">{formatScheduledTime(task.scheduledFor)}</span>
-                      </div>
-                      
-                      {currentLocation && unit?.latitude && unit?.longitude && (
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-                          <span className="text-sm">
-                            {getDistanceToProperty(task.unitId)}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {getPriorityBadge(task.priority)}
-                    </div>
-                    
                     <div>
-                      {isCheckedIn ? (
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Checked In {arrivalTimes[task.id]}
-                        </Badge>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => startNavigation(unit?.address || "")}
-                          disabled={!unit?.address}
-                        >
-                          <Navigation className="h-4 w-4 mr-1" />
-                          Directions
-                        </Button>
-                      )}
+                      <div className="font-medium">{unit?.name || `Property #${task.unitId}`}</div>
+                      <div className="text-sm text-gray-500">
+                        {unit?.address || "Address unknown"}
+                      </div>
                     </div>
                   </div>
                   
-                  {/* Task sheet with extended details and actions */}
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <div 
-                        className="mt-3 py-2 flex items-center justify-center text-sm text-blue-600 cursor-pointer hover:text-blue-800"
-                        onClick={() => setSelectedTask(task)}
-                      >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setSelectedTask(task)}>
                         View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onSelect={() => startNavigation(unit?.address || "")}
+                        disabled={!unit?.address}
+                      >
+                        Navigate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onSelect={() => handleCheckIn(task.id)}
+                        disabled={isCheckedIn}
+                      >
+                        Check In
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                      <span className="text-sm">{formatScheduledTime(task.scheduledFor)}</span>
+                    </div>
+                    
+                    {currentLocation && unit?.latitude && unit?.longitude && (
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+                        <span className="text-sm">
+                          {getDistanceToProperty(task.unitId)}
+                        </span>
                       </div>
-                    </SheetTrigger>
-                    <SheetContent>
-                      <SheetHeader>
-                        <SheetTitle>Task Details</SheetTitle>
-                        <SheetDescription>
-                          View details and actions for this cleaning task
-                        </SheetDescription>
-                      </SheetHeader>
-                      
-                      {selectedTask && (
-                        <div className="py-4 space-y-4">
+                    )}
+                    
+                    {getPriorityBadge(task.priority)}
+                  </div>
+                  
+                  <div>
+                    {isCheckedIn ? (
+                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Checked In {arrivalTimes[task.id]}
+                      </Badge>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => startNavigation(unit?.address || "")}
+                        disabled={!unit?.address}
+                      >
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Directions
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Task sheet with extended details and actions */}
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <div 
+                      className="mt-3 py-2 flex items-center justify-center text-sm text-blue-600 cursor-pointer hover:text-blue-800"
+                      onClick={() => setSelectedTask(task)}
+                    >
+                      View Details
+                    </div>
+                  </SheetTrigger>
+                  <SheetContent>
+                    <SheetHeader>
+                      <SheetTitle>Task Details</SheetTitle>
+                      <SheetDescription>
+                        View details and actions for this cleaning task
+                      </SheetDescription>
+                    </SheetHeader>
+                    
+                    {selectedTask && (
+                      <div className="py-4 space-y-4">
+                        <div>
+                          <h3 className="font-medium text-lg">
+                            {getUnit(selectedTask.unitId)?.name || `Property #${selectedTask.unitId}`}
+                          </h3>
+                          <p className="text-gray-500">
+                            {getUnit(selectedTask.unitId)?.address || "Address unknown"}
+                          </p>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <h3 className="font-medium text-lg">
-                              {getUnit(selectedTask.unitId)?.name || `Property #${selectedTask.unitId}`}
-                            </h3>
-                            <p className="text-gray-500">
-                              {getUnit(selectedTask.unitId)?.address || "Address unknown"}
-                            </p>
+                            <p className="text-sm text-gray-500">Scheduled Time</p>
+                            <p className="font-medium">{format(new Date(selectedTask.scheduledFor), "h:mm a")}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Status</p>
+                            <p className="font-medium capitalize">{selectedTask.status}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Priority</p>
+                            <p className="font-medium capitalize">{selectedTask.priority || "Normal"}</p>
+                          </div>
+                          {currentLocation && (
+                            <div>
+                              <p className="text-sm text-gray-500">Distance</p>
+                              <p className="font-medium">{getDistanceToProperty(selectedTask.unitId)}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Actions</h4>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button 
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => startNavigation(getUnit(selectedTask.unitId)?.address || "")}
+                            >
+                              <Navigation className="h-4 w-4 mr-2" />
+                              Navigate
+                            </Button>
+                            
+                            <Button 
+                              variant="default"
+                              className="w-full"
+                              onClick={() => {
+                                handleCheckIn(selectedTask.id);
+                              }}
+                              disabled={isCheckedIn}
+                            >
+                              <MapPin className="h-4 w-4 mr-2" />
+                              Check In
+                            </Button>
                           </div>
                           
-                          <Separator />
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm text-gray-500">Scheduled Time</p>
-                              <p className="font-medium">{format(new Date(selectedTask.scheduledFor), "h:mm a")}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Status</p>
-                              <p className="font-medium capitalize">{selectedTask.status}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Priority</p>
-                              <p className="font-medium capitalize">{selectedTask.priority || "Normal"}</p>
-                            </div>
-                            {currentLocation && (
-                              <div>
-                                <p className="text-sm text-gray-500">Distance</p>
-                                <p className="font-medium">{getDistanceToProperty(selectedTask.unitId)}</p>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <Separator />
-                          
-                          <div className="space-y-2">
-                            <h4 className="font-medium">Actions</h4>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <Button 
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => {
+                                // Link to go to the cleaning details page
+                                window.location.href = `/mobile-cleaning?taskId=${selectedTask.id}`;
+                              }}
+                            >
+                              <CheckSquare className="h-4 w-4 mr-2" />
+                              Start Cleaning
+                            </Button>
                             
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button 
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => startNavigation(getUnit(selectedTask.unitId)?.address || "")}
-                              >
-                                <Navigation className="h-4 w-4 mr-2" />
-                                Navigate
-                              </Button>
-                              
-                              <Button 
-                                variant="default"
-                                className="w-full"
-                                onClick={() => {
-                                  handleCheckIn(selectedTask.id);
-                                }}
-                                disabled={isCheckedIn}
-                              >
-                                <MapPin className="h-4 w-4 mr-2" />
-                                Check In
-                              </Button>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <Button 
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => {
-                                  // Link to go to the cleaning details page
-                                  window.location.href = `/mobile-cleaning?taskId=${selectedTask.id}`;
-                                }}
-                              >
-                                <CheckSquare className="h-4 w-4 mr-2" />
-                                Start Cleaning
-                              </Button>
-                              
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button 
-                                    variant="outline"
-                                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
-                                  >
-                                    <Flag className="h-4 w-4 mr-2" />
-                                    Report Issue
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Report an Issue</DialogTitle>
-                                  </DialogHeader>
-                                  <div className="py-4">
-                                    <p className="text-sm text-gray-500 mb-4">
-                                      Report an issue with this property that needs attention.
-                                    </p>
-                                    {/* Issue reporting form would go here */}
-                                    <div className="space-y-4">
-                                      <div>
-                                        <label className="text-sm font-medium">Issue Type</label>
-                                        <Select defaultValue="access">
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select issue type" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="access">Access Problem</SelectItem>
-                                            <SelectItem value="damage">Property Damage</SelectItem>
-                                            <SelectItem value="missing">Missing Items</SelectItem>
-                                            <SelectItem value="safety">Safety Concern</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="outline"
+                                  className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                                >
+                                  <Flag className="h-4 w-4 mr-2" />
+                                  Report Issue
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Report an Issue</DialogTitle>
+                                </DialogHeader>
+                                <div className="py-4">
+                                  <p className="text-sm text-gray-500 mb-4">
+                                    Report an issue with this property that needs attention.
+                                  </p>
+                                  {/* Issue reporting form would go here */}
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="text-sm font-medium">Issue Type</label>
+                                      <Select defaultValue="access">
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select issue type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="access">Access Problem</SelectItem>
+                                          <SelectItem value="damage">Property Damage</SelectItem>
+                                          <SelectItem value="missing">Missing Items</SelectItem>
+                                          <SelectItem value="safety">Safety Concern</SelectItem>
+                                          <SelectItem value="other">Other</SelectItem>
+                                        </SelectContent>
+                                      </Select>
                                     </div>
                                   </div>
-                                  <DialogFooter>
-                                    <Button type="submit">
-                                      <Send className="h-4 w-4 mr-2" />
-                                      Submit Issue
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
-                            </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button type="submit">
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Submit Issue
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
                           </div>
-                          
-                          <Separator />
-                          
-                          <SheetClose asChild>
-                            <Button variant="ghost" className="w-full">Close</Button>
-                          </SheetClose>
                         </div>
-                      )}
-                    </SheetContent>
-                  </Sheet>
-                </CardContent>
-              </Card>
-                </div>
-              </motion.div>
-            </motion.div>
+                        
+                        <Separator />
+                        
+                        <SheetClose asChild>
+                          <Button variant="ghost" className="w-full">Close</Button>
+                        </SheetClose>
+                      </div>
+                    )}
+                  </SheetContent>
+                </Sheet>
+              </SwipeableTaskCard>
             );
           })
         )}
