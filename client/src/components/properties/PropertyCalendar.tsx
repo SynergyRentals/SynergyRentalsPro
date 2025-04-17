@@ -45,12 +45,14 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
   // Find events for a specific day
   const getEventsForDay = (day: Date) => {
     return processedEvents.filter(event => {
-      // Check if this day falls within the event's range
-      // Note: iCal end date is the day after checkout (represents checkout morning)
+      // Get the actual checkout day (1 day before the end date in iCal)
+      const actualCheckoutDay = addDays(event.end as Date, -1);
+      
+      // Check if this day falls within the event's range (inclusive of check-in and check-out days)
       return isWithinInterval(day, {
         start: event.start as Date,
-        end: addDays(event.end as Date, -1) // Adjusting end date to represent last night of stay
-      }) || isSameDay(day, event.start as Date) || isSameDay(day, event.end as Date);
+        end: actualCheckoutDay // Using the adjusted checkout day
+      });
     });
   };
 
@@ -164,27 +166,46 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                   const topPosition = eventIndex * (eventHeight + 2); // Add small gap between events
                                   
                                   if ((isWithinEvent || isFirstDay || isLastDay)) {
-                                    // Determine width and position of connecting bar
-                                    const leftPosition = isFirstDay ? '50%' : '0%';
-                                    const rightPosition = isLastDay ? '50%' : '0%';
-                                    
-                                    return (
-                                      <div 
-                                        key={`bar-${event.uid}-${eventIndex}`}
-                                        className={`${barColorClass} absolute opacity-60 z-10`} 
-                                        style={{
-                                          top: `${topPosition}px`,
-                                          left: leftPosition,
-                                          right: rightPosition,
-                                          height: `${eventHeight}px`,
-                                          width: isFirstDay && isLastDay ? 
-                                            '0' : // No connecting bar needed for 1-day stays
-                                            isFirstDay ? 'calc(50% + 1px)' : // From middle to end
-                                              isLastDay ? 'calc(50% + 1px)' : // From start to middle
-                                                '100%' // Full width for middle days
-                                        }}
-                                      />
-                                    );
+                                    // Handle one-day stays and regular stays differently
+                                    if (isFirstDay && isLastDay) {
+                                      // For one-day stays, we'll connect two dots side by side
+                                      const leftDot = eventIndex % 2 === 0 ? '35%' : '65%';
+                                      const rightDot = eventIndex % 2 === 0 ? '65%' : '35%';
+                                      
+                                      return (
+                                        <div 
+                                          key={`bar-${event.uid}-${eventIndex}`}
+                                          className={`${barColorClass} absolute opacity-60 z-10`} 
+                                          style={{
+                                            top: `${topPosition + (eventHeight - 5) / 2}px`, // Center vertically with the dots
+                                            left: leftDot,
+                                            width: `calc(${rightDot} - ${leftDot} + 5px)`, // Connect the two dots (+5px for dot size)
+                                            height: '5px', // Match the dot height
+                                            transform: 'translateX(-50%)', // Adjust for dot center
+                                          }}
+                                        />
+                                      );
+                                    } else {
+                                      // For multi-day stays
+                                      const leftPosition = isFirstDay ? '50%' : '0%';
+                                      const rightPosition = isLastDay ? '50%' : '0%';
+                                      
+                                      return (
+                                        <div 
+                                          key={`bar-${event.uid}-${eventIndex}`}
+                                          className={`${barColorClass} absolute opacity-60 z-10`} 
+                                          style={{
+                                            top: `${topPosition}px`,
+                                            left: leftPosition,
+                                            right: rightPosition,
+                                            height: `${eventHeight}px`,
+                                            width: isFirstDay ? 'calc(50% + 1px)' : // From middle to end
+                                                  isLastDay ? 'calc(50% + 1px)' : // From start to middle
+                                                  '100%' // Full width for middle days
+                                          }}
+                                        />
+                                      );
+                                    }
                                   }
                                   return null;
                                 })}
@@ -218,7 +239,9 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                                 className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
                                                 style={{
                                                   top: `${topPosition}px`,
-                                                  left: dotLeftPos,
+                                                  left: isFirstDay && isLastDay ? 
+                                                    (eventIndex % 2 === 0 ? '35%' : '65%') : // Offset for same-day check-in/out
+                                                    '50%', // Regular check-in dot
                                                   transform: 'translate(-50%, 0)',
                                                   marginTop: `${(eventHeight - 5) / 2}px`, // Center the dot
                                                 }}
@@ -231,7 +254,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                                 className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
                                                 style={{
                                                   top: `${topPosition}px`,
-                                                  left: dotLeftPos,
+                                                  left: '50%',
                                                   transform: 'translate(-50%, 0)',
                                                   marginTop: `${(eventHeight - 5) / 2}px`, // Center the dot
                                                 }}
@@ -240,11 +263,14 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             
                                             {/* For same-day check-in/check-out on the same reservation */}
                                             {isFirstDay && isLastDay && (
-                                              <div className="w-full h-full absolute" 
+                                              <div 
+                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
                                                 style={{
                                                   top: `${topPosition}px`,
-                                                  height: `${eventHeight}px`,
-                                                }} 
+                                                  left: eventIndex % 2 === 0 ? '65%' : '35%', // Opposite dots for same-day stays
+                                                  transform: 'translate(-50%, 0)',
+                                                  marginTop: `${(eventHeight - 5) / 2}px`, // Center the dot
+                                                }}
                                               />
                                             )}
                                           </div>
