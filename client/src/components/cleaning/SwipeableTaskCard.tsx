@@ -15,6 +15,7 @@ interface SwipeableTaskCardProps {
   formatDate: (dateString: string | null | undefined) => string;
   getPriorityBadge: (priority: string | null | undefined) => React.ReactNode;
   isActive?: boolean;
+  children?: React.ReactNode;
 }
 
 export default function SwipeableTaskCard({
@@ -27,6 +28,7 @@ export default function SwipeableTaskCard({
   formatDate,
   getPriorityBadge,
   isActive = true,
+  children,
 }: SwipeableTaskCardProps) {
   const controls = useAnimation();
   const cardRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,75 @@ export default function SwipeableTaskCard({
     } else {
       setSwipeDirection(null);
     }
+  };
+
+  // Render the default card content or custom children
+  const renderCardContent = () => {
+    if (children) {
+      return children;
+    }
+
+    return (
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center">
+              {getPriorityBadge(task.priority)}
+              <h3 className="text-base font-medium">{getUnitName(task.unitId)}</h3>
+            </div>
+            
+            <div className="flex items-center text-sm text-gray-500 mt-1">
+              <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+              <span className="truncate max-w-[200px]">
+                {task.notes || "No additional details"}
+              </span>
+            </div>
+            
+            <div className="flex items-center text-xs text-gray-500 mt-2">
+              <Clock className="h-3 w-3 mr-1 text-gray-400" />
+              <span>{formatDate(task.scheduledFor)}</span>
+            </div>
+            
+            <div className="flex flex-wrap gap-1 mt-2">
+              <Badge variant="outline" className="text-xs">
+                {task.cleaningType || "Standard"}
+              </Badge>
+              
+              {task.hasFlaggedIssues && (
+                <Badge variant="destructive" className="text-xs">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Issues
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-end gap-2">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDetails();
+              }}
+              className="text-gray-500"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+            
+            {task.status !== "completed" && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReschedule();
+                }}
+                className="text-gray-500"
+              >
+                <Repeat className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    );
   };
 
   return (
@@ -128,65 +199,7 @@ export default function SwipeableTaskCard({
                   : "border-l-gray-300"
           }`}
         >
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center">
-                  {getPriorityBadge(task.priority)}
-                  <h3 className="text-base font-medium">{getUnitName(task.unitId)}</h3>
-                </div>
-                
-                <div className="flex items-center text-sm text-gray-500 mt-1">
-                  <MapPin className="h-3 w-3 mr-1 text-gray-400" />
-                  <span className="truncate max-w-[200px]">
-                    {task.notes || "No additional details"}
-                  </span>
-                </div>
-                
-                <div className="flex items-center text-xs text-gray-500 mt-2">
-                  <Clock className="h-3 w-3 mr-1 text-gray-400" />
-                  <span>{formatDate(task.scheduledFor)}</span>
-                </div>
-                
-                <div className="flex flex-wrap gap-1 mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    {task.cleaningType || "Standard"}
-                  </Badge>
-                  
-                  {task.hasFlaggedIssues && (
-                    <Badge variant="destructive" className="text-xs">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Issues
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex flex-col items-end gap-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewDetails();
-                  }}
-                  className="text-gray-500"
-                >
-                  <MoreVertical className="h-5 w-5" />
-                </button>
-                
-                {task.status !== "completed" && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onReschedule();
-                    }}
-                    className="text-gray-500"
-                  >
-                    <Repeat className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </CardContent>
+          {renderCardContent()}
         </Card>
       </motion.div>
     </div>
