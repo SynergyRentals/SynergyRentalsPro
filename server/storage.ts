@@ -23,7 +23,7 @@ import {
   InsertHostAiAutopilotSettings, InsertHostAiAutopilotLog
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -953,7 +953,24 @@ export class MemStorage implements IStorage {
   
   async getCleaningChecklistItemsByChecklist(checklistId: number): Promise<CleaningChecklistItem[]> {
     return Array.from(this.cleaningChecklistItems.values())
-      .filter(item => item.checklistId === checklistId);
+      .filter(item => item.checklistId === checklistId)
+      .sort((a, b) => a.order - b.order);
+  }
+  
+  async reorderCleaningChecklistItems(items: { id: number, order: number }[]): Promise<boolean> {
+    try {
+      for (const item of items) {
+        const existingItem = this.cleaningChecklistItems.get(item.id);
+        if (existingItem) {
+          existingItem.order = item.order;
+          this.cleaningChecklistItems.set(item.id, existingItem);
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error("Error reordering cleaning checklist items:", error);
+      return false;
+    }
   }
   
   // Cleaning Checklist Completions Methods
@@ -1788,7 +1805,26 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getCleaningChecklistItemsByChecklist(checklistId: number): Promise<CleaningChecklistItem[]> {
-    return await db.select().from(schema.cleaningChecklistItems).where(eq(schema.cleaningChecklistItems.checklistId, checklistId));
+    return await db.select().from(schema.cleaningChecklistItems)
+      .where(eq(schema.cleaningChecklistItems.checklistId, checklistId))
+      .orderBy(schema.cleaningChecklistItems.order);
+  }
+  
+  async reorderCleaningChecklistItems(items: { id: number, order: number }[]): Promise<boolean> {
+    try {
+      // Use a transaction to ensure all updates happen or none happen
+      await db.transaction(async (tx) => {
+        for (const item of items) {
+          await tx.update(schema.cleaningChecklistItems)
+            .set({ order: item.order })
+            .where(eq(schema.cleaningChecklistItems.id, item.id));
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error("Error reordering cleaning checklist items:", error);
+      return false;
+    }
   }
   
   // Cleaning Checklist Completions Methods
