@@ -2,6 +2,7 @@ import express, { type Express, Request, Response, NextFunction } from "express"
 import { createServer, type Server } from "http";
 import fs from 'fs';
 import fileUpload from 'express-fileupload';
+import { WebSocketServer, WebSocket } from 'ws';
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { db } from "./db";
@@ -4662,6 +4663,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Create HTTP server
   const httpServer = createServer(app);
+  
+  // Add WebSocket server for AI Assistant
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Handle WebSocket connections
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('WebSocket client connected');
+    
+    // Send a welcome message
+    ws.send(JSON.stringify({
+      type: 'welcome',
+      message: 'Connected to AI Assistant WebSocket Server'
+    }));
+    
+    // Handle incoming messages
+    ws.on('message', async (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        console.log('Received WebSocket message:', data);
+        
+        // Handle different message types
+        if (data.type === 'ai_request') {
+          // Process AI request
+          const { prompt, userId } = data;
+          
+          // Create a new interaction
+          const interaction = await storage.createAiPlannerInteraction({
+            prompt,
+            userId,
+            status: 'pending',
+            response: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          
+          // Update status to processing
+          await storage.updateAiPlannerInteraction(interaction.id, {
+            status: 'processing',
+            updatedAt: new Date()
+          });
+          
+          // Send processing status to client
+          ws.send(JSON.stringify({
+            type: 'status_update',
+            interactionId: interaction.id,
+            status: 'processing'
+          }));
+          
+          // Generate AI response (simulated)
+          setTimeout(async () => {
+            // Generate response based on the prompt
+            let response = '';
+            
+            if (prompt.toLowerCase().includes('task') && prompt.toLowerCase().includes('create')) {
+              response = "I can help create a new task. Here's a suggested task:\n\n" +
+                "Title: Follow up with cleaning team\n" +
+                "Priority: Medium\n" +
+                "Due Date: Tomorrow at 2pm\n" +
+                "Description: Check that all units have been properly cleaned and prepared for upcoming guests\n\n" +
+                "Would you like me to create this task for you?";
+            } else if (prompt.toLowerCase().includes('project') && prompt.toLowerCase().includes('plan')) {
+              response = "I can help create a project plan. Based on your request, here's a suggested project structure:\n\n" +
+                "Project: Quarterly Maintenance Review\n\n" +
+                "Milestones:\n" +
+                "1. Initial property assessment (1 week)\n" +
+                "2. Vendor coordination (2 weeks)\n" +
+                "3. Maintenance implementation (3 weeks)\n" +
+                "4. Final inspection (1 week)\n\n" +
+                "Would you like me to set this up as a new project with these milestones?";
+            } else if (prompt.toLowerCase().includes('analyze') || prompt.toLowerCase().includes('report')) {
+              response = "Based on your current projects and tasks, here's a quick analysis:\n\n" +
+                "- You have 5 high priority tasks pending\n" +
+                "- The maintenance team is currently handling more tasks than the cleaning team\n" +
+                "- Most of your tasks are concentrated around the end of the month\n\n" +
+                "Would you like a more detailed analysis or help redistributing these tasks?";
+            } else {
+              response = "I understand you need assistance with your projects and tasks. I can help with:\n\n" +
+                "- Creating new tasks or projects\n" +
+                "- Planning project timelines and milestones\n" +
+                "- Analyzing your current workload\n" +
+                "- Suggesting task prioritization\n" +
+                "- Generating reports\n\n" +
+                "Please let me know what specific help you need with your projects or tasks.";
+            }
+            
+            // Update interaction with response
+            const updatedInteraction = await storage.updateAiPlannerInteraction(interaction.id, {
+              status: 'completed',
+              response,
+              updatedAt: new Date()
+            });
+            
+            // Send completed response to client
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'ai_response',
+                interaction: updatedInteraction
+              }));
+            }
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+        
+        // Send error to client
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Error processing your request'
+          }));
+        }
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+    });
+  });
 
   return httpServer;
 }

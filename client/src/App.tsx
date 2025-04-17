@@ -24,9 +24,10 @@ import PropertyNewPage from "@/pages/property-new-page";
 import UnitDetailPage from "@/pages/unit-detail-page";
 import ProjectsPage from "@/pages/projects-page";
 import ProjectDetailPage from "@/pages/project-detail-page";
-// HostAI Inbox Pages
+// HostAI Inbox & AI Planner Pages
 import HostAIInboxPage from "@/pages/hostai-inbox-page";
 import HostAIInboxSettingsPage from "@/pages/hostai-inbox-settings-page";
+import AiPlannerPage from "@/pages/ai-planner-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -53,9 +54,10 @@ function Router() {
       <ProtectedRoute path="/unit/:id" component={UnitDetailPage} />
       <ProtectedRoute path="/projects" component={ProjectsPage} />
       <ProtectedRoute path="/projects/:id" component={ProjectDetailPage} />
-      {/* HostAI Task Inbox Routes */}
+      {/* HostAI Task Inbox and AI Planner Routes */}
       <ProtectedRoute path="/projects-tasks/hostai-inbox" component={HostAIInboxPage} />
       <ProtectedRoute path="/projects-tasks/hostai-inbox/settings" component={HostAIInboxSettingsPage} />
+      <ProtectedRoute path="/projects-tasks/ai-planner" component={AiPlannerPage} />
       <Route component={NotFound} />
     </Switch>
   );
