@@ -38,6 +38,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
+// Import our enhanced photo documentation component
+import PhotoDocumentation from "@/components/cleaning/PhotoDocumentation";
+
 // Mobile-optimized cleaning page
 export default function MobileCleaningPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -316,7 +319,8 @@ export default function MobileCleaningPage() {
     });
   };
 
-  // Handle uploading photos
+  // This entire function can be removed since PhotoDocumentation component now handles photo uploads
+  // We're keeping it just for backward compatibility with other parts of the code
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     // This is a mock implementation - in a real app, you would upload to a server
     if (e.target.files && e.target.files.length > 0) {
@@ -750,38 +754,14 @@ export default function MobileCleaningPage() {
                 />
               </div>
 
-              {/* Photo Upload */}
-              <div>
-                <Label className="block mb-1">
-                  Upload Photos
-                </Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {photoUrls.map((url, index) => (
-                    <div key={index} className="w-16 h-16 rounded bg-gray-100 relative">
-                      <img
-                        src={url}
-                        className="w-full h-full object-cover rounded"
-                        alt={`Uploaded ${index + 1}`}
-                      />
-                    </div>
-                  ))}
-                  
-                  <label htmlFor="photo-upload" className="w-16 h-16 flex items-center justify-center rounded border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-50">
-                    <Camera className="h-6 w-6 text-gray-400" />
-                    <input
-                      id="photo-upload"
-                      type="file"
-                      className="hidden"
-                      multiple
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                    />
-                  </label>
-                </div>
-                <p className="text-xs text-[#9EA2B1]">
-                  Upload photos of the completed cleaning
-                </p>
-              </div>
+              {/* Enhanced Photo Documentation */}
+              <PhotoDocumentation
+                photos={photoUrls}
+                onPhotosChange={setPhotoUrls}
+                requiredCount={3}
+                requiredRooms={["Bathroom", "Kitchen", "Bedroom"]}
+                roomOptions={["Bathroom", "Bedroom", "Kitchen", "Living Room", "Outdoor", "Other"]}
+              />
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-2 pt-2">
@@ -853,38 +833,13 @@ export default function MobileCleaningPage() {
                 </select>
               </div>
 
-              {/* Photo Upload */}
-              <div>
-                <Label className="block mb-1">
-                  Upload Photos
-                </Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {photoUrls.map((url, index) => (
-                    <div key={index} className="w-16 h-16 rounded bg-gray-100 relative">
-                      <img
-                        src={url}
-                        className="w-full h-full object-cover rounded"
-                        alt={`Uploaded ${index + 1}`}
-                      />
-                    </div>
-                  ))}
-                  
-                  <label htmlFor="flag-photo-upload" className="w-16 h-16 flex items-center justify-center rounded border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-50">
-                    <Camera className="h-6 w-6 text-gray-400" />
-                    <input
-                      id="flag-photo-upload"
-                      type="file"
-                      className="hidden"
-                      multiple
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                    />
-                  </label>
-                </div>
-                <p className="text-xs text-[#9EA2B1]">
-                  Upload photos showing the issue
-                </p>
-              </div>
+              {/* Enhanced Photo Documentation for Issues */}
+              <PhotoDocumentation
+                photos={photoUrls}
+                onPhotosChange={setPhotoUrls}
+                requiredCount={1}
+                roomOptions={["Bathroom", "Bedroom", "Kitchen", "Living Room", "Outdoor", "Other"]}
+              />
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-2 pt-2">
