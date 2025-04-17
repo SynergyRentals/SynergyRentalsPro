@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { motion } from 'framer-motion';
 import {
   Camera,
   CheckCircle,
@@ -24,6 +25,7 @@ interface PhotoDocumentationProps {
   requiredCount?: number;
   requiredRooms?: string[];
   checklistItemId?: number;
+  isMobile?: boolean;
 }
 
 export default function PhotoDocumentation({
