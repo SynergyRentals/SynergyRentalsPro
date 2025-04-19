@@ -4681,31 +4681,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
-  // Add WebSocket server with proper configuration
+  // Create a basic WebSocket server with absolute minimal configuration to eliminate potential issues
   const wss = new WebSocketServer({ 
     server: httpServer, 
-    path: '/ws'
+    path: '/ws',
+    // Basic configuration that works reliably
+    perMessageDeflate: false,
+    clientTracking: true
   });
   
-  // Log WebSocket server status
+  // Log WebSocket server initialization
   console.log('WebSocket server initialized on path: /ws');
   
-  // Ping clients every 30 seconds to keep connections alive
+  // Set up very simple ping to keep connections alive
   const pingInterval = setInterval(() => {
-    const clientCount = wss.clients.size;
-    if (clientCount > 0) {
-      console.log(`Pinging ${clientCount} WebSocket clients`);
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
+    try {
+      const clientCount = wss.clients.size;
+      if (clientCount > 0) {
+        console.log(`Pinging ${clientCount} WebSocket clients`);
+        wss.clients.forEach((client) => {
           try {
-            client.ping();
-          } catch (error) {
-            console.error('Error pinging client:', error);
+            if (client.readyState === WebSocket.OPEN) {
+              client.ping();
+            }
+          } catch (e) {
+            // Ignore individual client ping errors
           }
-        }
+        });
+      }
+    } catch (e) {
+      console.error('Error in ping interval:', e);
+    }
+  }, 20000);
+  
+  // Create a direct endpoint that can be used to test WebSocket connection status
+  app.get('/api/websocket-status', (req, res) => {
+    try {
+      const clientCount = wss.clients.size;
+      res.json({
+        status: 'online',
+        clients: clientCount,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        status: 'error', 
+        message: 'Error checking WebSocket status',
+        error: error.message 
       });
     }
-  }, 30000);
+  });
+  
+  // Create a polling fallback endpoint for cases where WebSockets don't work
+  app.post('/api/ai-planner/process-request', checkAuth, async (req: Request, res: Response) => {
+    const { prompt, userId, projectId } = req.body;
+    
+    if (!prompt || !userId) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'Prompt and userId are required'
+      });
+    }
+    
+    let interaction;
+    try {
+      // Create a new interaction
+      interaction = await storage.createAiPlannerInteraction({
+        prompt,
+        userId,
+        rawAiResponse: {}, // Required empty object
+        generatedPlan: {}, // Required empty object
+        status: 'pending'
+      });
+      
+      // Update status to processing (Don't await to return quickly)
+      storage.updateAiPlannerInteraction(interaction.id, {
+        status: 'processing',
+        updatedAt: new Date()
+      });
+      
+      // Return immediately with the interaction ID so client can poll
+      res.status(202).json({
+        message: 'Request accepted and processing',
+        interactionId: interaction.id
+      });
+      
+      // Process in the background
+      (async () => {
+        try {
+          // Get project context if available
+          let projectContext = null;
+          if (projectId) {
+            try {
+              const project = await storage.getProject(projectId);
+              if (project) {
+                const tasks = await storage.getProjectTasksByProject(projectId);
+                projectContext = {
+                  ...project,
+                  tasks
+                };
+              }
+            } catch (err) {
+              console.error('Error fetching project context:', err);
+            }
+          }
+          
+          // Call OpenAI API
+          const planningRequest = {
+            prompt,
+            userId,
+            interactionId: interaction.id,
+            projectContext
+          };
+          
+          const aiResponse = await generatePlan(planningRequest);
+          const response = aiResponse.response;
+          
+          // Update interaction with response
+          await storage.updateAiPlannerInteraction(interaction.id, {
+            status: 'completed',
+            response,
+            rawAiResponse: aiResponse,
+            generatedPlan: { content: response },
+            updatedAt: new Date()
+          });
+          
+        } catch (error) {
+          console.error('Error processing AI request:', error);
+          
+          try {
+            await storage.updateAiPlannerInteraction(interaction.id, {
+              status: 'error',
+              rawAiResponse: { error: 'Error processing request' },
+              generatedPlan: { error: 'Error processing request' },
+              updatedAt: new Date()
+            });
+          } catch (updateError) {
+            console.error('Error updating interaction with error status:', updateError);
+          }
+        }
+      })();
+      
+    } catch (error) {
+      console.error('Error creating AI interaction:', error);
+      res.status(500).json({
+        error: 'Failed to create interaction',
+        message: 'An error occurred while creating the interaction'
+      });
+    }
+  });
   
   // Handle WebSocket connections
   wss.on('connection', (ws, req) => {
