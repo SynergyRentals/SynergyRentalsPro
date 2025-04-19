@@ -160,7 +160,7 @@ const AiAssistant: React.FC = () => {
   // Create a new interaction
   const createInteraction = useMutation({
     mutationFn: async (newPrompt: string) => {
-      return await apiRequest('/api/ai-planner/interactions', 'POST', {
+      return await apiRequest('POST', '/api/ai-planner/interactions', {
         prompt: newPrompt,
         status: 'pending',
       });
@@ -173,7 +173,8 @@ const AiAssistant: React.FC = () => {
         description: 'Your request has been sent to the AI Assistant.',
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Error creating interaction:', error);
       toast({
         title: 'Error',
         description: 'Failed to send your request. Please try again.',
@@ -185,7 +186,7 @@ const AiAssistant: React.FC = () => {
   // Simulate AI response (in a real implementation, this would be handled by a webhook)
   const simulateAiResponse = async (interaction: AiInteraction) => {
     // Update status to processing
-    await apiRequest(`/api/ai-planner/interactions/${interaction.id}`, 'PATCH', {
+    await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
       status: 'processing',
     });
     
@@ -230,7 +231,7 @@ const AiAssistant: React.FC = () => {
     }
     
     // Update with the response
-    await apiRequest(`/api/ai-planner/interactions/${interaction.id}`, 'PATCH', {
+    await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
       status: 'completed',
       response,
     });
