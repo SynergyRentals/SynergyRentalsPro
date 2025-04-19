@@ -11,24 +11,55 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-): Promise<Response> {
+): Promise<any> {
   // Check if data is FormData, if so, don't set Content-Type 
   // (browser will set it with the boundary) and don't stringify
   const isFormData = data instanceof FormData;
   
-  const res = await fetch(url, {
-    method,
-    headers: data && !isFormData ? { "Content-Type": "application/json" } : {},
-    body: data 
-      ? isFormData 
-        ? data 
-        : JSON.stringify(data) 
-      : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: data && !isFormData ? { "Content-Type": "application/json" } : {},
+      body: data 
+        ? isFormData 
+          ? data 
+          : JSON.stringify(data) 
+        : undefined,
+      credentials: "include",
+    });
+  
+    await throwIfResNotOk(res);
+    
+    // Check if the response has content
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const jsonData = await res.json();
+        
+        // Additional validation to ensure we have a proper object
+        if (jsonData === null || jsonData === undefined) {
+          console.error('API request returned null or undefined JSON', { url, method });
+          throw new Error('Invalid response: Empty JSON data');
+        }
+        
+        return jsonData;
+      } catch (jsonError) {
+        console.error('Error parsing JSON response:', jsonError);
+        throw new Error(`Failed to parse JSON response: ${jsonError.message}`);
+      }
+    } else {
+      // For non-JSON responses, return the Response object
+      return { 
+        success: true, 
+        status: res.status,
+        statusText: res.statusText,
+        nonJsonResponse: true
+      };
+    }
+  } catch (error) {
+    console.error(`API request failed (${method} ${url}):`, error);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
