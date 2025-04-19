@@ -4712,47 +4712,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: 'processing'
           }));
           
-          // Generate AI response (simulated)
-          setTimeout(async () => {
-            // Generate response based on the prompt
-            let response = '';
+          // Generate AI response using OpenAI
+          try {
+            console.log('Generating AI response for prompt:', prompt);
             
-            if (prompt.toLowerCase().includes('task') && prompt.toLowerCase().includes('create')) {
-              response = "I can help create a new task. Here's a suggested task:\n\n" +
-                "Title: Follow up with cleaning team\n" +
-                "Priority: Medium\n" +
-                "Due Date: Tomorrow at 2pm\n" +
-                "Description: Check that all units have been properly cleaned and prepared for upcoming guests\n\n" +
-                "Would you like me to create this task for you?";
-            } else if (prompt.toLowerCase().includes('project') && prompt.toLowerCase().includes('plan')) {
-              response = "I can help create a project plan. Based on your request, here's a suggested project structure:\n\n" +
-                "Project: Quarterly Maintenance Review\n\n" +
-                "Milestones:\n" +
-                "1. Initial property assessment (1 week)\n" +
-                "2. Vendor coordination (2 weeks)\n" +
-                "3. Maintenance implementation (3 weeks)\n" +
-                "4. Final inspection (1 week)\n\n" +
-                "Would you like me to set this up as a new project with these milestones?";
-            } else if (prompt.toLowerCase().includes('analyze') || prompt.toLowerCase().includes('report')) {
-              response = "Based on your current projects and tasks, here's a quick analysis:\n\n" +
-                "- You have 5 high priority tasks pending\n" +
-                "- The maintenance team is currently handling more tasks than the cleaning team\n" +
-                "- Most of your tasks are concentrated around the end of the month\n\n" +
-                "Would you like a more detailed analysis or help redistributing these tasks?";
-            } else {
-              response = "I understand you need assistance with your projects and tasks. I can help with:\n\n" +
-                "- Creating new tasks or projects\n" +
-                "- Planning project timelines and milestones\n" +
-                "- Analyzing your current workload\n" +
-                "- Suggesting task prioritization\n" +
-                "- Generating reports\n\n" +
-                "Please let me know what specific help you need with your projects or tasks.";
+            // Get project context if available
+            let projectContext = null;
+            if (data.projectId) {
+              try {
+                const project = await storage.getProject(data.projectId);
+                if (project) {
+                  // Get associated tasks for additional context
+                  const tasks = await storage.getProjectTasks(data.projectId);
+                  
+                  projectContext = {
+                    ...project,
+                    tasks: tasks
+                  };
+                  console.log('Including project context for AI:', project.title);
+                }
+              } catch (err) {
+                console.error('Error fetching project context:', err);
+              }
             }
+            
+            // Call OpenAI API via our service
+            const planningRequest = {
+              prompt,
+              userId: userId,
+              interactionId: interaction.id,
+              projectContext
+            };
+            
+            const aiResponse = await generatePlan(planningRequest);
+            const response = aiResponse.response;
             
             // Update interaction with response
             const updatedInteraction = await storage.updateAiPlannerInteraction(interaction.id, {
               status: 'completed',
-              response,
               updatedAt: new Date()
             });
             
@@ -4760,10 +4757,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({
                 type: 'ai_response',
-                interaction: updatedInteraction
+                interaction: {
+                  ...updatedInteraction,
+                  response // Include the response from OpenAI
+                }
               }));
             }
-          }, 2000);
+          } catch (error) {
+            console.error('Error generating AI response:', error);
+            
+            // Update interaction with error status
+            await storage.updateAiPlannerInteraction(interaction.id, {
+              status: 'error',
+              updatedAt: new Date()
+            });
+            
+            // Send error to client
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Error generating AI response',
+                interactionId: interaction.id
+              }));
+            }
+          }
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);

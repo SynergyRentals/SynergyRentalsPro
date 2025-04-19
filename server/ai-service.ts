@@ -48,11 +48,11 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
     // Build messages for the API call
     const messages = [
       { 
-        role: "system", 
+        role: "system" as const, 
         content: systemMessage
       },
       { 
-        role: "user", 
+        role: "user" as const, 
         content: request.prompt
       }
     ];
@@ -85,7 +85,7 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
       suggestedTitle: parsedResponse.title || parsedResponse.suggestedTitle,
       rawResponse: parsedResponse
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating AI plan:", error);
     return {
       response: "I'm sorry, I encountered an error while generating your plan. Please try again.",
@@ -119,8 +119,8 @@ export async function analyzeProjectData(data: any, prompt?: string): Promise<an
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `${userPrompt}\nData: ${JSON.stringify(data)}` }
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: `${userPrompt}\nData: ${JSON.stringify(data)}` }
       ],
       temperature: 0.5,
       max_tokens: 2000,
@@ -133,7 +133,7 @@ export async function analyzeProjectData(data: any, prompt?: string): Promise<an
     }
 
     return JSON.parse(content);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error analyzing project data:", error);
     return {
       summary: "Analysis failed due to an error",
@@ -158,20 +158,20 @@ export async function generateAIAssistantResponse(prompt: string, context?: any)
       model: "gpt-4o",
       messages: [
         { 
-          role: "system", 
+          role: "system" as const, 
           content: `You are an AI assistant for a property management company's operations software.
             You help users with projects, tasks, and property management questions.
             Be concise but thorough in your responses. If you don't know something, say so.
             When suggesting tasks or projects, be specific and actionable.${contextString}`
         },
-        { role: "user", content: prompt }
+        { role: "user" as const, content: prompt }
       ],
       temperature: 0.7,
       max_tokens: 1000,
     });
 
     return completion.choices[0].message.content || "I'm not sure how to respond to that.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating assistant response:", error);
     return "I encountered an error while processing your request. Please try again later.";
   }
