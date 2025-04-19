@@ -4631,7 +4631,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.patch("/api/ai-planner/interactions/:id", checkAuth, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      // Validate ID is a number
+      const idParam = req.params.id;
+      if (!idParam || isNaN(parseInt(idParam))) {
+        console.error(`Invalid interaction ID: ${idParam}`);
+        return res.status(400).json({ error: "Invalid interaction ID" });
+      }
+      
+      const id = parseInt(idParam);
       const userId = req.user?.id;
       
       if (!userId) {
@@ -4650,6 +4657,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const interactionData = req.body;
+      
+      // Ensure required fields exist if we're setting this to a completed status
+      if (interactionData.status === 'completed' && 
+          (!interactionData.rawAiResponse || !interactionData.generatedPlan)) {
+        interactionData.rawAiResponse = interactionData.rawAiResponse || {};
+        interactionData.generatedPlan = interactionData.generatedPlan || {};
+      }
+      
       const updatedInteraction = await storage.updateAiPlannerInteraction(id, interactionData);
       
       if (!updatedInteraction) {

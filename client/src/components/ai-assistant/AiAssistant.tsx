@@ -258,13 +258,19 @@ const AiAssistant: React.FC = () => {
           const projectIdMatch = window.location.pathname.match(/\/projects\/(\d+)/);
           const projectId = projectIdMatch ? parseInt(projectIdMatch[1], 10) : null;
           
-          socketRef.current.send(JSON.stringify({
-            type: 'ai_request',
-            prompt,
-            userId: currentUser.id,
-            interactionId: newInteraction.id,
-            projectId: projectId
-          }));
+          // Ensure we have a valid numeric ID
+          if (newInteraction && typeof newInteraction.id === 'number') {
+            socketRef.current.send(JSON.stringify({
+              type: 'ai_request',
+              prompt,
+              userId: currentUser.id,
+              interactionId: newInteraction.id,
+              projectId: projectId
+            }));
+          } else {
+            console.error('Invalid interaction ID:', newInteraction);
+            throw new Error('Invalid interaction ID');
+          }
           
           // The response will come back through the WebSocket
           console.log('Sent AI request through WebSocket');
