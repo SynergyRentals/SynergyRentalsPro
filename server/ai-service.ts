@@ -173,7 +173,7 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
          5. "suggestedDeadline": Estimated completion date for the entire project`;
 
     // Build messages for the API call with more context
-    const messages = [
+    let messages = [
       { 
         role: "system" as const, 
         content: systemMessage
@@ -183,6 +183,26 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
         content: request.prompt
       }
     ];
+    
+    // If this is a followup clarification, add the followup response
+    if (isFollowupRequest && request.followupResponse) {
+      console.log('Processing followup response for clarification');
+      
+      // Add a message from the assistant to simulate the clarification request
+      messages.push({
+        role: "assistant" as const,
+        content: JSON.stringify({
+          needsClarification: true,
+          message: "I need some additional information to create a better project plan."
+        })
+      });
+      
+      // Add the user's followup response
+      messages.push({
+        role: "user" as const,
+        content: `Additional information: ${request.followupResponse}`
+      });
+    }
 
     // Call OpenAI API with enhanced error handling and detailed timeout settings
     // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
