@@ -4702,10 +4702,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         wss.clients.forEach((client) => {
           try {
             if (client.readyState === WebSocket.OPEN) {
+              // Send both a standard ping and a heartbeat message for browsers with limited WebSocket implementations
               client.ping();
+              
+              // Send a heartbeat message as JSON
+              client.send(JSON.stringify({
+                type: 'heartbeat',
+                timestamp: new Date().toISOString()
+              }));
             }
           } catch (e) {
-            // Ignore individual client ping errors
+            console.error('Error sending ping to client:', e);
+            // Client may be in a bad state, try to terminate if possible
+            try {
+              client.terminate();
+            } catch (terminateError) {
+              // Just log and continue if we can't terminate
+              console.error('Failed to terminate client after ping error:', terminateError);
+            }
           }
         });
       }

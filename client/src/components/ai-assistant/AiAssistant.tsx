@@ -124,6 +124,11 @@ const AiAssistant: React.FC = () => {
               case 'welcome':
                 console.log('WebSocket welcome message:', data.message);
                 break;
+              case 'heartbeat':
+                // Reset connection status and update last activity
+                setWsConnected(true);
+                console.log('Heartbeat received at:', data.timestamp);
+                break;
               case 'status_update':
                 console.log('Status update for interaction:', data.interactionId);
                 queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
@@ -132,6 +137,14 @@ const AiAssistant: React.FC = () => {
                 console.log('AI response received for interaction:', 
                   data.interaction?.id || 'unknown');
                 queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+                
+                // Show a success toast notification when receiving a completed response
+                if (data.interaction?.status === 'completed') {
+                  toast({
+                    title: 'AI Response Ready',
+                    description: 'Your request has been processed successfully',
+                  });
+                }
                 break;
               case 'error':
                 console.error('WebSocket error message:', data.message);
