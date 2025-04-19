@@ -4608,7 +4608,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ error: 'User not authenticated' });
+        return res.status(401).json({ 
+          error: 'User not authenticated',
+          message: 'You must be logged in to use the AI Planner'
+        });
+      }
+      
+      // Validate required fields first
+      if (!req.body.prompt) {
+        return res.status(400).json({
+          error: 'Missing required fields',
+          message: 'Prompt is required'
+        });
+      }
+      
+      // Ensure all required complex objects exist with minimum structure
+      const defaultNow = new Date().toISOString();
+      
+      if (!req.body.rawAiResponse || typeof req.body.rawAiResponse !== 'object') {
+        req.body.rawAiResponse = { 
+          status: 'pending',
+          timestamp: defaultNow,
+          requestInfo: { 
+            userPrompt: req.body.prompt,
+            clientTime: defaultNow
+          }
+        };
+      }
+      
+      if (!req.body.generatedPlan || typeof req.body.generatedPlan !== 'object') {
+        req.body.generatedPlan = { 
+          status: 'pending',
+          createdAt: defaultNow,
+          processingStage: 'init'
+        };
+      }
+      
+      if (!req.body.status) {
+        req.body.status = 'pending';
       }
       
       // Add the user ID to the interaction data
@@ -4617,15 +4654,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId
       };
       
-      const insertInteraction = insertAiPlannerInteractionSchema.parse(interactionData);
-      const interaction = await storage.createAiPlannerInteraction(insertInteraction);
-      res.status(201).json(interaction);
-    } catch (error) {
-      console.error('Error creating AI Planner interaction:', error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+      try {
+        // Parse and validate the interaction data
+        const insertInteraction = insertAiPlannerInteractionSchema.parse(interactionData);
+        
+        // Create the interaction with validated data
+        console.log(`Creating AI Planner interaction with prompt: "${req.body.prompt.substring(0, 50)}..."`);
+        const interaction = await storage.createAiPlannerInteraction(insertInteraction);
+        
+        if (!interaction || !interaction.id) {
+          throw new Error('Failed to create interaction record (no ID returned)');
+        }
+        
+        console.log(`Successfully created AI Planner interaction with ID: ${interaction.id}`);
+        return res.status(201).json(interaction);
+        
+      } catch (validationError) {
+        console.error('Validation error creating AI Planner interaction:', validationError);
+        if (validationError instanceof z.ZodError) {
+          return res.status(400).json({ 
+            error: 'Validation failed',
+            message: 'The AI Planner interaction data is invalid',
+            details: validationError.errors 
+          });
+        }
+        throw validationError; // Re-throw for other errors
       }
-      res.status(500).json({ error: 'Failed to create AI Planner interaction' });
+      
+    } catch (error) {
+      // Handle general errors
+      console.error('Error creating AI Planner interaction:', error);
+      return res.status(500).json({ 
+        error: 'Server error',
+        message: 'Failed to create AI Planner interaction',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
   

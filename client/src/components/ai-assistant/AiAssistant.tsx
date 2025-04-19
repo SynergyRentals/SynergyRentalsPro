@@ -282,24 +282,57 @@ const AiAssistant: React.FC = () => {
     },
   });
 
-  // Create a new interaction
+  // Create a new interaction with enhanced validation
   const createInteraction = useMutation({
     mutationFn: async (newPrompt: string) => {
       try {
         console.log('Creating new interaction with prompt:', newPrompt);
         
-        // Create a properly formatted interaction with all required fields
+        // Create a properly formatted interaction with much more detailed placeholders
         const response = await apiRequest('POST', '/api/ai-planner/interactions', {
           prompt: newPrompt,
-          rawAiResponse: {status: 'pending'}, // More detailed placeholder
-          generatedPlan: {status: 'pending'}, // More detailed placeholder
+          // More comprehensive placeholders for required objects
+          rawAiResponse: {
+            status: 'pending',
+            timestamp: new Date().toISOString(),
+            requestInfo: {
+              userPrompt: newPrompt,
+              clientTime: new Date().toISOString(),
+              clientId: `client-${Math.random().toString(36).substr(2, 9)}`
+            },
+            stage: 'initializing'
+          },
+          generatedPlan: {
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            processingStage: 'waiting',
+            stepComplete: false
+          },
           // Include all potentially required fields based on schema
-          context: {},
+          context: {
+            source: 'web-interface',
+            timestamp: new Date().toISOString()
+          },
           editedPlan: null,
           finalPlan: null,
+          status: 'pending'
         });
         
-        console.log('Interaction created successfully:', response);
+        // Validate the response to ensure it has all required data
+        if (!response || typeof response !== 'object') {
+          throw new Error('Invalid response format from API');
+        }
+
+        // Log detailed response information for debugging
+        console.log('Interaction created successfully. Response type:', typeof response);
+        console.log('Response keys:', Object.keys(response).join(', '));
+        
+        // Check if the response includes an ID, which we need for tracking
+        if (!response.id || typeof response.id !== 'number') {
+          console.error('Missing ID in created interaction:', response);
+          throw new Error('Server returned an invalid interaction format (missing ID)');
+        }
+        
         return response;
       } catch (err) {
         console.error('Error in createInteraction mutationFn:', err);
@@ -308,20 +341,53 @@ const AiAssistant: React.FC = () => {
     },
     onSuccess: (data) => {
       console.log('Interaction created successfully, data:', data);
+      
+      // Make sure we have a valid interaction ID for tracking
+      if (!data || !data.id) {
+        console.error('Missing ID in created interaction:', data);
+        toast({
+          title: 'Warning',
+          description: 'Request sent but tracking ID is missing. Functionality may be limited.',
+          variant: 'destructive',
+        });
+      }
+      
+      // Refresh the interactions list
       queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+      
+      // Reset the prompt input
       setPrompt('');
+      
+      // Notify the user
       toast({
         title: 'Request sent',
         description: 'Your request has been sent to the AI Assistant.',
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      // Log detailed error information
       console.error('Error creating interaction:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to send your request. Please try again.',
-        variant: 'destructive',
-      });
+      console.error('Error details:', error.message || 'Unknown error');
+      
+      if (error.status === 400) {
+        toast({
+          title: 'Validation Error',
+          description: 'Your request contained invalid data. Please try a different prompt.',
+          variant: 'destructive',
+        });
+      } else if (error.status === 401) {
+        toast({
+          title: 'Authentication Error',
+          description: 'Please log in again to continue.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to send your request. Please try again.',
+          variant: 'destructive',
+        });
+      }
     },
   });
 
