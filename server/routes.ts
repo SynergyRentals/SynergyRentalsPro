@@ -4665,122 +4665,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
-  // Add WebSocket server for AI Assistant
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  // Add WebSocket server for AI Assistant with ping/pong for connection health monitoring
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    // Set ping interval and timeout to detect and clear broken connections
+    clientTracking: true,
+    perMessageDeflate: {
+      zlibDeflateOptions: {
+        // See zlib defaults.
+        chunkSize: 1024,
+        memLevel: 7,
+        level: 3
+      },
+      zlibInflateOptions: {
+        chunkSize: 10 * 1024
+      },
+      // Below options specified as default values.
+      concurrencyLimit: 10, // Limits zlib concurrency for performance.
+      threshold: 1024 // Size (in bytes) below which messages should not be compressed.
+    }
+  });
+  
+  // Ping all clients every 30 seconds to keep connections alive
+  const pingInterval = setInterval(() => {
+    console.log(`Pinging ${wss.clients.size} WebSocket clients`);
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.ping();
+      }
+    });
+  }, 30000); // 30 second interval
   
   // Handle WebSocket connections
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('WebSocket client connected');
+  wss.on('connection', (ws: WebSocket, req) => {
+    console.log(`WebSocket client connected from ${req.socket.remoteAddress}`);
+    
+    // Set up ping/pong for this specific connection
+    let isAlive = true;
+    
+    ws.on('pong', () => {
+      isAlive = true;
+    });
     
     // Send a welcome message
-    ws.send(JSON.stringify({
-      type: 'welcome',
-      message: 'Connected to AI Assistant WebSocket Server'
-    }));
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'welcome',
+        message: 'Connected to AI Assistant WebSocket Server',
+        timestamp: new Date().toISOString()
+      }));
+    }
     
     // Handle incoming messages
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        console.log('Received WebSocket message:', data);
+        console.log(`Received WebSocket message type: ${data.type}`);
         
         // Handle different message types
         if (data.type === 'ai_request') {
           // Process AI request
           const { prompt, userId } = data;
           
-          // Create a new interaction
-          const interaction = await storage.createAiPlannerInteraction({
-            prompt,
-            userId,
-            status: 'pending',
-            response: null,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-          
-          // Update status to processing
-          await storage.updateAiPlannerInteraction(interaction.id, {
-            status: 'processing',
-            updatedAt: new Date()
-          });
-          
-          // Send processing status to client
-          ws.send(JSON.stringify({
-            type: 'status_update',
-            interactionId: interaction.id,
-            status: 'processing'
-          }));
-          
-          // Generate AI response using OpenAI
-          try {
-            console.log('Generating AI response for prompt:', prompt);
-            
-            // Get project context if available
-            let projectContext = null;
-            if (data.projectId) {
-              try {
-                const project = await storage.getProject(data.projectId);
-                if (project) {
-                  // Get associated tasks for additional context
-                  const tasks = await storage.getProjectTasksByProject(data.projectId);
-                  
-                  projectContext = {
-                    ...project,
-                    tasks: tasks
-                  };
-                  console.log('Including project context for AI:', project.title);
-                }
-              } catch (err) {
-                console.error('Error fetching project context:', err);
-              }
-            }
-            
-            // Call OpenAI API via our service
-            const planningRequest = {
-              prompt,
-              userId: userId,
-              interactionId: interaction.id,
-              projectContext
-            };
-            
-            const aiResponse = await generatePlan(planningRequest);
-            const response = aiResponse.response;
-            
-            // Update interaction with response
-            const updatedInteraction = await storage.updateAiPlannerInteraction(interaction.id, {
-              status: 'completed',
-              updatedAt: new Date()
-            });
-            
-            // Send completed response to client
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({
-                type: 'ai_response',
-                interaction: {
-                  ...updatedInteraction,
-                  response // Include the response from OpenAI
-                }
-              }));
-            }
-          } catch (error) {
-            console.error('Error generating AI response:', error);
-            
-            // Update interaction with error status
-            await storage.updateAiPlannerInteraction(interaction.id, {
-              status: 'error',
-              updatedAt: new Date()
-            });
-            
-            // Send error to client
+          if (!prompt || !userId) {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({
                 type: 'error',
-                message: 'Error generating AI response',
-                interactionId: interaction.id
+                message: 'Invalid request: missing prompt or userId',
+                timestamp: new Date().toISOString()
               }));
             }
+            return;
           }
+          
+          // Process the AI request in separate function to manage error handling better
+          await processAiRequest(ws, prompt, userId, data);
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -4789,11 +4749,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             type: 'error',
-            message: 'Error processing your request'
+            message: 'Error processing your request',
+            timestamp: new Date().toISOString()
           }));
         }
       }
     });
+    
+    // Process AI requests with proper error handling
+    async function processAiRequest(ws: WebSocket, prompt: string, userId: number, data: any) {
+      let interaction;
+      try {
+        // Create a new interaction
+        interaction = await storage.createAiPlannerInteraction({
+          prompt,
+          userId,
+          status: 'pending',
+          response: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        console.log(`Created AI interaction with ID: ${interaction.id}`);
+        
+        // Update status to processing
+        await storage.updateAiPlannerInteraction(interaction.id, {
+          status: 'processing',
+          updatedAt: new Date()
+        });
+        
+        // Send processing status to client
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'status_update',
+            interactionId: interaction.id,
+            status: 'processing',
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        // Generate AI response using OpenAI
+        await generateAndSendAiResponse(ws, interaction, prompt, userId, data);
+        
+      } catch (error) {
+        console.error('Error creating AI interaction:', error);
+        
+        // Send error to client
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to create AI interaction',
+            timestamp: new Date().toISOString()
+          }));
+        }
+      }
+    }
+    
+    // Generate AI response and send it to the client
+    async function generateAndSendAiResponse(ws: WebSocket, interaction: AiPlannerInteraction, prompt: string, userId: number, data: any) {
+      try {
+        console.log('Generating AI response for prompt:', prompt);
+        
+        // Get project context if available
+        let projectContext = null;
+        if (data.projectId) {
+          try {
+            const project = await storage.getProject(data.projectId);
+            if (project) {
+              // Get associated tasks for additional context
+              const tasks = await storage.getProjectTasksByProject(data.projectId);
+              
+              projectContext = {
+                ...project,
+                tasks: tasks
+              };
+              console.log('Including project context for AI:', project.title);
+            }
+          } catch (err) {
+            console.error('Error fetching project context:', err);
+          }
+        }
+        
+        // Call OpenAI API via our service
+        const planningRequest = {
+          prompt,
+          userId: userId,
+          interactionId: interaction.id,
+          projectContext
+        };
+        
+        const aiResponse = await generatePlan(planningRequest);
+        const response = aiResponse.response;
+        
+        // Update interaction with response
+        const updatedInteraction = await storage.updateAiPlannerInteraction(interaction.id, {
+          status: 'completed',
+          response: response,
+          updatedAt: new Date()
+        });
+        
+        // Send completed response to client
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'ai_response',
+            interaction: {
+              ...updatedInteraction,
+              response: response // Include the response from OpenAI
+            },
+            timestamp: new Date().toISOString()
+          }));
+        }
+      } catch (error) {
+        console.error('Error generating AI response:', error);
+        
+        // Update interaction with error status
+        await storage.updateAiPlannerInteraction(interaction.id, {
+          status: 'error',
+          updatedAt: new Date()
+        });
+        
+        // Send error to client
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Error generating AI response',
+            interactionId: interaction.id,
+            timestamp: new Date().toISOString()
+          }));
+        }
+      }
+    }
     
     // Handle disconnection
     ws.on('close', () => {
