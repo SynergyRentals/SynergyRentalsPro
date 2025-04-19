@@ -4765,10 +4765,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         interaction = await storage.createAiPlannerInteraction({
           prompt,
           userId,
-          status: 'pending',
-          response: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          rawAiResponse: {}, // Empty object placeholder
+          generatedPlan: {}, // Empty object placeholder
+          status: 'pending'
         });
         
         console.log(`Created AI interaction with ID: ${interaction.id}`);
@@ -4845,7 +4844,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update interaction with response
         const updatedInteraction = await storage.updateAiPlannerInteraction(interaction.id, {
           status: 'completed',
-          response: response,
+          rawAiResponse: aiResponse,
+          generatedPlan: { content: response },
           updatedAt: new Date()
         });
         
@@ -4866,6 +4866,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update interaction with error status
         await storage.updateAiPlannerInteraction(interaction.id, {
           status: 'error',
+          rawAiResponse: { error: 'Error generating AI response' },
+          generatedPlan: { error: 'Error generating AI response' },
           updatedAt: new Date()
         });
         

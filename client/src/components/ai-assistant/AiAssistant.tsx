@@ -160,9 +160,11 @@ const AiAssistant: React.FC = () => {
   // Create a new interaction
   const createInteraction = useMutation({
     mutationFn: async (newPrompt: string) => {
+      // Create empty placeholders for the required fields
       return await apiRequest('POST', '/api/ai-planner/interactions', {
         prompt: newPrompt,
-        status: 'pending',
+        rawAiResponse: {}, // Empty object as placeholder
+        generatedPlan: {}, // Empty object as placeholder
       });
     },
     onSuccess: () => {
