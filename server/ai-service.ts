@@ -190,7 +190,7 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
       
       // Add a message from the assistant to simulate the clarification request
       messages.push({
-        role: "assistant" as const,
+        role: "assistant" as const as "user" | "system" | "assistant", // Type assertion to make TypeScript happy
         content: JSON.stringify({
           needsClarification: true,
           message: "I need some additional information to create a better project plan."
