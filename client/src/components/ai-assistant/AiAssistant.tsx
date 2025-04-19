@@ -554,63 +554,154 @@ const AiAssistant: React.FC = () => {
         await processViaRESTAPI(newInteraction, trimmedPrompt, currentUser.id, projectId);
       }
       
-      // Function to process request using REST API when WebSockets fail
+      // Enhanced function to process request using REST API when WebSockets fail
+      // with improved error handling, polling logic, and user feedback
       async function processViaRESTAPI(interaction: any, prompt: string, userId: number, projectId: number | null) {
         try {
-          console.log('Processing via REST API fallback');
+          console.log('Processing via REST API fallback with enhanced reliability');
           
-          // Call the fallback endpoint
+          // Call the fallback endpoint with more detailed request information
           const response = await apiRequest('POST', '/api/ai-planner/process-request', {
             prompt,
             userId,
-            projectId: projectId || undefined
+            projectId: projectId || undefined,
+            interactionId: interaction.id, // Pass the existing interaction ID
+            clientMetadata: {
+              timestamp: new Date().toISOString(),
+              fallbackReason: !wsConnected ? 'disconnected' : 'connection_error',
+              userAgent: navigator.userAgent,
+              viewportSize: `${window.innerWidth}x${window.innerHeight}`
+            }
           });
           
           if (response && response.interactionId) {
+            // Show a toast with more informative message
             toast({
               title: 'Request accepted',
               description: 'Your request is being processed in the background. Results will appear shortly.',
             });
             
-            // Start polling for updates
+            // Start polling for updates with progressive backoff
             queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
             
-            // Set up a polling interval to check for updates
-            const pollInterval = setInterval(async () => {
-              try {
-                // Force refetch to get latest status
-                await queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
-                
-                // Check if we need to continue polling
-                const interactions = queryClient.getQueryData(['/api/ai-planner/interactions']) || [];
-                const currentInteraction = Array.isArray(interactions) 
-                  ? interactions.find((i: any) => i.id === interaction.id)
-                  : null;
-                
-                if (currentInteraction && 
-                   (currentInteraction.status === 'completed' || 
-                    currentInteraction.status === 'error')) {
-                  clearInterval(pollInterval);
-                }
-              } catch (err) {
-                console.error('Error polling for updates:', err);
-                clearInterval(pollInterval);
-              }
-            }, 2000);
+            // Define polling parameters with exponential backoff
+            const initialPollingInterval = 1000; // Start with 1 second
+            const maxPollingInterval = 10000; // Max 10 seconds
+            const maxPollingTime = 120000; // Total polling time 2 minutes
+            let currentPollingInterval = initialPollingInterval;
+            let totalPollingTime = 0;
+            let consecutiveErrors = 0;
+            const maxConsecutiveErrors = 3;
             
-            // Safety cleanup after 60 seconds
-            setTimeout(() => clearInterval(pollInterval), 60000);
+            // Create a polling function that adjusts timing based on state
+            const pollForUpdates = async () => {
+              if (totalPollingTime >= maxPollingTime) {
+                console.log('Maximum polling time reached');
+                return;
+              }
+              
+              const pollTimeout = setTimeout(async () => {
+                try {
+                  // Force refetch to get latest status
+                  await queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+                  
+                  // Get the current data
+                  const interactions = queryClient.getQueryData(['/api/ai-planner/interactions']) || [];
+                  const currentInteraction = Array.isArray(interactions) 
+                    ? interactions.find((i: any) => i.id === interaction.id)
+                    : null;
+                  
+                  // Reset error counter on successful poll
+                  consecutiveErrors = 0;
+                  
+                  // Check if polling is complete
+                  if (currentInteraction) {
+                    console.log(`Polling: Interaction status is ${currentInteraction.status}`);
+                    
+                    if (currentInteraction.status === 'completed') {
+                      console.log('Polling complete: Interaction is completed');
+                      toast({
+                        title: 'Response ready',
+                        description: 'Your request has been processed successfully',
+                      });
+                      return; // Stop polling
+                    } else if (currentInteraction.status === 'error') {
+                      console.error('Polling complete: Interaction has error status');
+                      toast({
+                        title: 'Processing error',
+                        description: 'There was an error processing your request',
+                        variant: 'destructive',
+                      });
+                      return; // Stop polling
+                    } else if (currentInteraction.status === 'processing') {
+                      // Speed up polling when we know it's processing
+                      currentPollingInterval = initialPollingInterval;
+                    }
+                  }
+                  
+                  // Continue polling with adjusted interval
+                  totalPollingTime += currentPollingInterval;
+                  currentPollingInterval = Math.min(
+                    currentPollingInterval * 1.5, // Increase by 50%
+                    maxPollingInterval
+                  );
+                  pollForUpdates();
+                } catch (err) {
+                  console.error('Error during polling:', err);
+                  
+                  // Increment error counter
+                  consecutiveErrors++;
+                  
+                  if (consecutiveErrors >= maxConsecutiveErrors) {
+                    console.error('Too many consecutive polling errors, stopping');
+                    toast({
+                      title: 'Connection issue',
+                      description: 'Unable to check request status. Please refresh.',
+                      variant: 'destructive',
+                    });
+                    return; // Stop polling
+                  }
+                  
+                  // Slow down polling on errors
+                  totalPollingTime += currentPollingInterval;
+                  currentPollingInterval = Math.min(
+                    currentPollingInterval * 2, // Double on error
+                    maxPollingInterval
+                  );
+                  pollForUpdates();
+                }
+              }, currentPollingInterval);
+              
+              // Safety cleanup
+              return () => clearTimeout(pollTimeout);
+            };
+            
+            // Start the polling process
+            pollForUpdates();
+          } else {
+            throw new Error('Invalid response from REST API: Missing interactionId');
           }
         } catch (error) {
           console.error('Error with REST API fallback:', error);
           
-          // Last resort - use simulation
+          // More informative error message
           toast({
-            title: 'Using simulation mode',
-            description: 'Connection issues detected. Using local processing instead.',
+            title: 'Network issue detected',
+            description: 'Switching to local processing mode for reliability',
+            variant: 'destructive',
           });
           
-          await simulateAiResponse(interaction);
+          // Last resort - use simulation with better error handling
+          try {
+            await simulateAiResponse(interaction);
+          } catch (simError) {
+            console.error('Simulation fallback also failed:', simError);
+            toast({
+              title: 'Processing Failed',
+              description: 'All processing attempts failed. Please try again later.',
+              variant: 'destructive',
+            });
+          }
         }
       }
     } catch (error) {
