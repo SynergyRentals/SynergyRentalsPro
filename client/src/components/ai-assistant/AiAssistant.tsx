@@ -60,10 +60,21 @@ const AiAssistant: React.FC = () => {
     const baseReconnectDelay = 1000;
     const maxReconnectDelay = 30000; // 30 seconds max delay
     
-    // WebSocket connection URL
+    // WebSocket connection URL with improved reliability
     const getWebSocketUrl = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}/ws`;
+      // Force secure protocol for production environments
+      const isProduction = window.location.hostname !== 'localhost' && 
+                           !window.location.hostname.includes('127.0.0.1');
+      
+      // Always use secure protocol for production, or follow page protocol for development
+      const protocol = isProduction || window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      
+      // Use full host to ensure proper routing, with explicit port if needed
+      const host = window.location.host;
+      
+      // Include a cache-busting parameter to avoid stale connections
+      const timestamp = Date.now();
+      return `${protocol}//${host}/ws?t=${timestamp}`;
     };
     
     // Function to calculate exponential backoff delay with jitter
@@ -77,29 +88,52 @@ const AiAssistant: React.FC = () => {
       return delay * (0.8 + Math.random() * 0.4);
     };
     
-    // Connect to WebSocket server
+    // Enhanced WebSocket connection with improved error handling and connection management
     const connectWebSocket = () => {
       if (socketRef.current) {
-        // Clean up any existing connection first
+        // Clean up any existing connection first with proper state checking
         try {
-          if (socketRef.current.readyState === WebSocket.OPEN || 
-              socketRef.current.readyState === WebSocket.CONNECTING) {
+          // Check the readyState to determine proper cleanup action
+          const currentState = socketRef.current.readyState;
+          console.log(`Current WebSocket state before reconnect: ${currentState}`);
+          
+          if (currentState === WebSocket.OPEN) {
+            console.log('Closing open WebSocket connection before reconnecting');
+            // Use a clean close code with a reason
+            socketRef.current.close(1000, 'Reconnecting');
+          } else if (currentState === WebSocket.CONNECTING) {
+            console.log('Terminating connecting WebSocket before reconnecting');
+            // Terminate a socket in CONNECTING state since it can't be closed cleanly
             socketRef.current.close();
           }
+          // For CLOSING or CLOSED states, no action needed
         } catch (e) {
           console.error('Error closing existing WebSocket:', e);
         }
+        
+        // Always null out the ref after cleanup attempt
+        socketRef.current = null;
       }
       
       // Clear any pending reconnect timer
       if (reconnectTimer) {
+        console.log('Clearing existing reconnect timer');
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
       
       try {
-        console.log(`Connecting to WebSocket: ${getWebSocketUrl()}`);
-        const socket = new WebSocket(getWebSocketUrl());
+        // Include detailed debugging information in connection URL
+        const wsUrl = getWebSocketUrl();
+        console.log(`Connecting to WebSocket: ${wsUrl}`);
+        
+        // Create new connection with more detailed setup
+        const socket = new WebSocket(wsUrl);
+        
+        // Set binary type to improve compatibility
+        socket.binaryType = 'arraybuffer';
+        
+        // Store reference to connection
         socketRef.current = socket;
         
         // Connection opened handler

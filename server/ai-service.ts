@@ -91,15 +91,39 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
       }
     ];
 
-    // Call OpenAI API with improved error handling
+    // Call OpenAI API with enhanced error handling and detailed timeout settings
     // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2500, // Increased max tokens for more detailed responses
-      response_format: { type: "json_object" },
-    });
+    let completion;
+    try {
+      // Use more resilient fetch configuration to prevent timeouts
+      completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 2500, // Increased max tokens for more detailed responses
+        response_format: { type: "json_object" },
+        timeout: 60000, // Increased timeout to 60 seconds for more complex requests
+        stream: false, // Disable streaming for more reliable response handling
+      });
+    } catch (apiError: any) {
+      console.error('OpenAI API error:', apiError);
+      
+      // Provide detailed error information
+      if (apiError.status === 429) {
+        throw new Error('OpenAI rate limit exceeded. Please try again later.');
+      } else if (apiError.status === 401 || apiError.status === 403) {
+        throw new Error('Authentication error with OpenAI API. Please check your API key.');
+      } else if (apiError.status === 404) {
+        throw new Error('The selected OpenAI model is not available. Please try a different model.');
+      } else if (apiError.status >= 500) {
+        throw new Error('OpenAI service is currently experiencing issues. Please try again later.');
+      } else if (apiError.code === 'ECONNABORTED' || apiError.code === 'ETIMEDOUT') {
+        throw new Error('Request to OpenAI timed out. Please try a simpler request.');
+      }
+      
+      // Re-throw with more information for unhandled errors
+      throw new Error(`OpenAI request failed: ${apiError.message || 'Unknown error'}`);
+    }
 
     // Parse the response content with better error handling
     const content = completion.choices[0].message.content;

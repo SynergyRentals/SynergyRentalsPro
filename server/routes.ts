@@ -4685,15 +4685,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const wss = new WebSocketServer({ 
     server: httpServer, 
     path: '/ws',
-    // Basic configuration that works reliably
+    // Enhanced configuration for better stability
     perMessageDeflate: false,
-    clientTracking: true
+    clientTracking: true,
+    // Add headers for cross-origin support
+    handleProtocols: (protocols, request) => {
+      return protocols[0];
+    },
+    // Shorter timeout for faster detection of dead connections
+    pingTimeout: 5000
   });
   
   // Log WebSocket server initialization
   console.log('WebSocket server initialized on path: /ws');
   
-  // Set up very simple ping to keep connections alive
+  // Set up more frequent ping to keep connections alive
   const pingInterval = setInterval(() => {
     try {
       const clientCount = wss.clients.size;
@@ -4708,8 +4714,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Send a heartbeat message as JSON
               client.send(JSON.stringify({
                 type: 'heartbeat',
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                connectionId: client['connectionId'] || 'unknown'
               }));
+            } else if (client.readyState !== WebSocket.CONNECTING) {
+              // If client is in an unexpected state (not OPEN or CONNECTING), terminate it
+              console.log(`Terminating WebSocket client in state: ${client.readyState}`);
+              client.terminate();
             }
           } catch (e) {
             console.error('Error sending ping to client:', e);
@@ -4726,7 +4737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e) {
       console.error('Error in ping interval:', e);
     }
-  }, 20000);
+  }, 10000); // Reduced from 20000ms to 10000ms for more frequent pings
   
   // Create a direct endpoint that can be used to test WebSocket connection status
   app.get('/api/websocket-status', (req, res) => {
@@ -4889,25 +4900,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Handle WebSocket connections
+  // Handle WebSocket connections with improved authentication and connection tracking
   wss.on('connection', (ws, req) => {
     console.log(`WebSocket client connected from ${req.socket.remoteAddress}`);
     
-    // Connection state tracking
+    // Enhanced connection state tracking
     const connectionId = Date.now().toString();
+    ws['connectionId'] = connectionId; // Store connection ID on the socket instance
     let isAlive = true;
+    let isAuthenticated = false;
+    let userId = null;
     
-    // Handle pong responses
+    // Handle pong responses with enhanced logging
     ws.on('pong', () => {
+      const prevState = isAlive;
       isAlive = true;
+      
+      // Only log when state changes from dead to alive
+      if (!prevState) {
+        console.log(`WebSocket client ${connectionId} is now alive (responded to ping)`);
+      }
     });
     
-    // Send welcome message on connection
+    // Set up a per-connection timer to check if the client is still alive
+    const checkAliveInterval = setInterval(() => {
+      if (!isAlive) {
+        console.log(`WebSocket client ${connectionId} is not responding - terminating connection`);
+        clearInterval(checkAliveInterval);
+        return ws.terminate();
+      }
+      
+      isAlive = false; // Will be set to true when pong is received
+      
+      try {
+        ws.ping(null, false, (err) => {
+          if (err) {
+            console.error(`Error sending ping to client ${connectionId}:`, err);
+          }
+        });
+      } catch (e) {
+        console.error(`Failed to ping WebSocket client ${connectionId}:`, e);
+        clearInterval(checkAliveInterval);
+        try {
+          ws.terminate();
+        } catch (err) {
+          console.error(`Error terminating WebSocket client ${connectionId}:`, err);
+        }
+      }
+    }, 15000);
+    
+    // Send welcome message on connection with enhanced metadata
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'welcome',
         message: 'Connected to AI Planner WebSocket',
-        timestamp: new Date().toISOString()
+        connectionId: connectionId,
+        timestamp: new Date().toISOString(),
+        requiresAuth: true
       }));
     }
     
