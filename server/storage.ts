@@ -2188,9 +2188,8 @@ export class DatabaseStorage implements IStorage {
     return updatedInteraction;
   }
   
-  async getAiPlannerInteractionsByUser(userId: number): Promise<AiPlannerInteraction[]> {
+  async getAllAiPlannerInteractions(): Promise<AiPlannerInteraction[]> {
     return await db.select().from(schema.aiPlannerInteractions)
-      .where(eq(schema.aiPlannerInteractions.userId, userId))
       .orderBy(desc(schema.aiPlannerInteractions.createdAt));
   }
   
@@ -2200,8 +2199,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.aiPlannerInteractions.createdAt));
   }
   
-  async getAllAiPlannerInteractions(): Promise<AiPlannerInteraction[]> {
+  async getAiPlannerInteractionsByUser(userId: number): Promise<AiPlannerInteraction[]> {
     return await db.select().from(schema.aiPlannerInteractions)
+      .where(eq(schema.aiPlannerInteractions.userId, userId))
       .orderBy(desc(schema.aiPlannerInteractions.createdAt));
   }
 }

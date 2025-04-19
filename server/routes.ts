@@ -4723,7 +4723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const project = await storage.getProject(data.projectId);
                 if (project) {
                   // Get associated tasks for additional context
-                  const tasks = await storage.getProjectTasks(data.projectId);
+                  const tasks = await storage.getProjectTasksByProject(data.projectId);
                   
                   projectContext = {
                     ...project,
