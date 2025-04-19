@@ -260,23 +260,52 @@ export default function AiPlannerPage() {
   // Get the current interaction details
   const getCurrentInteraction = () => {
     if (!interactions || !currentInteractionId) return null;
-    return interactions.find((interaction: any) => interaction.id === currentInteractionId) || null;
+    const interaction = interactions.find((interaction: any) => interaction.id === currentInteractionId) || null;
+    
+    // Debug the interaction data structure
+    if (interaction && interaction.status === 'completed') {
+      console.log('Current completed interaction:', interaction);
+      console.log('Generated plan:', interaction.generatedPlan);
+      console.log('Response from plan:', interaction.generatedPlan?.response);
+    }
+    
+    return interaction;
   };
 
   // Get suggested tasks from the current interaction
   const getSuggestedTasks = () => {
     const interaction = getCurrentInteraction();
-    if (!interaction || !interaction.generatedPlan) return [];
+    if (!interaction) return [];
     
-    return interaction.generatedPlan.suggestedTasks || [];
+    // Check for different response formats
+    if (interaction.generatedPlan?.suggestedTasks) {
+      return interaction.generatedPlan.suggestedTasks || [];
+    } else if (interaction.rawAiResponse?.suggestedTasks) {
+      return interaction.rawAiResponse.suggestedTasks || [];
+    } else if (interaction.rawAiResponse?.tasks) {
+      return interaction.rawAiResponse.tasks || [];
+    }
+    
+    console.log('No tasks found in the response');
+    return [];
   };
 
   // Get suggested milestones from the current interaction
   const getSuggestedMilestones = () => {
     const interaction = getCurrentInteraction();
-    if (!interaction || !interaction.generatedPlan) return [];
+    if (!interaction) return [];
     
-    return interaction.generatedPlan.suggestedMilestones || [];
+    // Check for different response formats
+    if (interaction.generatedPlan?.suggestedMilestones) {
+      return interaction.generatedPlan.suggestedMilestones || [];
+    } else if (interaction.rawAiResponse?.suggestedMilestones) {
+      return interaction.rawAiResponse.suggestedMilestones || [];
+    } else if (interaction.rawAiResponse?.milestones) {
+      return interaction.rawAiResponse.milestones || [];
+    }
+    
+    console.log('No milestones found in the response');
+    return [];
   };
 
   // Render the project planning form
@@ -452,7 +481,16 @@ export default function AiPlannerPage() {
                 <h3 className="font-medium">Project Plan</h3>
                 <ScrollArea className="h-[300px] rounded-md border p-4">
                   <div className="space-y-4">
-                    <p>{currentInteraction?.generatedPlan?.content || currentInteraction?.response}</p>
+                    {/* Try different possible response formats */}
+                    {currentInteraction?.generatedPlan?.response ? (
+                      <p className="whitespace-pre-wrap">{currentInteraction.generatedPlan.response}</p>
+                    ) : currentInteraction?.generatedPlan?.content ? (
+                      <p className="whitespace-pre-wrap">{currentInteraction.generatedPlan.content}</p>
+                    ) : currentInteraction?.rawAiResponse?.response ? (
+                      <p className="whitespace-pre-wrap">{currentInteraction.rawAiResponse.response}</p>
+                    ) : (
+                      <p className="text-muted-foreground">No plan generated yet.</p>
+                    )}
                   </div>
                 </ScrollArea>
               </div>
