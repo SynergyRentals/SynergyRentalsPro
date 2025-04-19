@@ -24,6 +24,7 @@ import {
   generateCompanyInsights, analyzeUnitHealth, generateProactiveRecommendations,
   generateForecast
 } from "./openai";
+import { generateAIAssistantResponse, generatePlan, analyzeProjectData } from "./ai-service";
 import { 
   syncProperties, syncReservations, syncAll, getLatestSyncLog,
   makeGuestyRequest, healthCheck

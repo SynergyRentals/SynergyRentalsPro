@@ -30,7 +30,6 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
     { name: "Properties", href: "/properties", icon: HomeWork },
     { name: "Guests", href: "/guests", icon: Users },
     { name: "Projects & Tasks", href: "/projects", icon: Assignment },
-    { name: "AI Planner", href: "/projects-tasks/ai-planner", icon: Psychology, highlight: true },
     { name: "Cleaning", href: "/cleaning", icon: CleaningServices },
     { name: "Maintenance", href: "/maintenance", icon: Construction },
     { name: "Inventory", href: "/inventory", icon: Inventory2 },
