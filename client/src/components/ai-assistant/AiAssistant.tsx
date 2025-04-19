@@ -48,84 +48,100 @@ const AiAssistant: React.FC = () => {
     const maxReconnectAttempts = 5;
     const reconnectTimeouts = [1000, 3000, 5000, 10000, 15000]; // Increasing timeouts
     
-    const connectWebSocket = () => {
-      // Create WebSocket connection
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      
+    // Create WebSocket connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    function connectWebSocket() {
       console.log(`Attempting WebSocket connection to ${wsUrl}`);
       
-      const socket = new WebSocket(wsUrl);
-      socketRef.current = socket;
-      
-      // Connection opened
-      socket.addEventListener('open', () => {
-        console.log('WebSocket connected successfully');
-        setWsConnected(true);
-        reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+      try {
+        const socket = new WebSocket(wsUrl);
+        socketRef.current = socket;
         
-        toast({
-          title: 'Connected',
-          description: 'Real-time AI Assistant connection established',
-        });
-      });
-      
-      // Listen for messages
-      socket.addEventListener('message', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('WebSocket message received:', data);
+        // Connection opened handler
+        socket.onopen = () => {
+          console.log('WebSocket connected successfully');
+          setWsConnected(true);
+          reconnectAttempts = 0; // Reset reconnect attempts on successful connection
           
-          // Handle different message types
-          if (data.type === 'welcome') {
-            console.log('WebSocket welcome message:', data.message);
-          } else if (data.type === 'status_update') {
-            // Update the interaction status in the cache
-            queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
-          } else if (data.type === 'ai_response') {
-            // Update with the new interaction data
-            queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
-          } else if (data.type === 'error') {
+          toast({
+            title: 'Connected',
+            description: 'Real-time AI Assistant connection established',
+          });
+        };
+        
+        // Message handler
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            
+            // Handle different message types
+            if (data.type === 'welcome') {
+              console.log('WebSocket welcome message:', data.message);
+            } else if (data.type === 'status_update') {
+              // Update the interaction status in the cache
+              queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+            } else if (data.type === 'ai_response') {
+              // Update with the new interaction data
+              queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+            } else if (data.type === 'error') {
+              toast({
+                title: 'Error',
+                description: data.message || 'An error occurred with your AI request',
+                variant: 'destructive',
+              });
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+        
+        // Connection closed handler
+        socket.onclose = (event) => {
+          console.log(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
+          setWsConnected(false);
+          
+          // Attempt to reconnect unless this was a normal closure or component unmounting
+          if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+            const timeout = reconnectTimeouts[Math.min(reconnectAttempts, reconnectTimeouts.length - 1)];
+            console.log(`Attempting to reconnect in ${timeout}ms (attempt ${reconnectAttempts + 1} of ${maxReconnectAttempts})`);
+            
+            setTimeout(() => {
+              reconnectAttempts++;
+              connectWebSocket();
+            }, timeout);
+          } else if (reconnectAttempts >= maxReconnectAttempts) {
             toast({
-              title: 'Error',
-              description: data.message || 'An error occurred with your AI request',
+              title: 'Connection Failed',
+              description: 'Could not establish a connection to the AI service after multiple attempts',
               variant: 'destructive',
             });
           }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      });
-      
-      // Connection closed
-      socket.addEventListener('close', (event) => {
-        console.log(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
+        };
+        
+        // Error handler
+        socket.onerror = (event) => {
+          console.error('WebSocket error:', event);
+          // Don't set connection state here, as the close event will also fire
+        };
+      } catch (error) {
+        console.error('Error creating WebSocket connection:', error);
         setWsConnected(false);
         
-        // Attempt to reconnect unless this was a normal closure or component unmounting
-        if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+        // Try to reconnect after a delay
+        if (reconnectAttempts < maxReconnectAttempts) {
           const timeout = reconnectTimeouts[Math.min(reconnectAttempts, reconnectTimeouts.length - 1)];
-          console.log(`Attempting to reconnect in ${timeout}ms (attempt ${reconnectAttempts + 1} of ${maxReconnectAttempts})`);
+          console.log(`Error in WebSocket creation. Attempting to reconnect in ${timeout}ms (attempt ${reconnectAttempts + 1} of ${maxReconnectAttempts})`);
           
           setTimeout(() => {
             reconnectAttempts++;
             connectWebSocket();
           }, timeout);
-        } else if (reconnectAttempts >= maxReconnectAttempts) {
-          toast({
-            title: 'Connection Failed',
-            description: 'Could not establish a connection to the AI service after multiple attempts',
-            variant: 'destructive',
-          });
         }
-      });
-      
-      // Connection error
-      socket.addEventListener('error', (event) => {
-        console.error('WebSocket error:', event);
-        // Don't set connection state here, as the close event will also fire
-      });
-    };
+      }
+    }
     
     // Initial connection
     connectWebSocket();

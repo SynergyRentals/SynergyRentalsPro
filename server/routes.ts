@@ -4681,26 +4681,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
-  // Add WebSocket server for AI Assistant with ping/pong for connection health monitoring
+  // Add WebSocket server for AI Assistant with simplified configuration
   const wss = new WebSocketServer({ 
     server: httpServer, 
     path: '/ws',
-    // Set ping interval and timeout to detect and clear broken connections
-    clientTracking: true,
-    perMessageDeflate: {
-      zlibDeflateOptions: {
-        // See zlib defaults.
-        chunkSize: 1024,
-        memLevel: 7,
-        level: 3
-      },
-      zlibInflateOptions: {
-        chunkSize: 10 * 1024
-      },
-      // Below options specified as default values.
-      concurrencyLimit: 10, // Limits zlib concurrency for performance.
-      threshold: 1024 // Size (in bytes) below which messages should not be compressed.
-    }
+    // Simplified configuration to reduce potential connection issues
+    clientTracking: true
   });
   
   // Ping all clients every 30 seconds to keep connections alive
