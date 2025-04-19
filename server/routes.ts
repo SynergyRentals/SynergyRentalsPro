@@ -4844,9 +4844,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Create a polling fallback endpoint for cases where WebSockets don't work
+  // Form-based AI Project Planner endpoint with clarification capabilities
   app.post('/api/ai-planner/process-request', checkAuth, async (req: Request, res: Response) => {
-    const { prompt, userId, projectId } = req.body;
+    const { prompt, userId, projectId, followupResponse } = req.body;
     
     if (!prompt || !userId) {
       return res.status(400).json({
@@ -4857,44 +4857,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     let interaction;
     try {
-      // Create a new interaction with more detailed placeholder objects
-      interaction = await storage.createAiPlannerInteraction({
-        prompt,
-        userId,
-        // Use more detailed objects for required fields
-        rawAiResponse: {
-          status: 'pending',
-          timestamp: new Date().toISOString(),
-          requestInfo: { userPrompt: prompt }
-        },
-        generatedPlan: {
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          processingStage: 'init'
-        },
-        context: {},
-        status: 'pending'
-      });
+      if (followupResponse) {
+        // This is a clarification response, get the existing interaction
+        const existingInteraction = await storage.getAiPlannerInteraction(parseInt(req.body.interactionId));
+        
+        if (!existingInteraction) {
+          return res.status(404).json({
+            error: 'Interaction not found',
+            message: 'The specified interaction was not found'
+          });
+        }
+        
+        // Update the interaction with the followup response
+        await storage.updateAiPlannerInteraction(existingInteraction.id, {
+          status: 'processing_followup',
+          updatedAt: new Date(),
+          rawAiResponse: {
+            ...existingInteraction.rawAiResponse,
+            status: 'processing_followup',
+            followupResponse,
+            timestamp: new Date().toISOString(),
+            processingDetails: { stage: 'processing_clarification', progress: 50 }
+          }
+        });
+        
+        interaction = await storage.getAiPlannerInteraction(existingInteraction.id);
+      } else {
+        // This is a new request, create a new interaction
+        interaction = await storage.createAiPlannerInteraction({
+          prompt,
+          userId,
+          // Use more detailed objects for required fields
+          rawAiResponse: {
+            status: 'pending',
+            timestamp: new Date().toISOString(),
+            requestInfo: { userPrompt: prompt }
+          },
+          generatedPlan: {
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            processingStage: 'init'
+          },
+          context: {},
+          status: 'pending'
+        });
+      }
       
       // Update status to processing (Don't await to return quickly)
       storage.updateAiPlannerInteraction(interaction.id, {
-        status: 'processing',
+        status: followupResponse ? 'processing_followup' : 'processing',
         updatedAt: new Date(),
         rawAiResponse: {
-          status: 'processing',
+          status: followupResponse ? 'processing_followup' : 'processing',
           timestamp: new Date().toISOString(),
-          processingDetails: { stage: 'beginning', progress: 0 }
+          processingDetails: { 
+            stage: followupResponse ? 'processing_clarification' : 'beginning', 
+            progress: followupResponse ? 50 : 0 
+          }
         },
         generatedPlan: {
           status: 'in_progress',
-          processingStage: 'analyzing',
+          processingStage: followupResponse ? 'processing_clarification' : 'analyzing',
           lastUpdated: new Date().toISOString()
         }
       });
       
       // Return immediately with the interaction ID so client can poll
       res.status(202).json({
-        message: 'Request accepted and processing',
+        message: followupResponse ? 'Clarification accepted and processing' : 'Request accepted and processing',
         interactionId: interaction.id
       });
       
@@ -4918,15 +4948,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          // Call OpenAI API
+          // For new requests, first analyze if we need clarification
+          let aiResponse;
+          
+          if (!followupResponse) {
+            // First, analyze the prompt to see if clarification is needed
+            const promptAnalysis = await analyzePrompt(prompt);
+            
+            if (promptAnalysis.needsClarification) {
+              // Update interaction to show we need clarification
+              await storage.updateAiPlannerInteraction(interaction.id, {
+                status: 'needs_clarification',
+                updatedAt: new Date(),
+                rawAiResponse: {
+                  status: 'needs_clarification',
+                  timestamp: new Date().toISOString(),
+                  clarificationQuestions: promptAnalysis.clarificationQuestions,
+                  analysisResponse: promptAnalysis.analysisResponse,
+                  processingDetails: { stage: 'waiting_for_clarification', progress: 40 }
+                },
+                generatedPlan: {
+                  status: 'pending_clarification',
+                  processingStage: 'waiting_for_user_input',
+                  lastUpdated: new Date().toISOString(),
+                  needsClarification: true,
+                  clarificationQuestions: promptAnalysis.clarificationQuestions
+                }
+              });
+              
+              // Stop processing here and wait for user to provide clarification
+              return;
+            }
+          }
+          
+          // Proceed with generating the plan now that we have all the information
           const planningRequest = {
             prompt,
             userId,
             interactionId: interaction.id,
-            projectContext
+            projectContext,
+            followupResponse
           };
           
-          const aiResponse = await generatePlan(planningRequest);
+          aiResponse = await generatePlan(planningRequest);
           const response = aiResponse.response;
           
           // Update interaction with response using consistent, detailed formatting

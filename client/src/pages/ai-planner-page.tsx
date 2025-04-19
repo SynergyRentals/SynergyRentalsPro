@@ -45,28 +45,11 @@ export default function AiPlannerPage() {
     mutationFn: async (newPrompt: string) => {
       console.log('Creating new project plan with prompt:', newPrompt);
       
-      const response = await apiRequest('POST', '/api/ai-planner/interactions', {
+      // Use the new process-request endpoint for improved formalized planning workflow
+      const response = await apiRequest('POST', '/api/ai-planner/process-request', {
         prompt: newPrompt,
-        rawAiResponse: {
-          status: 'pending',
-          timestamp: new Date().toISOString(),
-          requestInfo: {
-            userPrompt: newPrompt,
-            clientTime: new Date().toISOString(),
-            clientId: `project-form-${Math.random().toString(36).substr(2, 9)}`
-          },
-          stage: 'planning'
-        },
-        generatedPlan: {
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          processingStage: 'initial_analysis'
-        },
-        context: {
-          source: 'project-form',
-          timestamp: new Date().toISOString()
-        },
-        status: 'pending'
+        userId: user?.id,
+        projectId: null,
       });
       
       return response;
@@ -106,12 +89,12 @@ export default function AiPlannerPage() {
     mutationFn: async ({ id, followupText }: { id: number; followupText: string }) => {
       console.log('Sending followup response for interaction:', id);
       
-      const response = await apiRequest('PATCH', `/api/ai-planner/interactions/${id}`, {
-        context: {
-          followupResponse: followupText,
-          timestamp: new Date().toISOString()
-        },
-        status: 'clarifying'
+      // Use the process-request endpoint for improved formalized planning workflow
+      const response = await apiRequest('POST', '/api/ai-planner/process-request', {
+        prompt: projectPrompt, // Include the original prompt
+        userId: user?.id,
+        interactionId: id,
+        followupResponse: followupText
       });
       
       return response;
