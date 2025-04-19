@@ -9,6 +9,7 @@ export interface PlanningRequest {
   projectContext?: any;
   userId: number;
   interactionId: number;
+  followupResponse?: string;
 }
 
 // Type for AI planning response
@@ -28,6 +29,8 @@ export interface PlanningResponse {
   suggestedTitle?: string;
   rawResponse?: any;
   error?: string;
+  needsClarification?: boolean;
+  clarificationQuestions?: string;
 }
 
 /**
@@ -35,6 +38,93 @@ export interface PlanningResponse {
  * @param request - The planning request containing prompt and context
  * @returns A planning response with AI-generated content
  */
+export async function analyzePrompt(prompt: string): Promise<{
+  needsClarification: boolean;
+  clarificationQuestions?: string;
+  analysisResponse?: string;
+}> {
+  // Check if OpenAI API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OpenAI API key is missing for prompt analysis");
+    return {
+      needsClarification: false,
+      analysisResponse: "I'm unable to analyze your prompt as the OpenAI API key is missing. Please contact your administrator."
+    };
+  }
+
+  const startTime = Date.now();
+  
+  try {
+    console.log(`Analyzing project prompt for potential clarification needs`);
+    
+    // System message for analyzing the prompt
+    const systemMessage = `You are an AI project planning assistant for a property management company.
+      Your task is to analyze a project prompt and determine if you need more information to create a comprehensive plan.
+      
+      If the prompt is clear and provides enough detail, respond with:
+      {
+        "needsClarification": false,
+        "analysis": "Brief assessment of the prompt's clarity and completeness"
+      }
+      
+      If you need more information, respond with:
+      {
+        "needsClarification": true,
+        "clarificationQuestions": "A numbered list of 2-4 specific questions to help clarify the project scope, timeline, resources, or other critical details",
+        "analysis": "Explanation of what information is missing and why it's important for planning"
+      }
+      
+      Look for missing information about:
+      - Timeline constraints or deadlines
+      - Available resources (people, budget, tools)
+      - Success criteria or objectives
+      - Dependencies on other projects/teams
+      - Priority level or urgency
+    `;
+    
+    // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+      response_format: { type: "json_object" },
+    });
+
+    const content = completion.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from AI service");
+    }
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(content);
+    } catch (parseError) {
+      console.error("Error parsing OpenAI response:", parseError);
+      throw new Error("Invalid JSON response received from AI service");
+    }
+    
+    // Calculate processing time
+    const processingTime = Date.now() - startTime;
+    console.log(`Prompt analysis completed in ${processingTime}ms`);
+    
+    return {
+      needsClarification: parsedResponse.needsClarification || false,
+      clarificationQuestions: parsedResponse.clarificationQuestions,
+      analysisResponse: parsedResponse.analysis
+    };
+  } catch (error: any) {
+    console.error("Error analyzing prompt:", error);
+    return {
+      needsClarification: false,
+      analysisResponse: "I encountered an error while analyzing your prompt. Let's proceed with the information you've provided."
+    };
+  }
+}
+
 export async function generatePlan(request: PlanningRequest): Promise<PlanningResponse> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
@@ -52,6 +142,9 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
   }
 
   const startTime = Date.now();
+  
+  // Check if this is an initial request or a followup clarification
+  const isFollowupRequest = !!request.followupResponse;
 
   try {
     // Log the request for debugging
