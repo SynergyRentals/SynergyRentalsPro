@@ -30,6 +30,7 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
     { name: "Properties", href: "/properties", icon: HomeWork },
     { name: "Guests", href: "/guests", icon: Users },
     { name: "Projects & Tasks", href: "/projects", icon: Assignment },
+    { name: "AI Planner", href: "/projects-tasks/ai-planner", icon: Psychology, highlight: true },
     { name: "Cleaning", href: "/cleaning", icon: CleaningServices },
     { name: "Maintenance", href: "/maintenance", icon: Construction },
     { name: "Inventory", href: "/inventory", icon: Inventory2 },
@@ -90,14 +91,25 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
                       className={`w-full text-left flex items-center px-4 py-3 hover:bg-white hover:bg-opacity-10 transition-colors ${
                         isActive
                           ? "bg-[#FFCF45] bg-opacity-20 border-l-4 border-[#FFCF45]"
-                          : ""
+                          : item.highlight
+                            ? "bg-primary bg-opacity-10 border-l-4 border-primary"
+                            : ""
                       }`}
                     >
                       <IconComponent
-                        className={`mr-3 ${isActive ? "text-[#FFCF45]" : "text-[#9EA2B1]"}`}
+                        className={`mr-3 ${
+                          isActive 
+                            ? "text-[#FFCF45]" 
+                            : item.highlight 
+                              ? "text-primary" 
+                              : "text-[#9EA2B1]"
+                        }`}
                         fontSize="small"
                       />
-                      <span>{item.name}</span>
+                      <span className={item.highlight && !isActive ? "text-primary font-medium" : ""}>{item.name}</span>
+                      {item.highlight && !isActive && (
+                        <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-primary text-white rounded">New</span>
+                      )}
                     </button>
                   </li>
                 );
@@ -105,14 +117,23 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
             </ul>
           </nav>
 
-          {/* Quick Actions Button */}
-          <div className="p-4 border-t border-gray-700">
+          {/* Quick Actions Buttons */}
+          <div className="p-4 border-t border-gray-700 space-y-2">
             <Button
               className="w-full bg-[#FFCF45] text-[#2C2E3E] hover:bg-opacity-90"
               onClick={() => handleNavClick("/projects")}
             >
               <Add className="mr-2 h-4 w-4" />
               <span>New Task</span>
+            </Button>
+            
+            <Button
+              className="w-full bg-primary hover:bg-opacity-90 text-white"
+              onClick={() => handleNavClick("/projects-tasks/ai-planner")}
+              variant="outline"
+            >
+              <Psychology className="mr-2 h-4 w-4" />
+              <span>AI Assistant</span>
             </Button>
           </div>
         </div>
