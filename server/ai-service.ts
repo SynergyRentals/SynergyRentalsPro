@@ -61,6 +61,8 @@ export async function analyzePrompt(prompt: string): Promise<{
     const systemMessage = `You are an AI project planning assistant for a property management company.
       Your task is to analyze a project prompt and determine if you need more information to create a comprehensive plan.
       
+      You must respond in JSON format with the following structure:
+      
       If the prompt is clear and provides enough detail, respond with:
       {
         "needsClarification": false,
@@ -156,21 +158,35 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
          You help create and optimize project plans, tasks, and milestones.
          Current project context: ${JSON.stringify(request.projectContext)}
          
-         Respond with a JSON object that includes:
-         1. "response": A detailed plan with structured sections (overview, approach, timeline, resources needed)
-         2. "suggestedTasks": An array of specific tasks, each with description, priority, and suggested due date
-         3. "suggestedMilestones": Key milestones for tracking progress
-         4. "suggestedTitle": A concise title for the project
-         5. "suggestedDeadline": Estimated completion date for the entire project`
+         Your response must be in JSON format with the following structure:
+         {
+           "response": "A detailed plan with structured sections (overview, approach, timeline, resources needed)",
+           "suggestedTasks": [
+             { "title": "Task 1", "description": "Task details", "priority": "high/medium/low", "dueDate": "YYYY-MM-DD" },
+             { "title": "Task 2", "description": "Task details", "priority": "high/medium/low", "dueDate": "YYYY-MM-DD" }
+           ],
+           "suggestedMilestones": [
+             { "title": "Milestone 1", "description": "Milestone details", "targetDate": "YYYY-MM-DD" }
+           ],
+           "suggestedTitle": "Concise project title",
+           "suggestedDeadline": "YYYY-MM-DD"
+         }`
       : `You are an AI project planning assistant for Synergy Rentals, a property management company.
          You help create and optimize project plans, tasks, and milestones.
          
-         Respond with a JSON object that includes:
-         1. "response": A detailed plan with structured sections (overview, approach, timeline, resources needed)
-         2. "suggestedTasks": An array of specific tasks, each with description, priority, and suggested due date
-         3. "suggestedMilestones": Key milestones for tracking progress
-         4. "suggestedTitle": A concise title for the project
-         5. "suggestedDeadline": Estimated completion date for the entire project`;
+         Your response must be in JSON format with the following structure:
+         {
+           "response": "A detailed plan with structured sections (overview, approach, timeline, resources needed)",
+           "suggestedTasks": [
+             { "title": "Task 1", "description": "Task details", "priority": "high/medium/low", "dueDate": "YYYY-MM-DD" },
+             { "title": "Task 2", "description": "Task details", "priority": "high/medium/low", "dueDate": "YYYY-MM-DD" }
+           ],
+           "suggestedMilestones": [
+             { "title": "Milestone 1", "description": "Milestone details", "targetDate": "YYYY-MM-DD" }
+           ],
+           "suggestedTitle": "Concise project title",
+           "suggestedDeadline": "YYYY-MM-DD"
+         }`;
 
     // Build messages for the API call with more context
     let messages = [
@@ -189,8 +205,9 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
       console.log('Processing followup response for clarification');
       
       // Add a message from the assistant to simulate the clarification request
+      // For the OpenAI API, the "assistant" role is valid, but TypeScript is using an older type definition
       messages.push({
-        role: "assistant" as const as "user" | "system" | "assistant", // Type assertion to make TypeScript happy
+        role: "assistant" as any, // TypeScript doesn't know about the assistant role in this context
         content: JSON.stringify({
           needsClarification: true,
           message: "I need some additional information to create a better project plan."
