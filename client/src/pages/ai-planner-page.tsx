@@ -58,12 +58,14 @@ export default function AiPlannerPage() {
       console.log('Project planning started successfully:', data);
       
       // Store the interaction ID for polling
-      if (data && data.id) {
-        setCurrentInteractionId(data.id);
+      if (data && (data.id || data.interactionId)) {
+        // The server returns interactionId but we check both for robustness
+        const id = data.interactionId || data.id;
+        setCurrentInteractionId(id);
         setPlanningStage('generating');
         
         // Start polling the interaction status
-        pollInteractionStatus(data.id);
+        pollInteractionStatus(id);
       } else {
         toast({
           title: 'Error',
@@ -103,10 +105,11 @@ export default function AiPlannerPage() {
       console.log('Followup sent successfully:', data);
       
       // Continue polling the interaction status
-      if (data && data.id) {
+      if (data && (data.id || data.interactionId)) {
+        const id = data.interactionId || data.id;
         setPlanningStage('generating');
         setFollowupResponse('');
-        pollInteractionStatus(data.id);
+        pollInteractionStatus(id);
       }
       
       queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
