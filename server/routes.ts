@@ -4681,19 +4681,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
-  // Create a basic WebSocket server with absolute minimal configuration to eliminate potential issues
+  // Create an enhanced WebSocket server with robust configuration for maximum reliability
   const wss = new WebSocketServer({ 
     server: httpServer, 
     path: '/ws',
-    // Enhanced configuration for better stability
+    // Disable compression to avoid potential issues with different client implementations
     perMessageDeflate: false,
+    // Enable client tracking for better connection management
     clientTracking: true,
-    // Add headers for cross-origin support
+    // Set a more reasonable maximum payload size (8MB)
+    maxPayload: 8 * 1024 * 1024,
+    // Accept all protocols for maximum compatibility
     handleProtocols: (protocols, request) => {
+      // If no protocols are specified, accept the connection anyway
+      if (!protocols || protocols.length === 0) return '';
+      // Otherwise accept the first protocol
       return protocols[0];
     },
     // Shorter timeout for faster detection of dead connections
-    pingTimeout: 5000
+    pingTimeout: 5000,
+    // Increased backlog size to handle more pending connections
+    backlog: 100
+  });
+  
+  // Add CORS headers for WebSocket requests at the HTTP level
+  app.use('/ws', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+      // Pre-flight request
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    
+    next();
   });
   
   // Log WebSocket server initialization

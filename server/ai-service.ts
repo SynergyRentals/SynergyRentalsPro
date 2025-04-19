@@ -95,16 +95,24 @@ export async function generatePlan(request: PlanningRequest): Promise<PlanningRe
     // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
     let completion;
     try {
-      // Use more resilient fetch configuration to prevent timeouts
+      // Use more resilient configuration to prevent timeouts
+      const controller = new AbortController();
+      // Set a 60 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      
       completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: messages,
         temperature: 0.7,
         max_tokens: 2500, // Increased max tokens for more detailed responses
         response_format: { type: "json_object" },
-        timeout: 60000, // Increased timeout to 60 seconds for more complex requests
-        stream: false, // Disable streaming for more reliable response handling
+        stream: false // Disable streaming for more reliable response handling
+      }, {
+        signal: controller.signal
       });
+      
+      // Clear the timeout
+      clearTimeout(timeoutId);
     } catch (apiError: any) {
       console.error('OpenAI API error:', apiError);
       
