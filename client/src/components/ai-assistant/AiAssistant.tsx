@@ -203,58 +203,95 @@ const AiAssistant: React.FC = () => {
 
   // Simulate AI response (in a real implementation, this would be handled by a webhook)
   const simulateAiResponse = async (interaction: AiInteraction) => {
-    // Update status to processing
-    await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
-      status: 'processing',
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
-    
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Generate a response based on the prompt
-    let response = '';
-    
-    if (interaction.prompt.toLowerCase().includes('task') && interaction.prompt.toLowerCase().includes('create')) {
-      response = "I can help create a new task. Here's a suggested task:\n\n" +
-        "Title: Follow up with cleaning team\n" +
-        "Priority: Medium\n" +
-        "Due Date: Tomorrow at 2pm\n" +
-        "Description: Check that all units have been properly cleaned and prepared for upcoming guests\n\n" +
-        "Would you like me to create this task for you?";
-    } else if (interaction.prompt.toLowerCase().includes('project') && interaction.prompt.toLowerCase().includes('plan')) {
-      response = "I can help create a project plan. Based on your request, here's a suggested project structure:\n\n" +
-        "Project: Quarterly Maintenance Review\n\n" +
-        "Milestones:\n" +
-        "1. Initial property assessment (1 week)\n" +
-        "2. Vendor coordination (2 weeks)\n" +
-        "3. Maintenance implementation (3 weeks)\n" +
-        "4. Final inspection (1 week)\n\n" +
-        "Would you like me to set this up as a new project with these milestones?";
-    } else if (interaction.prompt.toLowerCase().includes('analyze') || interaction.prompt.toLowerCase().includes('report')) {
-      response = "Based on your current projects and tasks, here's a quick analysis:\n\n" +
-        "- You have 5 high priority tasks pending\n" +
-        "- The maintenance team is currently handling more tasks than the cleaning team\n" +
-        "- Most of your tasks are concentrated around the end of the month\n\n" +
-        "Would you like a more detailed analysis or help redistributing these tasks?";
-    } else {
-      response = "I understand you need assistance with your projects and tasks. I can help with:\n\n" +
-        "- Creating new tasks or projects\n" +
-        "- Planning project timelines and milestones\n" +
-        "- Analyzing your current workload\n" +
-        "- Suggesting task prioritization\n" +
-        "- Generating reports\n\n" +
-        "Please let me know what specific help you need with your projects or tasks.";
+    if (!interaction || typeof interaction.id !== 'number') {
+      console.error('Invalid interaction object in simulateAiResponse:', interaction);
+      toast({
+        title: 'Error',
+        description: 'Failed to process AI request. Please try again.',
+        variant: 'destructive',
+      });
+      return;
     }
     
-    // Update with the response
-    await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
-      status: 'completed',
-      response,
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+    try {
+      // Update status to processing
+      await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
+        status: 'processing',
+        rawAiResponse: {}, // Empty placeholder to ensure validation passes
+        generatedPlan: {}, // Empty placeholder to ensure validation passes
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+      
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generate a response based on the prompt
+      let response = '';
+      
+      if (interaction.prompt.toLowerCase().includes('task') && interaction.prompt.toLowerCase().includes('create')) {
+        response = "I can help create a new task. Here's a suggested task:\n\n" +
+          "Title: Follow up with cleaning team\n" +
+          "Priority: Medium\n" +
+          "Due Date: Tomorrow at 2pm\n" +
+          "Description: Check that all units have been properly cleaned and prepared for upcoming guests\n\n" +
+          "Would you like me to create this task for you?";
+      } else if (interaction.prompt.toLowerCase().includes('project') && interaction.prompt.toLowerCase().includes('plan')) {
+        response = "I can help create a project plan. Based on your request, here's a suggested project structure:\n\n" +
+          "Project: Quarterly Maintenance Review\n\n" +
+          "Milestones:\n" +
+          "1. Initial property assessment (1 week)\n" +
+          "2. Vendor coordination (2 weeks)\n" +
+          "3. Maintenance implementation (3 weeks)\n" +
+          "4. Final inspection (1 week)\n\n" +
+          "Would you like me to set this up as a new project with these milestones?";
+      } else if (interaction.prompt.toLowerCase().includes('analyze') || interaction.prompt.toLowerCase().includes('report')) {
+        response = "Based on your current projects and tasks, here's a quick analysis:\n\n" +
+          "- You have 5 high priority tasks pending\n" +
+          "- The maintenance team is currently handling more tasks than the cleaning team\n" +
+          "- Most of your tasks are concentrated around the end of the month\n\n" +
+          "Would you like a more detailed analysis or help redistributing these tasks?";
+      } else {
+        response = "I understand you need assistance with your projects and tasks. I can help with:\n\n" +
+          "- Creating new tasks or projects\n" +
+          "- Planning project timelines and milestones\n" +
+          "- Analyzing your current workload\n" +
+          "- Suggesting task prioritization\n" +
+          "- Generating reports\n\n" +
+          "Please let me know what specific help you need with your projects or tasks.";
+      }
+      
+      // Update with the response and required fields for schema validation
+      await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
+        status: 'completed',
+        response,
+        rawAiResponse: { simulatedResponse: true },
+        generatedPlan: { content: response },
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+    } catch (error) {
+      console.error('Error in simulateAiResponse:', error);
+      
+      // Mark as error if something fails
+      try {
+        await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
+          status: 'error',
+          rawAiResponse: { error: 'Simulation error' },
+          generatedPlan: { error: 'Simulation error' },
+        });
+        
+        queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+      } catch (updateError) {
+        console.error('Error updating interaction status:', updateError);
+      }
+      
+      toast({
+        title: 'Error',
+        description: 'Failed to process your request. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -266,6 +303,17 @@ const AiAssistant: React.FC = () => {
       // First create a record of the interaction through the API
       const newInteraction = await createInteraction.mutateAsync(prompt);
       
+      // Check if we got a valid interaction from the API
+      if (!newInteraction || typeof newInteraction.id !== 'number') {
+        console.error('Invalid interaction ID from API:', newInteraction);
+        toast({
+          title: 'Error',
+          description: 'Failed to create interaction. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // If WebSocket is connected, send the request through WebSocket
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && currentUser) {
         // Give the connection another health check before sending
@@ -274,19 +322,13 @@ const AiAssistant: React.FC = () => {
           const projectIdMatch = window.location.pathname.match(/\/projects\/(\d+)/);
           const projectId = projectIdMatch ? parseInt(projectIdMatch[1], 10) : null;
           
-          // Ensure we have a valid numeric ID
-          if (newInteraction && typeof newInteraction.id === 'number') {
-            socketRef.current.send(JSON.stringify({
-              type: 'ai_request',
-              prompt,
-              userId: currentUser.id,
-              interactionId: newInteraction.id,
-              projectId: projectId
-            }));
-          } else {
-            console.error('Invalid interaction ID:', newInteraction);
-            throw new Error('Invalid interaction ID');
-          }
+          socketRef.current.send(JSON.stringify({
+            type: 'ai_request',
+            prompt,
+            userId: currentUser.id,
+            interactionId: newInteraction.id,
+            projectId: projectId
+          }));
           
           // The response will come back through the WebSocket
           console.log('Sent AI request through WebSocket');
