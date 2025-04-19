@@ -4569,13 +4569,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/ai-planner/interactions/:id", checkAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
+      console.log(`Getting AI Planner interaction details for ID: ${id}`);
+      
       const interaction = await storage.getAiPlannerInteraction(id);
       
       if (!interaction) {
+        console.log(`AI Planner interaction not found for ID: ${id}`);
         return res.status(404).json({ error: 'AI Planner interaction not found' });
       }
       
-      res.json(interaction);
+      // Log the status for debugging
+      console.log(`Returning AI Planner interaction with status: ${interaction.status}`);
+      
+      // Make sure essential properties are present
+      const responseData = {
+        ...interaction,
+        // Ensure these fields exist, providing defaults if necessary
+        status: interaction.status || 'unknown',
+        generatedPlan: interaction.generatedPlan || {},
+        rawAiResponse: interaction.rawAiResponse || {}
+      };
+      
+      res.json(responseData);
     } catch (error) {
       console.error('Error fetching AI Planner interaction:', error);
       res.status(500).json({ error: 'Failed to retrieve AI Planner interaction' });
@@ -4951,94 +4966,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // For new requests, first analyze if we need clarification
           let aiResponse;
           
-          if (!followupResponse) {
-            // First, analyze the prompt to see if clarification is needed
-            const promptAnalysis = await analyzePrompt(prompt);
-            
-            if (promptAnalysis.needsClarification) {
-              // Update interaction to show we need clarification
-              await storage.updateAiPlannerInteraction(interaction.id, {
-                status: 'needs_clarification',
-                updatedAt: new Date(),
-                rawAiResponse: {
-                  status: 'needs_clarification',
-                  timestamp: new Date().toISOString(),
-                  clarificationQuestions: promptAnalysis.clarificationQuestions,
-                  analysisResponse: promptAnalysis.analysisResponse,
-                  processingDetails: { stage: 'waiting_for_clarification', progress: 40 }
-                },
-                generatedPlan: {
-                  status: 'pending_clarification',
-                  processingStage: 'waiting_for_user_input',
-                  lastUpdated: new Date().toISOString(),
-                  needsClarification: true,
-                  clarificationQuestions: promptAnalysis.clarificationQuestions
-                }
-              });
-              
-              // Stop processing here and wait for user to provide clarification
-              return;
-            }
-          }
-          
-          // Proceed with generating the plan now that we have all the information
-          const planningRequest = {
-            prompt,
-            userId,
-            interactionId: interaction.id,
-            projectContext,
-            followupResponse
-          };
-          
-          aiResponse = await generatePlan(planningRequest);
-          const response = aiResponse.response;
-          
-          // Update interaction with response using consistent, detailed formatting
-          await storage.updateAiPlannerInteraction(interaction.id, {
-            status: 'completed',
-            response,
-            rawAiResponse: {
-              ...aiResponse,
-              status: 'complete',
-              completedAt: new Date().toISOString(),
-              processingTime: Date.now() - new Date(interaction.createdAt).getTime() // in ms
-            },
-            generatedPlan: { 
-              content: response,
-              status: 'complete', 
-              generatedAt: new Date().toISOString(),
-              suggestedTasks: aiResponse.suggestedTasks || [],
-              suggestedMilestones: aiResponse.suggestedMilestones || []
-            },
-            updatedAt: new Date()
-          });
-          
-        } catch (error) {
-          console.error('Error processing AI request:', error);
-          
           try {
-            // Update with detailed error information for consistency with the WebSocket error handling
+            if (!followupResponse) {
+              console.log(`Starting prompt analysis for interaction ID: ${interaction.id}`);
+              
+              // First, analyze the prompt to see if clarification is needed
+              const promptAnalysis = await analyzePrompt(prompt);
+              
+              console.log(`Prompt analysis result for interaction ID ${interaction.id}:`, 
+                promptAnalysis.needsClarification ? 'Needs clarification' : 'Ready to proceed');
+              
+              if (promptAnalysis.needsClarification) {
+                // Update interaction to show we need clarification
+                await storage.updateAiPlannerInteraction(interaction.id, {
+                  status: 'needs_clarification',
+                  updatedAt: new Date(),
+                  rawAiResponse: {
+                    status: 'needs_clarification',
+                    timestamp: new Date().toISOString(),
+                    clarificationQuestions: promptAnalysis.clarificationQuestions,
+                    analysisResponse: promptAnalysis.analysisResponse,
+                    processingDetails: { stage: 'waiting_for_clarification', progress: 40 }
+                  },
+                  generatedPlan: {
+                    status: 'pending_clarification',
+                    processingStage: 'waiting_for_user_input',
+                    lastUpdated: new Date().toISOString(),
+                    needsClarification: true,
+                    clarificationQuestions: promptAnalysis.clarificationQuestions
+                  }
+                });
+                
+                // Stop processing here and wait for user to provide clarification
+                console.log(`Interaction ${interaction.id} marked as needs_clarification, waiting for user input`);
+                return;
+              }
+            }
+            
+            // Mark the interaction as in progress for plan generation (after analysis phase)
             await storage.updateAiPlannerInteraction(interaction.id, {
-              status: 'error',
-              rawAiResponse: { 
-                error: 'Error processing request',
-                errorDetails: error instanceof Error ? error.message : 'Unknown error',
-                errorTime: new Date().toISOString(),
-                status: 'failed'
+              status: 'generating_plan',
+              updatedAt: new Date(),
+              rawAiResponse: {
+                status: 'generating_plan',
+                timestamp: new Date().toISOString(),
+                processingDetails: { stage: 'generating_plan', progress: 60 }
+              },
+              generatedPlan: {
+                status: 'in_progress',
+                processingStage: 'generating_plan',
+                lastUpdated: new Date().toISOString()
+              }
+            });
+            
+            console.log(`Starting plan generation for interaction ID: ${interaction.id}`);
+            
+            // Proceed with generating the plan now that we have all the information
+            const planningRequest = {
+              prompt,
+              userId,
+              interactionId: interaction.id,
+              projectContext,
+              followupResponse
+            };
+            
+            // Generate the plan with detailed logging
+            console.log(`Calling generatePlan for interaction ID: ${interaction.id}`);
+            aiResponse = await generatePlan(planningRequest);
+            console.log(`Plan generation completed for interaction ID: ${interaction.id}`);
+            
+            const response = aiResponse.response;
+            
+            // Update interaction with response using consistent, detailed formatting
+            await storage.updateAiPlannerInteraction(interaction.id, {
+              status: 'completed',
+              response,
+              rawAiResponse: {
+                ...aiResponse,
+                status: 'complete',
+                completedAt: new Date().toISOString(),
+                processingTime: Date.now() - new Date(interaction.createdAt).getTime() // in ms
               },
               generatedPlan: { 
-                error: 'Error processing request',
-                status: 'failed',
-                errorTime: new Date().toISOString()
+                content: response,
+                status: 'complete', 
+                generatedAt: new Date().toISOString(),
+                suggestedTasks: aiResponse.suggestedTasks || [],
+                suggestedMilestones: aiResponse.suggestedMilestones || []
               },
-              updatedAt: new Date(),
-              // Include any other required fields
-              editedPlan: null,
-              finalPlan: null
+              updatedAt: new Date()
             });
-          } catch (updateError) {
-            console.error('Error updating interaction with error status:', updateError);
+          } catch (error) {
+            console.error('Error processing AI request:', error);
+            
+            try {
+              // Update with detailed error information for consistency with the WebSocket error handling
+              await storage.updateAiPlannerInteraction(interaction.id, {
+                status: 'error',
+                rawAiResponse: { 
+                  error: 'Error processing request',
+                  errorDetails: error instanceof Error ? error.message : 'Unknown error',
+                  errorTime: new Date().toISOString(),
+                  status: 'failed'
+                },
+                generatedPlan: { 
+                  error: 'Error processing request',
+                  status: 'failed',
+                  errorTime: new Date().toISOString()
+                },
+                updatedAt: new Date(),
+                // Include any other required fields
+                editedPlan: null,
+                finalPlan: null
+              });
+            } catch (updateError) {
+              console.error('Error updating interaction with error status:', updateError);
+            }
           }
+        } catch (outerError) {
+          console.error('Error in AI planning process:', outerError);
         }
       })();
       
