@@ -15,7 +15,8 @@ import {
   insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema,
   guestyProperties, guestyReservations, guestySyncLogs, guestyWebhookEvents,
   InsertGuestyWebhookEvent,
-  insights as insightsTable, unitHealthScores, insightLogs
+  insights as insightsTable, unitHealthScores, insightLogs,
+  insertAiPlannerInteractionSchema, AiPlannerInteraction
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";
@@ -4616,7 +4617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId
       };
       
-      const insertInteraction = schema.insertAiPlannerInteractionSchema.parse(interactionData);
+      const insertInteraction = insertAiPlannerInteractionSchema.parse(interactionData);
       const interaction = await storage.createAiPlannerInteraction(insertInteraction);
       res.status(201).json(interaction);
     } catch (error) {
