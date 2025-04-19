@@ -4745,19 +4745,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     let interaction;
     try {
-      // Create a new interaction
+      // Create a new interaction with more detailed placeholder objects
       interaction = await storage.createAiPlannerInteraction({
         prompt,
         userId,
-        rawAiResponse: {}, // Required empty object
-        generatedPlan: {}, // Required empty object
+        // Use more detailed objects for required fields
+        rawAiResponse: {
+          status: 'pending',
+          timestamp: new Date().toISOString(),
+          requestInfo: { userPrompt: prompt }
+        },
+        generatedPlan: {
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          processingStage: 'init'
+        },
+        context: {},
         status: 'pending'
       });
       
       // Update status to processing (Don't await to return quickly)
       storage.updateAiPlannerInteraction(interaction.id, {
         status: 'processing',
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        rawAiResponse: {
+          status: 'processing',
+          timestamp: new Date().toISOString(),
+          processingDetails: { stage: 'beginning', progress: 0 }
+        },
+        generatedPlan: {
+          status: 'in_progress',
+          processingStage: 'analyzing',
+          lastUpdated: new Date().toISOString()
+        }
       });
       
       // Return immediately with the interaction ID so client can poll
@@ -4797,12 +4817,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const aiResponse = await generatePlan(planningRequest);
           const response = aiResponse.response;
           
-          // Update interaction with response
+          // Update interaction with response using consistent, detailed formatting
           await storage.updateAiPlannerInteraction(interaction.id, {
             status: 'completed',
             response,
-            rawAiResponse: aiResponse,
-            generatedPlan: { content: response },
+            rawAiResponse: {
+              ...aiResponse,
+              status: 'complete',
+              completedAt: new Date().toISOString(),
+              processingTime: Date.now() - new Date(interaction.createdAt).getTime() // in ms
+            },
+            generatedPlan: { 
+              content: response,
+              status: 'complete', 
+              generatedAt: new Date().toISOString(),
+              suggestedTasks: aiResponse.suggestedTasks || [],
+              suggestedMilestones: aiResponse.suggestedMilestones || []
+            },
             updatedAt: new Date()
           });
           
@@ -4810,11 +4841,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Error processing AI request:', error);
           
           try {
+            // Update with detailed error information for consistency with the WebSocket error handling
             await storage.updateAiPlannerInteraction(interaction.id, {
               status: 'error',
-              rawAiResponse: { error: 'Error processing request' },
-              generatedPlan: { error: 'Error processing request' },
-              updatedAt: new Date()
+              rawAiResponse: { 
+                error: 'Error processing request',
+                errorDetails: error instanceof Error ? error.message : 'Unknown error',
+                errorTime: new Date().toISOString(),
+                status: 'failed'
+              },
+              generatedPlan: { 
+                error: 'Error processing request',
+                status: 'failed',
+                errorTime: new Date().toISOString()
+              },
+              updatedAt: new Date(),
+              // Include any other required fields
+              editedPlan: null,
+              finalPlan: null
             });
           } catch (updateError) {
             console.error('Error updating interaction with error status:', updateError);
@@ -4877,17 +4921,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             interaction = await storage.createAiPlannerInteraction({
               prompt,
               userId,
-              rawAiResponse: {}, // Required empty object
-              generatedPlan: {}, // Required empty object
+              // Use more detailed placeholder objects for better validation
+              rawAiResponse: {
+                status: 'pending',
+                timestamp: new Date().toISOString(),
+                requestInfo: { userPrompt: prompt }
+              },
+              generatedPlan: {
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                processingStage: 'init'
+              },
+              context: {},
               status: 'pending'
             });
             
             console.log(`Created AI interaction with ID: ${interaction.id}`);
             
-            // Update status to processing
+            // Update status to processing with more detailed information
             await storage.updateAiPlannerInteraction(interaction.id, {
               status: 'processing',
-              updatedAt: new Date()
+              updatedAt: new Date(),
+              rawAiResponse: {
+                status: 'processing',
+                timestamp: new Date().toISOString(),
+                processingDetails: { stage: 'beginning', progress: 0 }
+              },
+              generatedPlan: {
+                status: 'in_progress',
+                processingStage: 'analyzing',
+                lastUpdated: new Date().toISOString()
+              }
             });
             
             // Send processing status
@@ -4926,12 +4990,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const aiResponse = await generatePlan(planningRequest);
             const response = aiResponse.response;
             
-            // Update interaction with response
+            // Update interaction with response using detailed, consistent formatting
             const updatedInteraction = await storage.updateAiPlannerInteraction(interaction.id, {
               status: 'completed',
               response: response, // Include response in the main object
-              rawAiResponse: aiResponse,
-              generatedPlan: { content: response },
+              rawAiResponse: {
+                ...aiResponse,
+                status: 'complete',
+                completedAt: new Date().toISOString(),
+                processingTime: Date.now() - new Date(interaction.createdAt).getTime() // in ms
+              },
+              generatedPlan: { 
+                content: response,
+                status: 'complete', 
+                generatedAt: new Date().toISOString(),
+                suggestedTasks: aiResponse.suggestedTasks || [],
+                suggestedMilestones: aiResponse.suggestedMilestones || []
+              },
               updatedAt: new Date()
             });
             
@@ -4951,11 +5026,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // If we have an interaction ID, update its status
             if (interaction && interaction.id) {
               try {
+                // Update with detailed error information
                 await storage.updateAiPlannerInteraction(interaction.id, {
                   status: 'error',
-                  rawAiResponse: { error: 'Error processing request' },
-                  generatedPlan: { error: 'Error processing request' },
-                  updatedAt: new Date()
+                  rawAiResponse: { 
+                    error: 'Error processing request',
+                    errorDetails: error instanceof Error ? error.message : 'Unknown error',
+                    errorTime: new Date().toISOString(),
+                    status: 'failed'
+                  },
+                  generatedPlan: { 
+                    error: 'Error processing request',
+                    status: 'failed',
+                    errorTime: new Date().toISOString()
+                  },
+                  updatedAt: new Date(),
+                  // Include any other required fields
+                  editedPlan: null,
+                  finalPlan: null
                 });
               } catch (updateError) {
                 console.error('Error updating interaction with error status:', updateError);

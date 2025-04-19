@@ -238,14 +238,29 @@ const AiAssistant: React.FC = () => {
   // Create a new interaction
   const createInteraction = useMutation({
     mutationFn: async (newPrompt: string) => {
-      // Create empty placeholders for the required fields
-      return await apiRequest('POST', '/api/ai-planner/interactions', {
-        prompt: newPrompt,
-        rawAiResponse: {}, // Empty object as placeholder
-        generatedPlan: {}, // Empty object as placeholder
-      });
+      try {
+        console.log('Creating new interaction with prompt:', newPrompt);
+        
+        // Create a properly formatted interaction with all required fields
+        const response = await apiRequest('POST', '/api/ai-planner/interactions', {
+          prompt: newPrompt,
+          rawAiResponse: {status: 'pending'}, // More detailed placeholder
+          generatedPlan: {status: 'pending'}, // More detailed placeholder
+          // Include all potentially required fields based on schema
+          context: {},
+          editedPlan: null,
+          finalPlan: null,
+        });
+        
+        console.log('Interaction created successfully:', response);
+        return response;
+      } catch (err) {
+        console.error('Error in createInteraction mutationFn:', err);
+        throw err;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Interaction created successfully, data:', data);
       queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
       setPrompt('');
       toast({
@@ -263,8 +278,9 @@ const AiAssistant: React.FC = () => {
     },
   });
 
-  // Simulate AI response (in a real implementation, this would be handled by a webhook)
+  // Simulate AI response (fallback for when real APIs fail)
   const simulateAiResponse = async (interaction: AiInteraction) => {
+    console.log('Starting simulation with interaction:', interaction);
     if (!interaction || typeof interaction.id !== 'number') {
       console.error('Invalid interaction object in simulateAiResponse:', interaction);
       toast({
@@ -276,29 +292,49 @@ const AiAssistant: React.FC = () => {
     }
     
     try {
-      // Update status to processing
+      console.log('Updating interaction status to processing');
+      
+      // Update status to processing with all required fields
       await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
         status: 'processing',
-        rawAiResponse: {}, // Empty placeholder to ensure validation passes
-        generatedPlan: {}, // Empty placeholder to ensure validation passes
+        // Include detailed placeholders that follow schema requirements
+        rawAiResponse: {
+          status: 'processing',
+          processingDetails: {
+            startedAt: new Date().toISOString(),
+            step: 'init'
+          }
+        },
+        generatedPlan: {
+          status: 'in_progress',
+          stepComplete: false
+        },
+        // Include other fields that might be required
+        editedPlan: null,
+        finalPlan: null,
+        context: {}
       });
       
+      // Make sure UI is updated
       queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
       
-      // Simulate processing time
+      // Simulate processing time (2 seconds)
+      console.log('Simulating processing time...');
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Generate a response based on the prompt
       let response = '';
+      let prompt = interaction.prompt.toLowerCase();
       
-      if (interaction.prompt.toLowerCase().includes('task') && interaction.prompt.toLowerCase().includes('create')) {
+      // Generate different responses based on prompt contents
+      if (prompt.includes('task') && prompt.includes('create')) {
         response = "I can help create a new task. Here's a suggested task:\n\n" +
           "Title: Follow up with cleaning team\n" +
           "Priority: Medium\n" +
           "Due Date: Tomorrow at 2pm\n" +
           "Description: Check that all units have been properly cleaned and prepared for upcoming guests\n\n" +
           "Would you like me to create this task for you?";
-      } else if (interaction.prompt.toLowerCase().includes('project') && interaction.prompt.toLowerCase().includes('plan')) {
+      } else if (prompt.includes('project') && prompt.includes('plan')) {
         response = "I can help create a project plan. Based on your request, here's a suggested project structure:\n\n" +
           "Project: Quarterly Maintenance Review\n\n" +
           "Milestones:\n" +
@@ -307,7 +343,7 @@ const AiAssistant: React.FC = () => {
           "3. Maintenance implementation (3 weeks)\n" +
           "4. Final inspection (1 week)\n\n" +
           "Would you like me to set this up as a new project with these milestones?";
-      } else if (interaction.prompt.toLowerCase().includes('analyze') || interaction.prompt.toLowerCase().includes('report')) {
+      } else if (prompt.includes('analyze') || prompt.includes('report')) {
         response = "Based on your current projects and tasks, here's a quick analysis:\n\n" +
           "- You have 5 high priority tasks pending\n" +
           "- The maintenance team is currently handling more tasks than the cleaning team\n" +
@@ -323,15 +359,42 @@ const AiAssistant: React.FC = () => {
           "Please let me know what specific help you need with your projects or tasks.";
       }
       
+      console.log('Simulation complete, updating interaction with response');
+      
       // Update with the response and required fields for schema validation
-      await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
+      const updatedInteraction = await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
         status: 'completed',
-        response,
-        rawAiResponse: { simulatedResponse: true },
-        generatedPlan: { content: response },
+        // Include response in multiple places for compatibility
+        response: response,
+        rawAiResponse: { 
+          simulatedResponse: true,
+          content: response,
+          completedAt: new Date().toISOString(),
+          processingTime: 2000 // milliseconds
+        },
+        generatedPlan: { 
+          content: response,
+          status: 'complete',
+          generatedAt: new Date().toISOString()
+        },
+        context: {
+          simulationMode: true
+        },
+        editedPlan: null,
+        finalPlan: null,
       });
       
+      console.log('Interaction updated successfully:', updatedInteraction);
+      
+      // Ensure UI is updated
       queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
+      
+      // Notify user
+      toast({
+        title: 'Response ready',
+        description: 'The AI Assistant has processed your request in simulation mode.',
+      });
+      
     } catch (error) {
       console.error('Error in simulateAiResponse:', error);
       
@@ -339,13 +402,23 @@ const AiAssistant: React.FC = () => {
       try {
         await apiRequest('PATCH', `/api/ai-planner/interactions/${interaction.id}`, {
           status: 'error',
-          rawAiResponse: { error: 'Simulation error' },
-          generatedPlan: { error: 'Simulation error' },
+          rawAiResponse: { 
+            error: 'Simulation processing error',
+            errorDetails: error instanceof Error ? error.message : 'Unknown error',
+            errorTime: new Date().toISOString()
+          },
+          generatedPlan: { 
+            error: 'Simulation error',
+            status: 'failed'
+          },
+          editedPlan: null,
+          finalPlan: null,
         });
         
+        // Make sure UI is updated
         queryClient.invalidateQueries({ queryKey: ['/api/ai-planner/interactions'] });
       } catch (updateError) {
-        console.error('Error updating interaction status:', updateError);
+        console.error('Error updating interaction error status:', updateError);
       }
       
       toast({
