@@ -477,6 +477,30 @@ export default function ProjectsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Projects & Tasks</h1>
         <div className="flex gap-3">
+          <Button 
+            variant="outline"
+            className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+            onClick={() => window.location.href = "/projects-tasks/ai-planner"}
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="mr-2 h-4 w-4"
+            >
+              <path d="M12 2a5 5 0 0 0-5 5v2a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5Z"></path>
+              <path d="M2 12.5h4a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H2"></path>
+              <path d="M16 12.5h4a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-4"></path>
+              <path d="M10 13h4"></path>
+              <path d="M11 13v8"></path>
+              <path d="M13 13v8"></path>
+            </svg>
+            AI Assistant
+          </Button>
           <Button variant="outline" onClick={() => window.location.href = "/projects-tasks/hostai-inbox"}>
             <Mail className="mr-2 h-4 w-4" />
             HostAI Inbox
