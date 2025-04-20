@@ -42,17 +42,22 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
     end: endOfCalendar
   });
 
-  // Find events for a specific day
+  // Find events for a specific day - improved to handle edge cases better
   const getEventsForDay = (day: Date) => {
     return processedEvents.filter(event => {
+      const startDate = event.start as Date;
       // Get the actual checkout day (1 day before the end date in iCal)
       const actualCheckoutDay = addDays(event.end as Date, -1);
       
-      // Check if this day falls within the event's range (inclusive of check-in and check-out days)
-      return isWithinInterval(day, {
-        start: event.start as Date,
-        end: actualCheckoutDay // Using the adjusted checkout day
-      });
+      // Make sure we're working with midnight-to-midnight comparison
+      const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      const reservationStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      const reservationEnd = new Date(actualCheckoutDay.getFullYear(), actualCheckoutDay.getMonth(), actualCheckoutDay.getDate());
+      
+      // Include the day if it's on or between the start and end dates
+      return (
+        dayStart >= reservationStart && dayStart <= reservationEnd
+      );
     });
   };
 
@@ -196,12 +201,12 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                       return (
                                         <div 
                                           key={`bar-${event.uid}-${eventIndex}`}
-                                          className={`${barColorClass} absolute opacity-60 z-10`} 
+                                          className={`${barColorClass} absolute opacity-70 z-10 rounded-full shadow-sm`} 
                                           style={{
                                             top: `${topPosition + (eventHeight - 5) / 2}px`, // Center vertically with the dots
                                             left: leftDot,
                                             width: `calc(${rightDot} - ${leftDot} + 5px)`, // Connect the two dots (+5px for dot size)
-                                            height: '5px', // Match the dot height
+                                            height: '6px', // Slightly thicker for better visibility
                                             transform: 'translateX(-50%)', // Adjust for dot center
                                           }}
                                         />
@@ -214,12 +219,15 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                       return (
                                         <div 
                                           key={`bar-${event.uid}-${eventIndex}`}
-                                          className={`${barColorClass} absolute opacity-60 z-10`} 
+                                          className={`${barColorClass} absolute opacity-70 z-10 shadow-sm`} 
                                           style={{
                                             top: `${topPosition}px`,
                                             left: leftPosition,
                                             right: rightPosition,
                                             height: `${eventHeight}px`,
+                                            borderRadius: isFirstDay ? '4px 0 0 4px' : // Round left corners for first day
+                                                       isLastDay ? '0 4px 4px 0' : // Round right corners for last day
+                                                       '0', // No rounding for middle days
                                             width: isFirstDay ? 'calc(50% + 1px)' : // From middle to end
                                                   isLastDay ? 'calc(50% + 1px)' : // From start to middle
                                                   '100%' // Full width for middle days
@@ -278,7 +286,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             {/* Check-in dot */}
                                             {isFirstDay && (
                                               <div 
-                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
+                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-85 absolute z-20 shadow-md border-2 border-white`}
                                                 style={{
                                                   top: `${topPosition}px`,
                                                   left: isFirstDay && isLastDay ? 
@@ -293,7 +301,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             {/* Check-out dot */}
                                             {isLastDay && !isFirstDay && (
                                               <div 
-                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
+                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-85 absolute z-20 shadow-md border-2 border-white`}
                                                 style={{
                                                   top: `${topPosition}px`,
                                                   left: '50%',
