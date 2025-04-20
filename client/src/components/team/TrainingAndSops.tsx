@@ -93,7 +93,7 @@ export default function TrainingAndSops({ users, currentUser }: TrainingAndSopsP
 
   // Check if a training is assigned to current user's role
   const isTrainingRequired = (training: TrainingModule) => {
-    if (!currentUser) return false;
+    if (!currentUser || !currentUser.role) return false;
     return training.requiredFor.includes(currentUser.role);
   };
 

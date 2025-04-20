@@ -79,15 +79,26 @@ export default function DashboardPage() {
     negative: 0,
   };
 
-  // Empty inventory alerts
-  const inventoryAlerts: { id: number; severity: string; location: string; item: string; current: number; target: number }[] = [];
+  // Empty inventory alerts (with proper typing)
+  const inventoryAlerts: {
+    id: number;
+    severity: 'critical' | 'warning' | 'info';
+    location: string;
+    item: string;
+    current: number;
+    target: number;
+  }[] = [];
 
-  // Empty calendar events 
-  const calendarEvents: { date: number; type: string; label: string }[] = [];
+  // Empty calendar events (with proper typing)
+  const calendarEvents: {
+    date: number;
+    type: 'cleaning' | 'maintenance' | 'inventory' | 'urgent';
+    label: string;
+  }[] = [];
 
-  // Empty tasks
+  // Empty tasks (with proper typing)
   const upcomingTasks: {
-    type: string;
+    type: 'cleaning' | 'maintenance' | 'inventory' | 'urgent';
     time: string;
     title: string;
     assignee?: { initials: string; name: string };
