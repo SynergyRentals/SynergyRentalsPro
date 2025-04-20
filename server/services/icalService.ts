@@ -199,6 +199,9 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
           const validStart = ensureValidDate(event.start);
           const validEnd = ensureValidDate(event.end);
           
+          // In iCal format, DTSTART is the first day of the reservation (check-in)
+          // DTEND is the day AFTER the last day (exclusive end date)
+          
           // Normalize dates to midnight for consistent comparisons
           const normalizedStart = new Date(
             validStart.getFullYear(), 
@@ -212,18 +215,21 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
             validEnd.getDate()
           );
           
+          // Calculate checkout date as the day before the end date (since end date is exclusive in iCal)
+          const checkoutDate = getCheckoutDate(normalizedEnd);
+          
           // Log date processing for debugging
           console.log(`Processing event ${event.uid || 'unknown'}: 
             Original dates: start=${validStart.toISOString()}, end=${validEnd.toISOString()}
             Normalized dates: start=${normalizedStart.toISOString()}, end=${normalizedEnd.toISOString()}
-            Checkout date: ${getCheckoutDate(normalizedEnd).toISOString()}
+            Checkout date: ${checkoutDate.toISOString()}
           `);
           
           // Create a sanitized event object with normalized dates
           const calendarEvent: CalendarEvent = {
-            start: normalizedStart,
-            end: normalizedEnd,
-            checkout: getCheckoutDate(normalizedEnd), // Add explicit checkout date
+            start: normalizedStart,  // Check-in date (no adjustment needed)
+            end: normalizedEnd,      // End date (exclusive in iCal)
+            checkout: checkoutDate,  // Actual checkout date (day before end date)
             title: (event.summary && typeof event.summary === 'string') 
               ? event.summary 
               : 'Reservation',
