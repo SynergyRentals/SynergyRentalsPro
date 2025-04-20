@@ -721,3 +721,160 @@ export async function getAllSyncLogs(): Promise<any[]> {
 export function setApiCredentials(apiKey: string, apiSecret: string): void {
   guestyApiClient.setCredentials(apiKey, apiSecret);
 }
+
+/**
+ * Perform a batch synchronization operation
+ * This function coordinates the synchronization of properties and reservations
+ * while respecting rate limits
+ */
+export async function performBatchSync(options: {
+  prioritizeProperties?: boolean;
+  prioritizeReservations?: boolean;
+  reservationTimeRange?: {
+    checkInAfter?: Date;
+    checkInBefore?: Date;
+    checkOutAfter?: Date;
+    checkOutBefore?: Date;
+  };
+  forceSync?: boolean;
+}): Promise<{
+  success: boolean;
+  message: string;
+  propertiesSynced: number;
+  reservationsSynced: number;
+  requestsUsed: number;
+  requestsRemaining: number;
+  errors: string[];
+  propertiesDetails?: {
+    new: number;
+    updated: number;
+    total: number;
+  };
+  reservationsDetails?: {
+    new: number;
+    updated: number;
+    total: number;
+  };
+}> {
+  try {
+    console.log('Starting batch sync with options:', options);
+    
+    // Check if we can perform the sync (rate limit check)
+    if (!options.forceSync) {
+      const rateLimitStatus = await checkBatchRateLimit();
+      if (rateLimitStatus.isRateLimited) {
+        return {
+          success: false,
+          message: `Rate limited: ${rateLimitStatus.message}`,
+          propertiesSynced: 0,
+          reservationsSynced: 0,
+          requestsUsed: 0,
+          requestsRemaining: rateLimitStatus.requestsRemaining,
+          errors: [`Rate limit exceeded: ${rateLimitStatus.message}`]
+        };
+      }
+    }
+    
+    // Create sync log entry
+    const syncLogId = await createSyncLog(SyncType.ALL);
+    console.log(`Created sync log with ID: ${syncLogId}`);
+    
+    // Determine operation priorities
+    let propertiesResult = null;
+    let reservationsResult = null;
+    let errors: string[] = [];
+    
+    // First priority: Properties (if prioritized)
+    if (options.prioritizeProperties) {
+      try {
+        propertiesResult = await syncProperties();
+        if (!propertiesResult.success) {
+          errors.push(`Properties sync error: ${propertiesResult.error?.details || 'Unknown error'}`);
+        }
+      } catch (error: any) {
+        errors.push(`Exception during properties sync: ${error.message}`);
+      }
+    }
+    
+    // Second priority: Reservations (if prioritized)
+    if (options.prioritizeReservations) {
+      try {
+        reservationsResult = await syncAllReservations();
+        if (!reservationsResult.success) {
+          errors.push(`Reservations sync error: ${reservationsResult.error?.details || 'Unknown error'}`);
+        }
+      } catch (error: any) {
+        errors.push(`Exception during reservations sync: ${error.message}`);
+      }
+    }
+    
+    // If neither was prioritized, try both in order
+    if (!options.prioritizeProperties && !options.prioritizeReservations) {
+      try {
+        propertiesResult = await syncProperties();
+        if (!propertiesResult.success) {
+          errors.push(`Properties sync error: ${propertiesResult.error?.details || 'Unknown error'}`);
+        }
+      } catch (error: any) {
+        errors.push(`Exception during properties sync: ${error.message}`);
+      }
+      
+      try {
+        reservationsResult = await syncAllReservations();
+        if (!reservationsResult.success) {
+          errors.push(`Reservations sync error: ${reservationsResult.error?.details || 'Unknown error'}`);
+        }
+      } catch (error: any) {
+        errors.push(`Exception during reservations sync: ${error.message}`);
+      }
+    }
+    
+    // Get the current rate limit status
+    const finalRateLimitStatus = await checkBatchRateLimit();
+    
+    // Update the sync log
+    await completeSyncLog(
+      syncLogId,
+      propertiesResult?.success && reservationsResult?.success,
+      errors.length > 0 ? errors.join('; ') : undefined,
+      SyncType.ALL
+    );
+    
+    // Prepare the response
+    const response = {
+      success: (propertiesResult?.success || propertiesResult === null) && 
+               (reservationsResult?.success || reservationsResult === null),
+      message: errors.length > 0 
+        ? `Sync completed with ${errors.length} issues` 
+        : `Sync completed successfully`,
+      propertiesSynced: propertiesResult?.syncLogId ? 1 : 0, // We count 1 sync operation, not individual properties
+      reservationsSynced: reservationsResult?.syncLogId ? 1 : 0, // We count 1 sync operation, not individual reservations
+      requestsUsed: 5 - finalRateLimitStatus.requestsRemaining,
+      requestsRemaining: finalRateLimitStatus.requestsRemaining,
+      errors: errors,
+      propertiesDetails: {
+        new: 0, // Would need to track this in the sync operations
+        updated: 0, // Would need to track this in the sync operations
+        total: 0 // Would need to get this from the database
+      },
+      reservationsDetails: {
+        new: 0, // Would need to track this in the sync operations
+        updated: 0, // Would need to track this in the sync operations
+        total: 0 // Would need to get this from the database
+      }
+    };
+    
+    return response;
+  } catch (error: any) {
+    console.error('Error in performBatchSync:', error);
+    return {
+      success: false,
+      message: `Batch sync failed: ${error.message}`,
+      propertiesSynced: 0,
+      reservationsSynced: 0,
+      requestsUsed: 0,
+      requestsRemaining: 0,
+      errors: [`Exception during batch sync: ${error.message}`]
+    };
+  }
+}
