@@ -237,8 +237,29 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                   const actualCheckoutDay = addDays(event.end as Date, -1);
                                   const isLastDay = isSameDay(day, actualCheckoutDay);
                                   
-                                  // For dots, we use blue
-                                  const dotColorClass = "bg-blue-500";
+                                  // Color the dots based on status too
+                                  let dotColorClass = "bg-blue-500"; // Default color
+                                  
+                                  // Status-based dot coloring to match the bar colors
+                                  if (event.status) {
+                                    switch(event.status.toLowerCase()) {
+                                      case 'confirmed':
+                                        dotColorClass = "bg-green-600";
+                                        break;
+                                      case 'tentative':
+                                        dotColorClass = "bg-amber-500";
+                                        break;
+                                      case 'cancelled':
+                                      case 'canceled':
+                                        dotColorClass = "bg-red-600";
+                                        break;
+                                      case 'pending':
+                                        dotColorClass = "bg-blue-500";
+                                        break;
+                                      default:
+                                        dotColorClass = "bg-blue-500";
+                                    }
+                                  }
                                   
                                   // Calculate same positioning as bars
                                   const eventHeight = 20;
@@ -302,9 +323,40 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             <p className="text-xs">
                                               {format(event.start as Date, 'MMM d, yyyy')} - {format(addDays(event.end as Date, -1), 'MMM d, yyyy')}
                                             </p>
-                                            <p className="text-xs">ID: {event.uid.substring(0, 8)}...</p>
+                                            
+                                            {/* Duration calculation */}
+                                            <p className="text-xs mt-1">
+                                              Duration: {
+                                                Math.ceil(
+                                                  (addDays(event.end as Date, -1).getTime() - (event.start as Date).getTime()) 
+                                                  / (1000 * 60 * 60 * 24)
+                                                ) + 1
+                                              } {
+                                                Math.ceil(
+                                                  (addDays(event.end as Date, -1).getTime() - (event.start as Date).getTime()) 
+                                                  / (1000 * 60 * 60 * 24)
+                                                ) + 1 === 1 ? 'day' : 'days'
+                                              }
+                                            </p>
+                                            
+                                            <p className="text-xs mt-1">ID: {event.uid.substring(0, 8)}...</p>
+                                            
+                                            {/* Enhanced status display */}
                                             {event.status && (
-                                              <p className="text-xs capitalize">Status: {event.status}</p>
+                                              <div className="mt-2 flex items-center">
+                                                <div 
+                                                  className={`w-3 h-3 rounded-full mr-1.5 ${
+                                                    event.status.toLowerCase() === 'confirmed' ? 'bg-green-600' :
+                                                    event.status.toLowerCase() === 'tentative' ? 'bg-amber-500' :
+                                                    event.status.toLowerCase() === 'cancelled' || event.status.toLowerCase() === 'canceled' ? 'bg-red-600' :
+                                                    event.status.toLowerCase() === 'pending' ? 'bg-blue-500' :
+                                                    'bg-gray-400'
+                                                  }`} 
+                                                />
+                                                <span className="text-xs font-medium capitalize">
+                                                  {event.status}
+                                                </span>
+                                              </div>
                                             )}
                                           </div>
                                         </TooltipContent>
