@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import fileUpload from "express-fileupload";
 import { setupRoutes } from "./routes-new";
-import { registerRoutes } from "./routes"; // Import the original routes
+import { registerRoutes } from "./routes-safe"; // Using the safe routes without createLog
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { setupAuth } from "./auth";
