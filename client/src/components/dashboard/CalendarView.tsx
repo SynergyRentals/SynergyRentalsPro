@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { format, isSameDay, addDays, isWithinInterval, isBefore, isAfter } from "date-fns";
+import { format, isSameDay, isWithinInterval, isBefore, isAfter } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { normalizeToUTCMidnight, getCheckoutDate } from "../../utils/dateUtils";
 
 // Define the event types
 export type CalendarEventType = "cleaning" | "maintenance" | "inventory" | "urgent" | "checkin" | "checkout";
@@ -108,8 +109,11 @@ export function CalendarView({ events }: CalendarViewProps) {
         const actualEndDate = new Date(event.endDate);
         
         // For display purposes, check-out dot should appear the day AFTER the actual check-out
-        // since guests typically check out at 11 AM but the unit is occupied until then
-        const displayCheckOutDate = addDays(actualEndDate, 1);
+        // First use our shared utility to get the standardized checkout date
+        const checkoutDate = getCheckoutDate(actualEndDate);
+        // Then use the normalized date for display purposes (the day after checkout)
+        const displayCheckOutDate = new Date(checkoutDate);
+        displayCheckOutDate.setDate(displayCheckOutDate.getDate() + 1);
         
         // Get all dates between start and actual end (occupied period)
         let currentDate = new Date(startDate);
@@ -132,8 +136,10 @@ export function CalendarView({ events }: CalendarViewProps) {
             dateMap.set(dateKey, dateData);
           }
           
-          // Move to next day
-          currentDate = addDays(currentDate, 1);
+          // Move to next day (use standard Date API to be consistent)
+          const nextDay = new Date(currentDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          currentDate = nextDay;
         }
         
         // Now handle the check-out indicator which appears on the day AFTER the actual end date
