@@ -515,6 +515,13 @@ export async function syncReservations(): Promise<{
 // Trigger a full sync of Guesty data
 export async function syncAll() {
   try {
+    const clientId = process.env.GUESTY_CLIENT_ID;
+    const clientSecret = process.env.GUESTY_CLIENT_SECRET;
+    
+    if (!clientId || !clientSecret) {
+      throw new Error("GUESTY_CLIENT_ID is not defined");
+    }
+    
     // Attempt to initialize the Guesty API client
     const initialized = initGuestyClient();
     if (!initialized) {
