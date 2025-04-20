@@ -57,106 +57,10 @@ interface TrainingModule {
   completionStatus?: Record<number, { completed: boolean; date: string }>;
 }
 
-// Sample data
-const sampleSops: SopDocument[] = [
-  {
-    id: 1,
-    title: "Guest Check-in Procedure",
-    category: "Guest Relations",
-    createdAt: "2023-10-15",
-    updatedAt: "2023-12-20",
-    assignedRoles: ["ops", "va"],
-    version: "2.1"
-  },
-  {
-    id: 2,
-    title: "Maintenance Request Handling",
-    category: "Maintenance",
-    createdAt: "2023-09-05",
-    updatedAt: "2023-11-10",
-    assignedRoles: ["ops", "maintenance"],
-    version: "1.4"
-  },
-  {
-    id: 3,
-    title: "Property Cleaning Standards",
-    category: "Cleaning",
-    createdAt: "2023-08-22",
-    updatedAt: "2024-01-15",
-    assignedRoles: ["ops", "cleaner"],
-    version: "3.0"
-  },
-  {
-    id: 4,
-    title: "Inventory Management Process",
-    category: "Operations",
-    createdAt: "2023-11-08",
-    updatedAt: "2024-02-01",
-    assignedRoles: ["ops", "va"],
-    version: "1.2"
-  },
-  {
-    id: 5,
-    title: "User Account Management",
-    category: "Administration",
-    createdAt: "2023-10-01",
-    updatedAt: "2023-10-01",
-    assignedRoles: ["admin"],
-    version: "1.0"
-  }
-];
+// Empty data arrays
+const sampleSops: SopDocument[] = [];
 
-const sampleTrainings: TrainingModule[] = [
-  {
-    id: 1,
-    title: "Welcome to Synergy Rentals",
-    description: "Introduction to company policies, culture, and expectations.",
-    type: "video",
-    section: "Onboarding",
-    duration: 15,
-    requiredFor: ["admin", "ops", "va", "maintenance", "cleaner"],
-    completionStatus: {
-      1: { completed: true, date: "2023-09-10" },
-      2: { completed: true, date: "2023-10-15" }
-    }
-  },
-  {
-    id: 2,
-    title: "Platform Navigation",
-    description: "Learn how to use the Synergy Rentals AI Brain platform efficiently.",
-    type: "video",
-    section: "Software Systems",
-    duration: 25,
-    requiredFor: ["admin", "ops", "va"]
-  },
-  {
-    id: 3,
-    title: "Maintenance Procedures",
-    description: "Standard procedures for handling property maintenance issues.",
-    type: "document",
-    section: "Maintenance",
-    duration: 30,
-    requiredFor: ["ops", "maintenance"]
-  },
-  {
-    id: 4,
-    title: "Guest Communication Best Practices",
-    description: "Learn how to communicate effectively with guests.",
-    type: "video",
-    section: "Communications",
-    duration: 20,
-    requiredFor: ["ops", "va"]
-  },
-  {
-    id: 5,
-    title: "Cleaning Standards Certification",
-    description: "Test your knowledge of our cleaning standards.",
-    type: "test",
-    section: "Safety",
-    duration: 45,
-    requiredFor: ["ops", "cleaner"]
-  }
-];
+const sampleTrainings: TrainingModule[] = [];
 
 // Props interface
 interface TrainingAndSopsProps {

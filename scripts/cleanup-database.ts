@@ -188,9 +188,7 @@ export async function main() {
 // This will be ignored when imported as a module
 // Disable automatic execution to prevent running during server startup
 // To run the cleanup script directly use: npx tsx scripts/cleanup-database.ts
-// Uncomment the following if direct execution is needed
-/*
-if (import.meta.url === import.meta.resolve('./cleanup-database.ts')) {
-  main();
-}
-*/
+// DISABLED: Do not run automatically to prevent issues with server startup
+// if (import.meta.url.endsWith('cleanup-database.ts')) {
+//   main();
+// }

@@ -68,67 +68,30 @@ export default function DashboardPage() {
     queryFn: undefined,
   });
 
-  // Sample cleaners performance data (in a real app, this would come from API)
-  const cleanersData = [
-    { name: 'Sarah Davis', score: 98 },
-    { name: 'Michael Johnson', score: 95 },
-    { name: 'Emily Wilson', score: 87 },
-    { name: 'David Lee', score: 92 },
-  ];
+  // Empty data for cleaners performance
+  const cleanersData: { name: string; score: number }[] = [];
 
-  // Sample sentiment data (in a real app, this would come from API)
+  // Empty data for sentiment
   const sentimentData = {
-    average: 4.8,
-    positive: 89,
-    neutral: 8,
-    negative: 3,
+    average: 0,
+    positive: 0,
+    neutral: 0,
+    negative: 0,
   };
 
-  // Sample inventory alerts (in a real app, this would come from API)
-  const inventoryAlerts = [
-    { id: 1, severity: 'critical', location: 'Beach House', item: 'Low on Towels', current: 4, target: 12 },
-    { id: 2, severity: 'warning', location: 'Downtown Loft', item: 'Coffee Running Low', current: 2, target: 5 },
-    { id: 3, severity: 'warning', location: 'Lakeside Cabin', item: 'Toilet Paper', current: 3, target: 8 },
-    { id: 4, severity: 'info', location: 'Garage Inventory', item: 'Cleaning Supplies', current: 5, target: 15 },
-  ];
+  // Empty inventory alerts
+  const inventoryAlerts: { id: number; severity: string; location: string; item: string; current: number; target: number }[] = [];
 
-  // Sample calendar events (in a real app, this would come from API)
-  const calendarEvents = [
-    { date: 1, type: 'cleaning', label: '3 Cleanings' },
-    { date: 4, type: 'maintenance', label: 'Maintenance' },
-    { date: 6, type: 'inventory', label: 'Inventory' },
-    { date: 9, type: 'cleaning', label: '2 Cleanings' },
-    { date: 15, type: 'cleaning', label: '4 Cleanings' },
-    { date: 15, type: 'urgent', label: 'Urgent' },
-  ];
+  // Empty calendar events 
+  const calendarEvents: { date: number; type: string; label: string }[] = [];
 
-  // Sample tasks (in a real app, this would come from tasks API data)
-  const upcomingTasks = [
-    {
-      type: 'cleaning',
-      time: 'Today, 2:00 PM',
-      title: 'Ocean View Suite Turnover',
-      assignee: { initials: 'SD', name: 'Sarah Davis' },
-    },
-    {
-      type: 'maintenance',
-      time: 'Today, 4:30 PM',
-      title: 'Fix AC in Downtown Loft',
-      assignee: { initials: 'RM', name: 'Robert Miller' },
-    },
-    {
-      type: 'inventory',
-      time: 'Tomorrow, 10:00 AM',
-      title: 'Restock Beach House Supplies',
-      assignee: { initials: 'JW', name: 'Jessica Wong' },
-    },
-    {
-      type: 'urgent',
-      time: 'Tomorrow, 9:00 AM',
-      title: 'Plumbing Issue at Lakeside Cabin',
-      assignee: { initials: 'TS', name: 'Tom Smith' },
-    },
-  ];
+  // Empty tasks
+  const upcomingTasks: {
+    type: string;
+    time: string;
+    title: string;
+    assignee?: { initials: string; name: string };
+  }[] = [];
 
   const handleRefresh = () => {
     toast({
@@ -157,75 +120,42 @@ export default function DashboardPage() {
     // You could implement a skeleton loader here
   }
 
-  // Stats could be calculated from the API data
+  // Empty stats
   const stats = {
-    occupancyRate: "87%",
-    occupancyChange: "4.6%",
-    activeGuests: 14,
-    checkInsToday: 8,
-    scheduledCleanings: 9,
-    delayedCleanings: 1,
-    openMaintenance: 5,
-    urgentMaintenance: 2,
+    occupancyRate: "0%",
+    occupancyChange: "0%",
+    activeGuests: 0,
+    checkInsToday: 0,
+    scheduledCleanings: 0,
+    delayedCleanings: 0,
+    openMaintenance: 0,
+    urgentMaintenance: 0,
   };
 
-  // Sample data for the occupancy chart
-  const occupancyData = [
-    { name: 'Jan', occupancy: 72, revenue: 28000 },
-    { name: 'Feb', occupancy: 75, revenue: 30000 },
-    { name: 'Mar', occupancy: 81, revenue: 35000 },
-    { name: 'Apr', occupancy: 84, revenue: 38000 },
-    { name: 'May', occupancy: 78, revenue: 32000 },
-    { name: 'Jun', occupancy: 92, revenue: 45000 },
-    { name: 'Jul', occupancy: 96, revenue: 52000 },
-    { name: 'Aug', occupancy: 87, revenue: 48000 },
-  ];
+  // Empty data for the occupancy chart
+  const occupancyData: { name: string; occupancy: number; revenue: number }[] = [];
 
-  // Sample data for maintenance status chart
+  // Empty data for maintenance status chart with category structure maintained
   const maintenanceStatusData = [
-    { name: 'Urgent', value: 2, color: '#ef4444' },
-    { name: 'In Progress', value: 8, color: '#f59e0b' },
-    { name: 'Scheduled', value: 5, color: '#3b82f6' },
-    { name: 'Completed', value: 23, color: '#22c55e' },
+    { name: 'Urgent', value: 0, color: '#ef4444' },
+    { name: 'In Progress', value: 0, color: '#f59e0b' },
+    { name: 'Scheduled', value: 0, color: '#3b82f6' },
+    { name: 'Completed', value: 0, color: '#22c55e' },
   ];
 
-  // Sample data for guest analytics
-  const stayLengthData = [
-    { name: '1-2', count: 24 },
-    { name: '3-4', count: 42 },
-    { name: '5-7', count: 18 },
-    { name: '8-14', count: 8 },
-    { name: '15+', count: 3 },
-  ];
+  // Empty data for guest analytics
+  const stayLengthData: { name: string; count: number }[] = [];
 
-  const currentGuests = [
-    { 
-      id: 1, 
-      name: 'Sarah Johnson', 
-      location: 'Beach House #2', 
-      checkIn: 'Aug 12', 
-      checkOut: 'Aug 18', 
-      guestCount: 4,
-      rating: 5.0
-    },
-    { 
-      id: 2, 
-      name: 'Michael Chen', 
-      location: 'Downtown Loft', 
-      checkIn: 'Aug 13', 
-      checkOut: 'Aug 17', 
-      guestCount: 2,
-      rating: 4.8
-    },
-    { 
-      id: 3, 
-      name: 'Emily Davis', 
-      location: 'Lakeside Cabin', 
-      checkIn: 'Aug 15', 
-      checkOut: 'Aug 22', 
-      guestCount: 6
-    },
-  ];
+  // Empty current guests
+  const currentGuests: { 
+    id: number; 
+    name: string; 
+    location: string; 
+    checkIn: string; 
+    checkOut: string; 
+    guestCount: number;
+    rating?: number 
+  }[] = [];
 
   return (
     <Layout>
@@ -346,10 +276,10 @@ export default function DashboardPage() {
         <GuestAnalytics 
           stayLengthData={stayLengthData}
           currentGuests={currentGuests}
-          totalGuests={95}
-          newGuestsPercent={32}
-          repeatGuestsPercent={68}
-          averageStayLength={4.7}
+          totalGuests={0}
+          newGuestsPercent={0}
+          repeatGuestsPercent={0}
+          averageStayLength={0}
         />
         
         {/* Maintenance Status and Charts */}
