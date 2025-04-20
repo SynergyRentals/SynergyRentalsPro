@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { format, parseISO, addDays, eachDayOfInterval, isSameDay, isWithinInterval } from "date-fns";
+import { format, parseISO, eachDayOfInterval, isSameDay, isWithinInterval } from "date-fns";
 import { toZonedTime, format as formatTZ } from "date-fns-tz";
 import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { normalizeToUTCMidnight, getCheckoutDate, createFallbackDates } from "../../utils/dateUtils";
@@ -126,7 +126,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
   const getCheckOutsForDay = (day: Date) => {
     return processedEvents.filter(event => {
       // Use the checkout date from backend when available, otherwise calculate from end date
-      const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
+      const checkoutDate = event.checkout as Date || getCheckoutDate(event.end as Date);
       return isSameDay(day, checkoutDate);
     });
   };
