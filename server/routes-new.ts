@@ -79,7 +79,23 @@ export function setupRoutes(app: Express) {
       res.json(events);
     } catch (error) {
       console.error(`Error fetching calendar for property ${req.params.id}:`, error);
-      res.status(500).json({ message: "Failed to fetch property calendar" });
+      
+      // More specific error handling based on error type
+      if (error instanceof Error) {
+        if (error.message.includes("No iCal URL")) {
+          return res.status(404).json({ message: "No calendar URL configured for this property" });
+        } else if (error.message.includes("Invalid URL") || error.message.includes("inaccessible")) {
+          return res.status(400).json({ message: error.message });
+        } else if (error.message.includes("Failed to parse")) {
+          return res.status(422).json({ message: error.message });
+        }
+      }
+      
+      // Default error response
+      res.status(500).json({ 
+        message: "Failed to fetch property calendar", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
   
@@ -106,7 +122,28 @@ export function setupRoutes(app: Express) {
       });
     } catch (error) {
       console.error(`Error refreshing calendar for property ${req.params.id}:`, error);
-      res.status(500).json({ message: "Failed to refresh property calendar" });
+      
+      // More specific error handling based on error type
+      if (error instanceof Error) {
+        if (error.message.includes("Invalid URL") || error.message.includes("inaccessible")) {
+          return res.status(400).json({ 
+            success: false,
+            message: error.message 
+          });
+        } else if (error.message.includes("Failed to parse")) {
+          return res.status(422).json({ 
+            success: false,
+            message: error.message 
+          });
+        }
+      }
+      
+      // Default error response
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to refresh property calendar", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 
@@ -121,7 +158,28 @@ export function setupRoutes(app: Express) {
       res.json(validation);
     } catch (error) {
       console.error("Error validating iCal URL:", error);
-      res.status(500).json({ message: "Failed to validate iCal URL" });
+      
+      // More specific error handling based on error type
+      if (error instanceof Error) {
+        if (error.message.includes("Invalid URL") || error.message.includes("inaccessible")) {
+          return res.status(400).json({ 
+            valid: false,
+            message: error.message 
+          });
+        } else if (error.message.includes("Failed to parse")) {
+          return res.status(422).json({ 
+            valid: false,
+            message: error.message 
+          });
+        }
+      }
+      
+      // Default error response
+      res.status(500).json({ 
+        valid: false,
+        message: "Failed to validate iCal URL", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 
