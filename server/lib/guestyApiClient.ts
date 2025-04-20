@@ -1,4 +1,5 @@
 import { AxiosError, AxiosInstance, AxiosResponse, default as axios } from 'axios';
+import { checkRateLimit, recordApiRequest } from './guestyRateLimiter';
 
 export class GuestyAPIClient {
   accessToken: string | null = null; // Changed from private to public for temporary access
@@ -7,17 +8,25 @@ export class GuestyAPIClient {
   private readonly clientSecret: string;
   private readonly baseURL: string;
   private readonly axios: AxiosInstance;
+  private isProduction: boolean;
 
   constructor() {
     console.log(`[${new Date().toISOString()}] GuestyAPIClient: Initializing client`);
     this.clientId = process.env.GUESTY_CLIENT_ID || '';
     this.clientSecret = process.env.GUESTY_CLIENT_SECRET || '';
     this.baseURL = 'https://open-api.guesty.com/v1';  // Changed from '/api/v2' to '/v1' to match endpoint paths
+    this.isProduction = process.env.NODE_ENV === 'production';
     
-    // Temporary hardcoded token to avoid rate limits during development
-    // This should be removed in production
-    this.accessToken = "dev-temp-token";
-    this.tokenExpiry = new Date(Date.now() + 86400000); // 24 hours from now
+    // Only use development token in non-production environments
+    if (!this.isProduction) {
+      // Temporary hardcoded token to avoid rate limits during development
+      this.accessToken = "dev-temp-token";
+      this.tokenExpiry = new Date(Date.now() + 86400000); // 24 hours from now
+      console.log(`[${new Date().toISOString()}] GuestyAPIClient: Using development token`);
+    } else {
+      this.accessToken = null;
+      this.tokenExpiry = null;
+    }
 
     this.axios = axios.create({
       baseURL: this.baseURL,
@@ -100,6 +109,19 @@ export class GuestyAPIClient {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] GuestyClient: makeRequest called for ${method} ${endpoint}`);
 
+    // Skip rate limit checks in development with fake token
+    if (this.isProduction) {
+      // Check rate limit before making the request
+      const rateLimitStatus = await checkRateLimit();
+      if (rateLimitStatus.isRateLimited) {
+        console.error(`[${timestamp}] GuestyClient: Rate limit exceeded for ${method} ${endpoint}`);
+        console.error(`[${timestamp}] GuestyClient: ${rateLimitStatus.message}`);
+        throw new Error(`Guesty API rate limit exceeded: ${rateLimitStatus.message}`);
+      }
+      
+      console.log(`[${timestamp}] GuestyClient: Rate limit check passed. ${rateLimitStatus.requestsRemaining} requests remaining.`);
+    }
+
     let currentRetry = 0;
 
     while (true) {
@@ -128,6 +150,19 @@ export class GuestyAPIClient {
           headers: requestHeaders
         });
 
+        // Record this successful API request for rate limiting in production
+        if (this.isProduction) {
+          await recordApiRequest(
+            endpoint,
+            method,
+            response.status,
+            response.data
+          ).catch(err => {
+            // Just log recording errors, don't throw
+            console.error(`[${timestamp}] Error recording API request: ${err.message}`);
+          });
+        }
+
         console.log(`[${timestamp}] GuestyClient: Request successful for ${method} ${endpoint}`);
         return response.data;
       } catch (error) {
@@ -139,6 +174,20 @@ export class GuestyAPIClient {
             await new Promise(resolve => setTimeout(resolve, waitTime));
             continue;
           }
+          
+          // Record this failed API request for rate limiting in production
+          if (this.isProduction) {
+            await recordApiRequest(
+              endpoint,
+              method,
+              error.response?.status,
+              error.response?.data
+            ).catch(err => {
+              // Just log recording errors, don't throw
+              console.error(`[${timestamp}] Error recording API request: ${err.message}`);
+            });
+          }
+          
           console.error(`[${timestamp}] GuestyClient: HTTP Error in makeRequest:`, error.response?.status, error.response?.data);
         } else {
           console.error(`[${timestamp}] GuestyClient: Network/Other Error in makeRequest:`, error);

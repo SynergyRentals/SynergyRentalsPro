@@ -2669,6 +2669,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // New Rate-Limited Batch Sync Route
+  // This endpoint efficiently syncs data with rate limit awareness
+  app.post("/api/guesty/batch-sync", checkRole(["admin"]), async (req: Request, res: Response) => {
+    try {
+      // Import the batch sync service
+      const { performBatchSync } = await import('./services/guestyBatchSyncService');
+      
+      // Get options from request body
+      const options = {
+        prioritizeProperties: req.body.prioritizeProperties === true,
+        prioritizeReservations: req.body.prioritizeReservations === true,
+        reservationTimeRange: req.body.reservationTimeRange,
+        forceSync: req.body.forceSync === true
+      };
+      
+      // Perform the batch sync
+      const result = await performBatchSync(options);
+      
+      // Send the response
+      res.json(result);
+      
+      // Log the sync
+      await storage.createLog({
+        action: "GUESTY_BATCH_SYNC",
+        userId: req.user?.id,
+        targetTable: "guesty_data",
+        notes: `Result: ${result.success ? 'success' : 'failed'} - ${result.message}. Properties: ${result.propertiesSynced}, Reservations: ${result.reservationsSynced}, Requests used: ${result.requestsUsed}`,
+        ipAddress: req.ip
+      });
+    } catch (error) {
+      console.error("Error in Guesty batch sync:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error occurred" 
+      });
+    }
+  });
+  
+  // Check Guesty rate limit status
+  app.get("/api/guesty/rate-limit-status", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    try {
+      // Import the rate limiter
+      const { checkRateLimit } = await import('./lib/guestyRateLimiter');
+      
+      // Check the rate limit status
+      const status = await checkRateLimit();
+      
+      // Send the response
+      res.json(status);
+    } catch (error) {
+      console.error("Error checking Guesty rate limit:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error occurred" 
+      });
+    }
+  });
+  
   // Reservations sync route
   // TODO: This will be migrated to use guestyClient.getReservations() directly in a future update
   // Current implementation is preserved for now to ensure backward compatibility
