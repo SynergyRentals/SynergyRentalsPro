@@ -95,24 +95,14 @@ async function updateSyncLog(
 async function completeSyncLog(
   logId: number,
   itemsProcessed: number,
-  itemsTotal: number,
-  syncType?: SyncType
+  itemsTotal: number
 ): Promise<void> {
-  const updateObj: Partial<InsertGuestySyncLog> = {
+  await updateSyncLog(logId, {
     status: SyncStatus.COMPLETED,
     completedAt: new Date(),
     itemsProcessed,
     notes: `Successfully processed ${itemsProcessed} of ${itemsTotal} items`,
-  };
-  
-  // Set the appropriate count based on sync type
-  if (syncType === SyncType.PROPERTIES) {
-    updateObj.propertiesCount = itemsProcessed;
-  } else if (syncType === SyncType.RESERVATIONS) {
-    updateObj.reservationsCount = itemsProcessed;
-  }
-  
-  await updateSyncLog(logId, updateObj);
+  });
 }
 
 /**
@@ -284,7 +274,7 @@ export async function syncProperties(): Promise<SyncResponse> {
       // Update progress
       await updateSyncLog(syncLogId, {
         itemsProcessed: processedCount,
-        notes: `Processing ${processedCount} of ${totalCount} items`,
+        itemsTotal: totalCount,
       });
     }
     
@@ -388,14 +378,14 @@ export async function syncAllReservations(): Promise<SyncResponse> {
       };
     }
     
-    // Sync reservations for each property
-    let processedPropertyCount = 0;
-    
     // Update sync log to in progress
     await updateSyncLog(syncLogId, {
       status: SyncStatus.IN_PROGRESS,
-      notes: `Starting to process ${properties.length} properties`,
+      itemsTotal: properties.length,
     });
+    
+    // Sync reservations for each property
+    let processedPropertyCount = 0;
     let totalReservationCount = 0;
     
     for (const property of properties) {
@@ -617,7 +607,7 @@ export async function syncPropertyReservations(propertyId: number): Promise<Sync
       // Update progress
       await updateSyncLog(syncLogId, {
         itemsProcessed: processedCount,
-        notes: `Processing ${processedCount} of ${totalCount} items`,
+        itemsTotal: totalCount,
       });
     }
     
