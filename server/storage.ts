@@ -98,6 +98,7 @@ export interface IStorage {
 
   // Guesty Sync Logs
   createGuestySyncLog(log: InsertGuestySyncLog): Promise<GuestySyncLog>;
+  updateGuestySyncLog(id: number, log: Partial<GuestySyncLog>): Promise<GuestySyncLog | undefined>;
   getAllGuestySyncLogs(): Promise<GuestySyncLog[]>;
   
   // Guesty Webhook Events
@@ -420,6 +421,11 @@ export class DatabaseStorage implements IStorage {
   async createGuestySyncLog(log: InsertGuestySyncLog): Promise<GuestySyncLog> {
     const [newLog] = await db.insert(guestySyncLogs).values(log).returning();
     return newLog;
+  }
+
+  async updateGuestySyncLog(id: number, log: Partial<GuestySyncLog>): Promise<GuestySyncLog | undefined> {
+    const [updatedLog] = await db.update(guestySyncLogs).set(log).where(eq(guestySyncLogs.id, id)).returning();
+    return updatedLog;
   }
 
   async getAllGuestySyncLogs(): Promise<GuestySyncLog[]> {

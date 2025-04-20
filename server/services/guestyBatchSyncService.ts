@@ -66,11 +66,14 @@ async function createSyncLog(type: SyncType): Promise<number> {
   const syncLog = await storage.createGuestySyncLog({
     syncType: type,
     status: SyncStatus.PENDING,
-    startTime: new Date(),
-    endTime: null,
-    itemsTotal: null,
+    syncDate: new Date(),
+    startedAt: new Date(),
+    completedAt: null,
     itemsProcessed: 0,
-    error: null,
+    propertiesCount: null,
+    reservationsCount: null,
+    errorMessage: null,
+    notes: null,
   });
   
   return syncLog.id;
@@ -96,9 +99,9 @@ async function completeSyncLog(
 ): Promise<void> {
   await updateSyncLog(logId, {
     status: SyncStatus.COMPLETED,
-    endTime: new Date(),
+    completedAt: new Date(),
     itemsProcessed,
-    itemsTotal,
+    notes: `Successfully processed ${itemsProcessed} of ${itemsTotal} items`,
   });
 }
 
@@ -112,8 +115,9 @@ async function failSyncLog(
 ): Promise<void> {
   await updateSyncLog(logId, {
     status: SyncStatus.FAILED,
-    endTime: new Date(),
-    error: JSON.stringify({ type: errorType, message: error }),
+    completedAt: new Date(),
+    errorMessage: error,
+    notes: `Sync failed: ${errorType} - ${error}`,
   });
 }
 
@@ -127,12 +131,9 @@ async function rateLimitSyncLog(
 ): Promise<void> {
   await updateSyncLog(logId, {
     status: SyncStatus.RATE_LIMITED,
-    endTime: new Date(),
-    error: JSON.stringify({
-      type: SyncErrorType.RATE_LIMIT,
-      message,
-      nextAvailableTime: nextAvailableTime ? nextAvailableTime.toISOString() : null,
-    }),
+    completedAt: new Date(),
+    errorMessage: message,
+    notes: `Rate limited: ${message}. Next available: ${nextAvailableTime ? nextAvailableTime.toISOString() : 'unknown'}`,
   });
 }
 
