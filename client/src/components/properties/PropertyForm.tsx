@@ -128,6 +128,13 @@ export default function PropertyForm({
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       
+      // Also invalidate the specific property query if we're editing
+      if (isEditing && initialData && initialData.id) {
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/properties/${initialData.id}`] 
+        });
+      }
+      
       // Call the onSuccess callback
       onSuccess(data);
     },
