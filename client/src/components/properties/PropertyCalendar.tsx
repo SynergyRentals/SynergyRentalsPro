@@ -314,7 +314,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             {/* For same-day check-in/check-out on the same reservation */}
                                             {isFirstDay && isLastDay && (
                                               <div 
-                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-80 absolute z-20`}
+                                                className={`${dotColorClass} w-5 h-5 rounded-full opacity-85 absolute z-20 shadow-md border-2 border-white`}
                                                 style={{
                                                   top: `${topPosition}px`,
                                                   left: eventIndex % 2 === 0 ? '65%' : '35%', // Opposite dots for same-day stays
