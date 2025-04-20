@@ -1,12 +1,13 @@
-import { eq, like, and, or, desc, asc, isNull, inArray } from 'drizzle-orm';
+import { eq, like, and, or, desc, asc, isNull, inArray, gte, lte, sql } from 'drizzle-orm';
 import {
   users, tasks, units, guests, projects, maintenanceIssues, inventoryItems, vendors,
   User, InsertUser, Task, InsertTask, Unit, InsertUnit, Guest, InsertGuest,
   Project, InsertProject, MaintenanceIssue, InsertMaintenanceIssue, 
   InventoryItem, InsertInventoryItem, Vendor, InsertVendor,
-  guestyProperties, guestyReservations, guestySyncLogs, guestyWebhookEvents,
+  guestyProperties, guestyReservations, guestySyncLogs, guestyWebhookEvents, guestyRateLimits,
   GuestyProperty, InsertGuestyProperty, GuestyReservation, InsertGuestyReservation,
-  GuestySyncLog, InsertGuestySyncLog, GuestyWebhookEvent, InsertGuestyWebhookEvent
+  GuestySyncLog, InsertGuestySyncLog, GuestyWebhookEvent, InsertGuestyWebhookEvent,
+  GuestyRateLimit, InsertGuestyRateLimit
 } from "../shared/schema";
 import { db } from "./db";
 
@@ -104,6 +105,11 @@ export interface IStorage {
   updateGuestyWebhookEvent(id: number, event: Partial<GuestyWebhookEvent>): Promise<GuestyWebhookEvent | undefined>;
   getAllGuestyWebhookEvents(): Promise<GuestyWebhookEvent[]>;
   getUnprocessedGuestyWebhookEvents(): Promise<GuestyWebhookEvent[]>;
+  
+  // Guesty Rate Limits
+  createGuestyRateLimit(rateLimit: InsertGuestyRateLimit): Promise<GuestyRateLimit>;
+  getGuestyRateLimitsInTimeRange(startTime: Date, endTime: Date): Promise<GuestyRateLimit[]>;
+  countGuestyRateLimitsInTimeRange(startTime: Date, endTime: Date): Promise<number>;
 }
 
 // Database Storage implementation
@@ -437,6 +443,39 @@ export class DatabaseStorage implements IStorage {
 
   async getUnprocessedGuestyWebhookEvents(): Promise<GuestyWebhookEvent[]> {
     return await db.select().from(guestyWebhookEvents).where(eq(guestyWebhookEvents.processed, false));
+  }
+
+  // Guesty Rate Limits
+  async createGuestyRateLimit(rateLimit: InsertGuestyRateLimit): Promise<GuestyRateLimit> {
+    const [newRateLimit] = await db.insert(guestyRateLimits).values(rateLimit).returning();
+    return newRateLimit;
+  }
+
+  async getGuestyRateLimitsInTimeRange(startTime: Date, endTime: Date): Promise<GuestyRateLimit[]> {
+    return await db.select()
+      .from(guestyRateLimits)
+      .where(
+        and(
+          // Use between for time range query
+          // requestTimestamp >= startTime AND requestTimestamp <= endTime
+          gte(guestyRateLimits.requestTimestamp, startTime),
+          lte(guestyRateLimits.requestTimestamp, endTime)
+        )
+      )
+      .orderBy(asc(guestyRateLimits.requestTimestamp));
+  }
+
+  async countGuestyRateLimitsInTimeRange(startTime: Date, endTime: Date): Promise<number> {
+    const result = await db.select({ count: sql`count(*)` })
+      .from(guestyRateLimits)
+      .where(
+        and(
+          gte(guestyRateLimits.requestTimestamp, startTime),
+          lte(guestyRateLimits.requestTimestamp, endTime)
+        )
+      );
+    
+    return Number(result[0]?.count || 0);
   }
 }
 
