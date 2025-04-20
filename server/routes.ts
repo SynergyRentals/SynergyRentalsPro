@@ -36,10 +36,14 @@ import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } f
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
 import { processHostAiWebhook } from "./lib/hostAiWebhookHandler";
+import { setupAdminDataRoutes } from "./routes/admin-data-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication - provides /api/register, /api/login, /api/logout, /api/user
   setupAuth(app);
+  
+  // Set up admin data management routes
+  setupAdminDataRoutes(app);
 
   // Middleware to check if user is authenticated
   const checkAuth = (req, res, next) => {

@@ -16,6 +16,7 @@ import TeamPage from "@/pages/team-page-new";
 import CompanyPage from "@/pages/company-page";
 import AiToolsPage from "@/pages/ai-tools-page";
 import AdminPage from "@/pages/admin-page";
+import { AdminDataPage } from "@/pages/AdminDataPage";
 // New properties pages
 import PropertiesNewPage from "@/pages/properties-new-page";
 import PropertyDetailNewPage from "@/pages/property-detail-new-page";
@@ -46,6 +47,7 @@ function Router() {
       <ProtectedRoute path="/company" component={CompanyPage} />
       <ProtectedRoute path="/ai-tools" component={AiToolsPage} />
       <ProtectedRoute path="/admin" component={AdminPage} />
+      <ProtectedRoute path="/admin/data" component={AdminDataPage} />
       {/* New properties routes */}
       <ProtectedRoute path="/properties" component={PropertiesNewPage} />
       <ProtectedRoute path="/properties/new" component={PropertyNewPage} />

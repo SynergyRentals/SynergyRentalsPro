@@ -9,7 +9,17 @@ import { Express, Request, Response } from 'express';
 import * as schema from '../../shared/schema';
 import { db } from '../db';
 import { storage } from '../storage';
-import { checkRole } from '../middleware/auth';
+// Using the checkRole from server/routes.ts since there's no middleware/auth module
+// For the admin routes, we'll declare our own checkRole middleware
+const checkRole = (roles: string[]) => (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  if (!roles.includes(req.user?.role)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+};
 import { 
   EntityType, 
   generateFieldMappingTemplate, 
@@ -23,9 +33,47 @@ import {
   bulkImport,
 } from '../services/dataImportService';
 import { cleanupDatabase } from '../../scripts/cleanup-database';
-import { stringify } from 'csv-stringify/sync';
 import path from 'path';
 import fs from 'fs';
+
+// Simple CSV stringify function since we can't use the csv-stringify package
+function stringify(records: any[], options: { header: boolean }): string {
+  if (!records || records.length === 0) {
+    return '';
+  }
+  
+  // Get headers from the first record
+  const headers = Object.keys(records[0]);
+  
+  // Create CSV content
+  let csv = '';
+  
+  // Add header row if requested
+  if (options.header) {
+    csv += headers.map(header => `"${header}"`).join(',') + '\n';
+  }
+  
+  // Add data rows
+  for (const record of records) {
+    const row = headers.map(header => {
+      const value = record[header];
+      // Handle different value types
+      if (value === null || value === undefined) {
+        return '';
+      } else if (typeof value === 'string') {
+        // Escape quotes and wrap in quotes
+        return `"${value.replace(/"/g, '""')}"`;
+      } else if (value instanceof Date) {
+        return `"${value.toISOString()}"`;
+      } else {
+        return `"${String(value)}"`;
+      }
+    }).join(',');
+    csv += row + '\n';
+  }
+  
+  return csv;
+}
 
 // Ensure tmp directory exists
 const TMP_DIR = './tmp';

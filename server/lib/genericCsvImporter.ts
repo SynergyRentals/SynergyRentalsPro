@@ -1,18 +1,88 @@
 /**
  * Generic CSV Importer
  * 
- * This module provides a flexible framework for importing CSV data into any entity type
- * in the system. It handles field mapping, data validation, and entity relationships.
+ * This module provides utilities for importing CSV data into the database
+ * in a flexible and configurable way.
  */
 
 import fs from 'fs';
-import { parse } from 'csv-parse';
+import * as schema from '@shared/schema';
 import { db } from '../db';
-import * as schema from '../../shared/schema';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
 
-// Define supported entity types
+// Simple CSV parser since we can't use csv-parse
+export function parseCSV(csvText: string, options: { columns: boolean, skip_empty_lines: boolean, delimiter?: string }): any[] {
+  const delimiter = options.delimiter || ',';
+  const lines = csvText.split('\n');
+  const results: any[] = [];
+  
+  // Skip empty lines if requested
+  const nonEmptyLines = options.skip_empty_lines 
+    ? lines.filter(line => line.trim().length > 0)
+    : lines;
+  
+  if (nonEmptyLines.length === 0) {
+    return [];
+  }
+  
+  // Extract headers from the first line
+  const headers = nonEmptyLines[0].split(delimiter).map(header => {
+    // Remove quotes and trim whitespace
+    return header.replace(/^["'](.*)["']$/, '$1').trim();
+  });
+  
+  // Process each data line
+  for (let i = 1; i < nonEmptyLines.length; i++) {
+    const line = nonEmptyLines[i];
+    if (!line.trim()) continue;
+    
+    // Split by delimiter, respecting quotes
+    const values = splitCSVLine(line, delimiter);
+    
+    if (options.columns) {
+      // Create an object using headers as keys
+      const row: any = {};
+      for (let j = 0; j < headers.length; j++) {
+        // Remove quotes from values
+        const value = j < values.length ? values[j].replace(/^["'](.*)["']$/, '$1') : '';
+        row[headers[j]] = value;
+      }
+      results.push(row);
+    } else {
+      // Just return the array of values
+      results.push(values);
+    }
+  }
+  
+  return results;
+}
+
+// Helper function to split CSV line respecting quotes
+function splitCSVLine(line: string, delimiter: string): string[] {
+  const result: string[] = [];
+  let currentValue = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === delimiter && !inQuotes) {
+      result.push(currentValue);
+      currentValue = '';
+    } else {
+      currentValue += char;
+    }
+  }
+  
+  // Add the last value
+  result.push(currentValue);
+  
+  return result;
+}
+
+// Entity type enum (matches the one in the client-side DataManagement component)
 export enum EntityType {
   USER = 'user',
   UNIT = 'unit',
@@ -29,16 +99,26 @@ export enum EntityType {
   VENDOR = 'vendor'
 }
 
-// Interface for mapping CSV columns to entity fields
+// Field mapping interface (maps CSV fields to database fields)
 export interface FieldMapping {
   csvField: string;
   entityField: string;
   required?: boolean;
-  transformer?: (value: string) => any;
-  validator?: (value: any) => boolean;
 }
 
-// Interface for the import result
+// Import configuration interface
+export interface ImportConfig {
+  entityType: EntityType;
+  fieldMappings: FieldMapping[];
+  updateExisting: boolean;
+  identifierField?: string;
+  options?: {
+    skipFirstRow?: boolean;
+    delimiter?: string;
+  };
+}
+
+// Import results interface
 export interface ImportResult {
   success: boolean;
   message: string;
@@ -48,32 +128,13 @@ export interface ImportResult {
   errors: string[];
 }
 
-// Interface for import options
-export interface ImportOptions {
-  entityType: EntityType;
-  fieldMappings: FieldMapping[];
-  updateExisting?: boolean;
-  identifierField?: string;
-  relationshipMappings?: {
-    entityField: string;
-    relatedEntityType: EntityType;
-    relatedEntityField: string;
-  }[];
-  skipFirstRow?: boolean;
-  delimiter?: string;
-}
-
 /**
  * Import data from a CSV file
  * @param filePath - Path to the CSV file
- * @param options - Import options
- * @returns Import result
+ * @param config - Import configuration
+ * @returns Import results
  */
-export async function importFromCsv(
-  filePath: string,
-  options: ImportOptions
-): Promise<ImportResult> {
-  // Initialize result
+export async function importFromCsv(filePath: string, config: ImportConfig): Promise<ImportResult> {
   const result: ImportResult = {
     success: false,
     message: '',
@@ -82,353 +143,265 @@ export async function importFromCsv(
     recordsSkipped: 0,
     errors: [],
   };
-
-  // Validate file existence
-  if (!fs.existsSync(filePath)) {
-    result.message = `File not found: ${filePath}`;
-    return result;
-  }
-
+  
   try {
-    // Configure parser
-    const parser = parse({
-      delimiter: options.delimiter || ',',
+    // Read and parse the CSV file
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const records = parseCSV(fileContent, {
       columns: true,
       skip_empty_lines: true,
-      trim: true,
-      skip_lines_with_error: true,
+      delimiter: config.options?.delimiter || ',',
     });
-
-    // Prepare data collection
-    const records: any[] = [];
     
-    // Process data from file
-    const dataPromise = new Promise<void>((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(parser)
-        .on('data', (row: any) => {
-          try {
-            // Skip first row if specified
-            if (options.skipFirstRow && result.recordsProcessed === 0) {
-              result.recordsProcessed++;
-              return;
+    // Skip first row if requested
+    const startIndex = config.options?.skipFirstRow ? 1 : 0;
+    const dataToProcess = records.slice(startIndex);
+    
+    result.recordsProcessed = dataToProcess.length;
+    
+    // Get the table for this entity type
+    const table = getTableForEntityType(config.entityType);
+    
+    if (!table) {
+      result.message = `Invalid entity type: ${config.entityType}`;
+      return result;
+    }
+    
+    // Process each record
+    for (let i = 0; i < dataToProcess.length; i++) {
+      const csvRecord = dataToProcess[i];
+      
+      try {
+        // Map CSV fields to entity fields
+        const entityRecord: Record<string, any> = {};
+        
+        // Apply field mappings
+        for (const mapping of config.fieldMappings) {
+          if (mapping.csvField && mapping.entityField) {
+            // Get the value from the CSV record
+            const value = csvRecord[mapping.csvField];
+            
+            // Skip empty values unless required
+            if ((value === undefined || value === null || value === '') && !mapping.required) {
+              continue;
             }
             
-            // Convert CSV row to entity object
-            const record = mapRowToEntity(row, options.fieldMappings);
-            
-            // Validate required fields
-            const requiredFieldsValid = validateRequiredFields(record, options.fieldMappings);
-            if (!requiredFieldsValid) {
-              result.errors.push(`Missing required fields in row: ${JSON.stringify(row)}`);
-              result.recordsSkipped++;
-              return;
+            // Check if required field is missing
+            if ((value === undefined || value === null || value === '') && mapping.required) {
+              throw new Error(`Required field ${mapping.entityField} is missing in record ${i + 1}`);
             }
             
-            records.push(record);
-            result.recordsProcessed++;
-          } catch (error) {
-            result.errors.push(`Error processing row: ${JSON.stringify(row)} - ${error instanceof Error ? error.message : 'Unknown error'}`);
-            result.recordsSkipped++;
+            // Convert value to appropriate type
+            entityRecord[mapping.entityField] = convertValue(value, mapping.entityField);
           }
-        })
-        .on('error', (error: Error) => {
-          result.errors.push(`CSV parsing error: ${error.message}`);
-          reject(error);
-        })
-        .on('end', () => {
-          resolve();
-        });
-    });
-
-    // Wait for the data to be processed
-    await dataPromise;
-    
-    // Process relationships if specified
-    if (options.relationshipMappings) {
-      await resolveRelationships(records, options.relationshipMappings);
+        }
+        
+        // If updating existing records
+        if (config.updateExisting && config.identifierField) {
+          // Get the identifier value
+          const identifierValue = entityRecord[config.identifierField];
+          
+          if (identifierValue) {
+            // Check if the record exists
+            const existingRecords = await db
+              .select()
+              .from(table)
+              .where(eq(table[config.identifierField as keyof typeof table], identifierValue));
+            
+            if (existingRecords.length > 0) {
+              // Update the existing record
+              await db
+                .update(table)
+                .set(entityRecord)
+                .where(eq(table[config.identifierField as keyof typeof table], identifierValue));
+              
+              result.recordsImported++;
+              continue;
+            }
+          }
+        }
+        
+        // Insert the record
+        await db.insert(table).values(entityRecord);
+        result.recordsImported++;
+      } catch (error) {
+        result.recordsSkipped++;
+        result.errors.push(`Error in record ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
     
-    // Store records in database
-    if (records.length > 0) {
-      await storeRecords(records, options, result);
-    }
-
-    // Set success status based on results
-    result.success = result.errors.length === 0;
-    result.message = result.success
-      ? `Successfully imported ${result.recordsImported} records`
-      : `Import completed with ${result.errors.length} errors`;
-
-    return result;
+    result.success = true;
+    result.message = `Imported ${result.recordsImported} records, skipped ${result.recordsSkipped} records`;
   } catch (error) {
     result.success = false;
-    result.message = `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    return result;
-  }
-}
-
-/**
- * Map a CSV row to an entity object
- * @param row - CSV row
- * @param fieldMappings - Field mappings
- * @returns Mapped entity object
- */
-function mapRowToEntity(row: any, fieldMappings: FieldMapping[]): any {
-  const entity: any = {};
-  
-  for (const mapping of fieldMappings) {
-    if (row[mapping.csvField] !== undefined) {
-      // Apply transformer if provided
-      if (mapping.transformer) {
-        entity[mapping.entityField] = mapping.transformer(row[mapping.csvField]);
-      } else {
-        entity[mapping.entityField] = row[mapping.csvField];
-      }
-      
-      // Apply validator if provided
-      if (mapping.validator && entity[mapping.entityField] !== undefined) {
-        if (!mapping.validator(entity[mapping.entityField])) {
-          throw new Error(`Validation failed for field ${mapping.entityField}`);
-        }
-      }
-    }
+    result.message = `Error importing data: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
   
-  return entity;
+  return result;
 }
 
 /**
- * Validate required fields
- * @param entity - Mapped entity object
- * @param fieldMappings - Field mappings
- * @returns True if all required fields are present
- */
-function validateRequiredFields(entity: any, fieldMappings: FieldMapping[]): boolean {
-  for (const mapping of fieldMappings) {
-    if (mapping.required && (entity[mapping.entityField] === undefined || entity[mapping.entityField] === '')) {
-      return false;
-    }
-  }
-  
-  return true;
-}
-
-/**
- * Resolve relationships between entities
- * @param records - Records to process
- * @param relationshipMappings - Relationship mappings
- */
-async function resolveRelationships(
-  records: any[],
-  relationshipMappings: {
-    entityField: string;
-    relatedEntityType: EntityType;
-    relatedEntityField: string;
-  }[]
-): Promise<void> {
-  // Process each relationship type
-  for (const relationship of relationshipMappings) {
-    // Get all unique values for the relationship field
-    const uniqueValues = new Set<string>();
-    for (const record of records) {
-      if (record[relationship.entityField]) {
-        uniqueValues.add(record[relationship.entityField].toString());
-      }
-    }
-    
-    // Skip if no values to look up
-    if (uniqueValues.size === 0) continue;
-    
-    // Get the related table and field
-    const { table, field } = getTableAndField(relationship.relatedEntityType, relationship.relatedEntityField);
-    if (!table || !field) continue;
-    
-    // Query for related entities
-    const relatedEntities = await db
-      .select()
-      .from(table)
-      .where(field.in([...uniqueValues]));
-    
-    // Create a map for quick lookup
-    const relatedEntityMap = new Map();
-    for (const entity of relatedEntities) {
-      relatedEntityMap.set(entity[relationship.relatedEntityField].toString(), entity);
-    }
-    
-    // Update records with related entity IDs
-    for (const record of records) {
-      if (record[relationship.entityField]) {
-        const relatedEntity = relatedEntityMap.get(record[relationship.entityField].toString());
-        if (relatedEntity) {
-          // Replace the value with the actual ID if it's a reference to another entity
-          record[relationship.entityField] = relatedEntity.id;
-        } else {
-          // Clear the field if no related entity found
-          delete record[relationship.entityField];
-        }
-      }
-    }
-  }
-}
-
-/**
- * Get table and field objects for a given entity type and field
+ * Generate a field mapping template for an entity type
  * @param entityType - Entity type
- * @param fieldName - Field name
- * @returns Table and field objects
- */
-function getTableAndField(entityType: EntityType, fieldName: string): { table: any; field: any } {
-  switch (entityType) {
-    case EntityType.USER:
-      return { table: schema.users, field: schema.users[fieldName] };
-    case EntityType.UNIT:
-      return { table: schema.units, field: schema.units[fieldName] };
-    case EntityType.GUEST:
-      return { table: schema.guests, field: schema.guests[fieldName] };
-    case EntityType.PROPERTY:
-      return { table: schema.properties, field: schema.properties[fieldName] };
-    case EntityType.GUESTY_PROPERTY:
-      return { table: schema.guestyProperties, field: schema.guestyProperties[fieldName] };
-    case EntityType.GUESTY_RESERVATION:
-      return { table: schema.guestyReservations, field: schema.guestyReservations[fieldName] };
-    case EntityType.PROJECT:
-      return { table: schema.projects, field: schema.projects[fieldName] };
-    case EntityType.TASK:
-      return { table: schema.tasks, field: schema.tasks[fieldName] };
-    case EntityType.MAINTENANCE:
-      return { table: schema.maintenance, field: schema.maintenance[fieldName] };
-    case EntityType.INVENTORY:
-      return { table: schema.inventory, field: schema.inventory[fieldName] };
-    case EntityType.CLEANING_TASK:
-      return { table: schema.cleaningTasks, field: schema.cleaningTasks[fieldName] };
-    case EntityType.DOCUMENT:
-      return { table: schema.documents, field: schema.documents[fieldName] };
-    case EntityType.VENDOR:
-      return { table: schema.vendors, field: schema.vendors[fieldName] };
-    default:
-      return { table: null, field: null };
-  }
-}
-
-/**
- * Store records in the database
- * @param records - Records to store
- * @param options - Import options
- * @param result - Import result to update
- */
-async function storeRecords(
-  records: any[],
-  options: ImportOptions,
-  result: ImportResult
-): Promise<void> {
-  const { table } = getTableAndField(options.entityType, 'id');
-  if (!table) {
-    result.errors.push(`Invalid entity type: ${options.entityType}`);
-    return;
-  }
-  
-  // Process each record
-  for (const record of records) {
-    try {
-      // Check if record exists if updating is enabled
-      if (options.updateExisting && options.identifierField && record[options.identifierField]) {
-        const existingRecords = await db
-          .select()
-          .from(table)
-          .where(eq(table[options.identifierField], record[options.identifierField]));
-        
-        if (existingRecords.length > 0) {
-          // Update existing record
-          await db
-            .update(table)
-            .set(record)
-            .where(eq(table[options.identifierField], record[options.identifierField]));
-          
-          result.recordsImported++;
-          continue;
-        }
-      }
-      
-      // Insert new record
-      await db.insert(table).values(record);
-      result.recordsImported++;
-    } catch (error) {
-      result.errors.push(`Error storing record: ${JSON.stringify(record)} - ${error instanceof Error ? error.message : 'Unknown error'}`);
-      result.recordsSkipped++;
-    }
-  }
-}
-
-/**
- * Generate a field mapping template for a given entity type
- * @param entityType - Entity type
- * @returns Field mapping template
+ * @returns Field mappings
  */
 export function generateFieldMappingTemplate(entityType: EntityType): FieldMapping[] {
+  // This function generates a template for field mappings based on the entity type
+  const fieldMappings: FieldMapping[] = [];
+  
+  // Define required fields for each entity type
+  const requiredFields: Record<EntityType, string[]> = {
+    [EntityType.USER]: ['username', 'name', 'role'],
+    [EntityType.UNIT]: ['name', 'address'],
+    [EntityType.GUEST]: ['name', 'email'],
+    [EntityType.PROPERTY]: ['name', 'address'],
+    [EntityType.GUESTY_PROPERTY]: ['name', 'externalId'],
+    [EntityType.GUESTY_RESERVATION]: ['propertyId', 'checkIn', 'checkOut'],
+    [EntityType.PROJECT]: ['title', 'status'],
+    [EntityType.TASK]: ['description', 'taskType'],
+    [EntityType.MAINTENANCE]: ['description', 'unitId'],
+    [EntityType.INVENTORY]: ['itemName', 'parLevel', 'currentStock'],
+    [EntityType.CLEANING_TASK]: ['unitId', 'status'],
+    [EntityType.DOCUMENT]: ['title', 'url'],
+    [EntityType.VENDOR]: ['name', 'phone'],
+  };
+  
+  // Get field names for the entity type
+  const fields = getFieldsForEntityType(entityType);
+  
+  // Create field mappings
+  for (const field of fields) {
+    fieldMappings.push({
+      csvField: '',
+      entityField: field,
+      required: requiredFields[entityType].includes(field),
+    });
+  }
+  
+  return fieldMappings;
+}
+
+/**
+ * Get fields for an entity type
+ * @param entityType - Entity type
+ * @returns Field names
+ */
+function getFieldsForEntityType(entityType: EntityType): string[] {
+  // Get the table for this entity type
+  const table = getTableForEntityType(entityType);
+  
+  if (!table) {
+    return [];
+  }
+  
+  // Get field names from the table columns
+  const fields = Object.keys(table).filter(key => {
+    // Exclude special fields like relations, functions, etc.
+    return typeof table[key] === 'object' && table[key] !== null && !key.startsWith('_');
+  });
+  
+  return fields;
+}
+
+/**
+ * Get the database table for an entity type
+ * @param entityType - Entity type
+ * @returns Database table
+ */
+function getTableForEntityType(entityType: EntityType): any {
   switch (entityType) {
     case EntityType.USER:
-      return [
-        { csvField: 'Name', entityField: 'name', required: true },
-        { csvField: 'Username', entityField: 'username', required: true },
-        { csvField: 'Email', entityField: 'email', required: true },
-        { csvField: 'Role', entityField: 'role', required: true },
-        { csvField: 'Phone', entityField: 'phone' },
-        { csvField: 'Active', entityField: 'active', transformer: (v) => v.toLowerCase() === 'true' },
-      ];
+      return schema.users;
     case EntityType.UNIT:
-      return [
-        { csvField: 'Name', entityField: 'name', required: true },
-        { csvField: 'Address', entityField: 'address', required: true },
-        { csvField: 'Lease URL', entityField: 'lease_url' },
-        { csvField: 'WiFi Info', entityField: 'wifi_info' },
-        { csvField: 'Notes', entityField: 'notes' },
-        { csvField: 'Tags', entityField: 'tags', transformer: (v) => v.split(',').map(t => t.trim()) },
-        { csvField: 'Active', entityField: 'active', transformer: (v) => v.toLowerCase() === 'true' },
-        { csvField: 'iCal URL', entityField: 'ical_url' },
-      ];
+      return schema.units;
+    case EntityType.GUEST:
+      return schema.guests;
+    case EntityType.PROPERTY:
+      return schema.properties;
     case EntityType.GUESTY_PROPERTY:
-      return [
-        { csvField: 'Property ID', entityField: 'propertyId', required: true },
-        { csvField: 'Name', entityField: 'name', required: true },
-        { csvField: 'Address', entityField: 'address' },
-        { csvField: 'Bedrooms', entityField: 'bedrooms', transformer: (v) => parseInt(v, 10) || 0 },
-        { csvField: 'Bathrooms', entityField: 'bathrooms', transformer: (v) => parseFloat(v) || 0 },
-        { csvField: 'Amenities', entityField: 'amenities', transformer: (v) => v.split(',').map(a => a.trim()) },
-        { csvField: 'Listing URL', entityField: 'listingUrl' },
-        { csvField: 'Guesty ID', entityField: 'guestyId' },
-        { csvField: 'Nickname', entityField: 'nickname' },
-        { csvField: 'City', entityField: 'city' },
-        { csvField: 'State', entityField: 'state' },
-        { csvField: 'Zipcode', entityField: 'zipcode' },
-        { csvField: 'Country', entityField: 'country' },
-        { csvField: 'Latitude', entityField: 'latitude', transformer: (v) => parseFloat(v) || null },
-        { csvField: 'Longitude', entityField: 'longitude', transformer: (v) => parseFloat(v) || null },
-        { csvField: 'iCal URL', entityField: 'icalUrl' },
-      ];
+      return schema.guestyProperties;
     case EntityType.GUESTY_RESERVATION:
-      return [
-        { csvField: 'Reservation ID', entityField: 'reservationId', required: true },
-        { csvField: 'Guest Name', entityField: 'guestName', required: true },
-        { csvField: 'Guest Email', entityField: 'guestEmail' },
-        { csvField: 'Property ID', entityField: 'propertyId', required: true },
-        { csvField: 'Check In', entityField: 'checkIn', required: true, transformer: (v) => new Date(v) },
-        { csvField: 'Check Out', entityField: 'checkOut', required: true, transformer: (v) => new Date(v) },
-        { csvField: 'Status', entityField: 'status', required: true },
-        { csvField: 'Channel', entityField: 'channel' },
-        { csvField: 'Total Price', entityField: 'totalPrice', transformer: (v) => parseInt(v, 10) || 0 },
-        { csvField: 'Guesty ID', entityField: 'guestyId' },
-        { csvField: 'Guest Phone', entityField: 'guestPhone' },
-        { csvField: 'Confirmation Code', entityField: 'confirmationCode' },
-        { csvField: 'Adults', entityField: 'adults', transformer: (v) => parseInt(v, 10) || 0 },
-        { csvField: 'Children', entityField: 'children', transformer: (v) => parseInt(v, 10) || 0 },
-        { csvField: 'Total Guests', entityField: 'totalGuests', transformer: (v) => parseInt(v, 10) || 0 },
-      ];
-    // Add more entity types as needed
+      return schema.guestyReservations;
+    case EntityType.PROJECT:
+      return schema.projects;
+    case EntityType.TASK:
+      return schema.tasks;
+    case EntityType.MAINTENANCE:
+      return schema.maintenance;
+    case EntityType.INVENTORY:
+      return schema.inventory;
+    case EntityType.CLEANING_TASK:
+      return schema.cleaningTasks;
+    case EntityType.DOCUMENT:
+      return schema.documents;
+    case EntityType.VENDOR:
+      return schema.vendors;
     default:
-      return [];
+      return null;
   }
 }
 
-// Export utility functions
-export { importFromCsv, generateFieldMappingTemplate };
+/**
+ * Convert a value to the appropriate type
+ * @param value - Value to convert
+ * @param fieldName - Field name
+ * @returns Converted value
+ */
+function convertValue(value: any, fieldName: string): any {
+  // Skip null/undefined values
+  if (value === null || value === undefined) {
+    return null;
+  }
+  
+  // Convert string to appropriate type based on common field naming patterns
+  if (typeof value === 'string') {
+    // Boolean fields
+    if (
+      fieldName.startsWith('is') ||
+      fieldName.startsWith('has') ||
+      fieldName === 'active' ||
+      fieldName === 'enabled'
+    ) {
+      return value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes';
+    }
+    
+    // Date fields
+    if (
+      fieldName.endsWith('At') ||
+      fieldName.endsWith('Date') ||
+      fieldName === 'date' ||
+      fieldName === 'checkIn' ||
+      fieldName === 'checkOut'
+    ) {
+      // Try to parse as date
+      try {
+        return new Date(value);
+      } catch (error) {
+        // Return as string if parsing fails
+        return value;
+      }
+    }
+    
+    // Number fields
+    if (
+      fieldName.endsWith('Id') ||
+      fieldName === 'id' ||
+      fieldName.endsWith('Count') ||
+      fieldName.endsWith('Amount') ||
+      fieldName === 'price' ||
+      fieldName === 'cost' ||
+      fieldName === 'quantity' ||
+      fieldName === 'order' ||
+      fieldName === 'parLevel' ||
+      fieldName === 'currentStock' ||
+      fieldName === 'reorderThreshold'
+    ) {
+      // Try to parse as number
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num;
+    }
+  }
+  
+  // Return the value as is for other cases
+  return value;
+}
