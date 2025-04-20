@@ -73,6 +73,11 @@ export interface IStorage {
   deleteProject(id: number): Promise<boolean>;
   getAllProjects(): Promise<Project[]>;
 
+  // Properties (mapping to Guesty Properties in routes-safe.ts)
+  getProperty(id: number): Promise<GuestyProperty | undefined>;
+  getAllProperties(): Promise<GuestyProperty[]>;
+  getPropertyReservations(propertyId: number): Promise<GuestyReservation[]>;
+
   // Guesty Properties
   getGuestyProperty(id: number): Promise<GuestyProperty | undefined>;
   getGuestyPropertyByGuestyId(guestyId: string): Promise<GuestyProperty | undefined>;
@@ -322,6 +327,23 @@ export class DatabaseStorage implements IStorage {
 
   async getAllProjects(): Promise<Project[]> {
     return await db.select().from(projects);
+  }
+
+  // Properties (mapping to Guesty Properties in routes-safe.ts)
+  async getProperty(id: number): Promise<GuestyProperty | undefined> {
+    return await this.getGuestyProperty(id);
+  }
+
+  async getAllProperties(): Promise<GuestyProperty[]> {
+    return await this.getAllGuestyProperties();
+  }
+
+  async getPropertyReservations(propertyId: number): Promise<GuestyReservation[]> {
+    const property = await this.getGuestyProperty(propertyId);
+    if (!property || !property.guestyId) {
+      return [];
+    }
+    return await db.select().from(guestyReservations).where(eq(guestyReservations.guestyPropertyId, property.guestyId));
   }
 
   // Guesty Properties
