@@ -1021,6 +1021,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  
+  // Create a project from an AI Planner interaction
+  app.post("/api/projects/from-interaction/:id", checkAuth, async (req, res) => {
+    try {
+      const interactionId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Fetch the interaction
+      const interaction = await storage.getAiPlannerInteraction(interactionId);
+      if (!interaction) {
+        return res.status(404).json({ message: "Interaction not found" });
+      }
+      
+      // Only allow users to convert their own interactions
+      if (interaction.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Extract data from the interaction to create a project
+      let title = "New Project";
+      let description = interaction.prompt;
+      
+      // Try to extract a title from the generated plan
+      if (interaction.generatedPlan?.suggestedTitle) {
+        title = interaction.generatedPlan.suggestedTitle;
+      } else if (interaction.prompt) {
+        // Take first 50 chars of prompt as fallback title
+        title = interaction.prompt.substring(0, 50);
+        if (interaction.prompt.length > 50) title += "...";
+      }
+      
+      // Create the project
+      const projectData = {
+        title,
+        description,
+        status: "active",
+        deadline: interaction.generatedPlan?.suggestedDeadline || null,
+        createdBy: userId,
+        notes: JSON.stringify({
+          source: "ai-planner",
+          interactionId: interaction.id,
+          createdAt: new Date().toISOString()
+        })
+      };
+      
+      const validatedData = insertProjectSchema.parse(projectData);
+      const project = await storage.createProject(validatedData);
+      
+      // Create tasks from suggested tasks
+      if (interaction.generatedPlan?.suggestedTasks && Array.isArray(interaction.generatedPlan.suggestedTasks)) {
+        for (const task of interaction.generatedPlan.suggestedTasks) {
+          try {
+            const taskData = {
+              title: task.description || "Task",
+              projectId: project.id,
+              status: "todo",
+              priority: task.priority || "medium",
+              dueDate: task.dueDate || null,
+              assignedTo: task.assignedTo || null,
+              createdBy: userId
+            };
+            
+            await storage.createProjectTask(taskData);
+          } catch (taskError) {
+            console.error("Error creating task from interaction:", taskError);
+            // Continue creating other tasks even if one fails
+          }
+        }
+      }
+      
+      // Update the interaction to mark it as converted
+      await storage.updateAiPlannerInteraction(interaction.id, {
+        convertedToProjectId: project.id,
+        status: "approved"
+      });
+      
+      // Return the created project
+      res.status(200).json(project);
+    } catch (error) {
+      console.error("Error creating project from interaction:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   app.patch("/api/projects/:id", checkRole(["admin", "ops"]), async (req, res) => {
     try {

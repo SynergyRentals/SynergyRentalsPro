@@ -505,7 +505,7 @@ export default function AiPlannerPage() {
                       <div key={index} className="flex items-start gap-3 p-3 border rounded-md">
                         <CheckSquare className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                         <div className="space-y-1 flex-1">
-                          <div className="font-medium">{task.description}</div>
+                          <div className="font-medium">{task.description || task.title}</div>
                           <div className="flex flex-wrap gap-2 text-xs">
                             {task.priority && (
                               <Badge variant="outline" className="text-xs">
