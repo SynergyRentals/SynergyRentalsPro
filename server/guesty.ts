@@ -1,3 +1,4 @@
+
 import { db } from "./db";
 import { 
   guestyProperties, guestyReservations, guestySyncLogs,
@@ -23,23 +24,6 @@ function initGuestyClient(): boolean {
     return true;
   } catch (error) {
     console.error('Error initializing Guesty client:', error);
-    return false;
-  }
-}
-function initGuestyClient() {
-  const clientId = process.env.GUESTY_CLIENT_ID;
-  const clientSecret = process.env.GUESTY_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    console.warn("GUESTY_CLIENT_ID or GUESTY_CLIENT_SECRET environment variables are not set");
-    return false;
-  }
-
-  try {
-    guestyApiClient.setCredentials(clientId, clientSecret);
-    return true;
-  } catch (error) {
-    console.error("Failed to initialize Guesty API client:", error);
     return false;
   }
 }
