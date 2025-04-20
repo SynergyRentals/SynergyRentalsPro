@@ -5,7 +5,7 @@ import { registerRoutes } from "./routes"; // Import the original routes
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { setupAuth } from "./auth";
-import { setupAdminDataRoutes } from "./routes/admin-data-routes";
+import adminDataRoutes, { setupAdminDataRoutes } from "./routes/admin-data-routes";
 import { createServer } from "http";
 import { setupApiMiddleware, apiResponseMiddleware } from "./lib/apiMiddleware";
 

@@ -1,189 +1,243 @@
 /**
  * Data Import Service
  * 
- * This module provides services for importing data from CSV files into the database.
- * It handles file uploads, data sampling, field mapping suggestions, and bulk imports.
+ * This service handles importing data from CSV files, maintaining proper relationships
+ * between entities, and ensuring data integrity during the import process.
  */
 
-import path from 'path';
-import fs from 'fs';
-import {
-  EntityType,
-  FieldMapping,
-  ImportConfig,
-  ImportResult,
-  importFromCsv,
-  generateFieldMappingTemplate
-} from '../lib/genericCsvImporter';
-
-// Import parseCSV function from the custom importer
-import { parseCSV } from '../lib/genericCsvImporter';
 import { db } from '../db';
-import * as schema from '@shared/schema';
 import { storage } from '../storage';
+import * as schema from '../../shared/schema';
+import { parse } from 'csv-parse/sync';
 
-// Ensure tmp directory exists
-const TMP_DIR = './tmp';
-if (!fs.existsSync(TMP_DIR)) {
-  fs.mkdirSync(TMP_DIR, { recursive: true });
+interface ImportResult {
+  success: boolean;
+  message: string;
+  entityType: string;
+  recordsProcessed: number;
+  recordsImported: number;
+  errors: string[];
+  warnings: string[];
+}
+
+interface FieldMapping {
+  csvField: string;
+  dbField: string;
 }
 
 /**
- * Save an uploaded file to the temporary directory
- * @param uploadedFile - Uploaded file from express-fileupload
- * @returns Path to the saved file
+ * Parse CSV data into objects
+ * @param csvData - Raw CSV data as string
+ * @returns Array of objects parsed from CSV
  */
-export async function saveUploadedFile(uploadedFile: any): Promise<string> {
-  // Generate a unique filename
-  const timestamp = Date.now();
-  const randomString = Math.random().toString(36).substring(2, 15);
-  const filename = `${timestamp}-${randomString}.csv`;
-  const filePath = path.join(TMP_DIR, filename);
-  
-  // Save the file
-  await uploadedFile.mv(filePath);
-  
-  return filePath;
-}
-
-/**
- * Get sample data from a CSV file
- * @param filePath - Path to the CSV file
- * @param rowCount - Number of rows to sample
- * @returns Sample data
- */
-export async function getSampleData(filePath: string, rowCount: number = 5): Promise<any[]> {
+export function parseCsvData(csvData: string): Record<string, any>[] {
   try {
-    // Read the file
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    
-    // Parse the CSV using our custom parser
-    const records = parseCSV(fileContent, {
+    const records = parse(csvData, {
       columns: true,
       skip_empty_lines: true,
+      trim: true
+    });
+    return records;
+  } catch (error) {
+    console.error('Error parsing CSV data:', error);
+    throw new Error(`Failed to parse CSV data: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Map CSV fields to database fields
+ * @param csvRecords - Array of objects parsed from CSV
+ * @param fieldMappings - Mappings from CSV field names to database field names
+ * @returns Array of objects with mapped field names
+ */
+export function mapFields(csvRecords: Record<string, any>[], fieldMappings: FieldMapping[]): Record<string, any>[] {
+  return csvRecords.map(record => {
+    const mappedRecord: Record<string, any> = {};
+    
+    fieldMappings.forEach(mapping => {
+      if (record[mapping.csvField] !== undefined) {
+        mappedRecord[mapping.dbField] = record[mapping.csvField];
+      }
     });
     
-    // Return the first n rows
-    return records.slice(0, rowCount);
-  } catch (error) {
-    console.error('Error getting sample data:', error);
-    return [];
-  }
+    return mappedRecord;
+  });
 }
 
 /**
- * Suggest field mappings for a CSV file
- * @param filePath - Path to the CSV file
- * @param entityType - Entity type
- * @returns Suggested field mappings
+ * Validate and transform data for import
+ * @param mappedRecords - Records with mapped field names
+ * @param entityType - Type of entity being imported
+ * @returns Validated and transformed records
  */
-export async function suggestFieldMappings(
-  filePath: string,
-  entityType: EntityType
-): Promise<FieldMapping[]> {
-  try {
-    // Get sample data to extract CSV headers
-    const sampleData = await getSampleData(filePath, 1);
+export function validateAndTransform(mappedRecords: Record<string, any>[], entityType: string): Record<string, any>[] {
+  return mappedRecords.map(record => {
+    const validated = { ...record };
     
-    if (sampleData.length === 0) {
-      return [];
+    // Perform entity-specific validation and transformation
+    switch (entityType) {
+      case 'users':
+        // Ensure password exists for users
+        if (!validated.password) {
+          validated.password = 'changeme123'; // Default password
+        }
+        break;
+        
+      case 'units':
+        // Ensure active status is boolean
+        if (validated.active !== undefined) {
+          validated.active = validated.active === 'true' || validated.active === '1' || validated.active === 'yes';
+        }
+        break;
+        
+      case 'guests':
+        // Parse dates
+        if (validated.checkIn) {
+          validated.checkIn = new Date(validated.checkIn);
+        }
+        if (validated.checkOut) {
+          validated.checkOut = new Date(validated.checkOut);
+        }
+        break;
+        
+      case 'tasks':
+        // Parse dates and boolean
+        if (validated.dueDate) {
+          validated.dueDate = new Date(validated.dueDate);
+        }
+        if (validated.completed !== undefined) {
+          validated.completed = validated.completed === 'true' || validated.completed === '1' || validated.completed === 'yes';
+        }
+        break;
+        
+      case 'guestyProperties':
+        // Convert numeric values
+        if (validated.bedrooms) {
+          validated.bedrooms = Number(validated.bedrooms);
+        }
+        if (validated.bathrooms) {
+          validated.bathrooms = Number(validated.bathrooms);
+        }
+        if (validated.maxGuests) {
+          validated.maxGuests = Number(validated.maxGuests);
+        }
+        break;
+        
+      case 'guestyReservations':
+        // Parse dates
+        if (validated.checkIn) {
+          validated.checkIn = new Date(validated.checkIn);
+        }
+        if (validated.checkOut) {
+          validated.checkOut = new Date(validated.checkOut);
+        }
+        break;
     }
     
-    // Get CSV column headers
-    const csvHeaders = Object.keys(sampleData[0]);
-    
-    // Get default field mappings for the entity type
-    const defaultMappings = generateFieldMappingTemplate(entityType);
-    
-    // Suggest mappings based on column name similarity
-    for (const mapping of defaultMappings) {
-      const entityField = mapping.entityField.toLowerCase();
-      
-      // Try to find an exact match
-      const exactMatch = csvHeaders.find(header => 
-        header.toLowerCase() === entityField
-      );
-      
-      if (exactMatch) {
-        mapping.csvField = exactMatch;
-        continue;
-      }
-      
-      // Try to find a partial match
-      const partialMatch = csvHeaders.find(header => 
-        header.toLowerCase().includes(entityField) || 
-        entityField.includes(header.toLowerCase())
-      );
-      
-      if (partialMatch) {
-        mapping.csvField = partialMatch;
-      }
-    }
-    
-    return defaultMappings;
-  } catch (error) {
-    console.error('Error suggesting field mappings:', error);
-    return [];
-  }
+    return validated;
+  });
 }
 
 /**
- * Import data from a CSV file
- * @param filePath - Path to the CSV file
- * @param config - Import configuration
- * @param userId - User ID for logging
+ * Import data into the database
+ * @param entityType - Type of entity to import
+ * @param csvData - CSV data as string
+ * @param fieldMappings - Mappings from CSV field names to database field names
  * @returns Import result
  */
 export async function importData(
-  filePath: string,
-  config: ImportConfig,
-  userId?: number
+  entityType: string,
+  csvData: string,
+  fieldMappings: FieldMapping[]
 ): Promise<ImportResult> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  let recordsImported = 0;
+  
   try {
-    // Import the data
-    const result = await importFromCsv(filePath, config);
+    // Parse and transform the data
+    const parsedRecords = parseCsvData(csvData);
+    const mappedRecords = mapFields(parsedRecords, fieldMappings);
+    const validatedRecords = validateAndTransform(mappedRecords, entityType);
     
-    // Log the import
-    if (userId) {
-      await db.insert(schema.logs).values({
-        action: `IMPORT_${config.entityType.toUpperCase()}`,
-        userId,
-        notes: `Imported ${result.recordsImported} ${config.entityType} records, skipped ${result.recordsSkipped} records`,
-        targetTable: config.entityType,
-        createdAt: new Date(),
-      });
-    }
+    // Import records in a transaction
+    await db.transaction(async (tx) => {
+      for (const record of validatedRecords) {
+        try {
+          // Import based on entity type
+          switch (entityType) {
+            case 'users':
+              await storage.createUser(record);
+              break;
+              
+            case 'units':
+              await storage.createUnit(record);
+              break;
+              
+            case 'guests':
+              await storage.createGuest(record);
+              break;
+              
+            case 'tasks':
+              await storage.createTask(record);
+              break;
+              
+            case 'maintenanceIssues':
+              await storage.createMaintenanceIssue(record);
+              break;
+              
+            case 'inventoryItems':
+              await storage.createInventoryItem(record);
+              break;
+              
+            case 'vendors':
+              await storage.createVendor(record);
+              break;
+              
+            case 'projects':
+              await storage.createProject(record);
+              break;
+              
+            case 'guestyProperties':
+              await storage.createGuestyProperty(record);
+              break;
+              
+            case 'guestyReservations':
+              await storage.createGuestyReservation(record);
+              break;
+              
+            default:
+              throw new Error(`Unsupported entity type: ${entityType}`);
+          }
+          
+          recordsImported++;
+        } catch (error) {
+          errors.push(`Error importing record: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    });
     
-    return result;
+    return {
+      success: errors.length === 0,
+      message: errors.length === 0 
+        ? `Successfully imported ${recordsImported} records into ${entityType}`
+        : `Partially imported data with ${errors.length} errors`,
+      entityType,
+      recordsProcessed: validatedRecords.length,
+      recordsImported,
+      errors,
+      warnings
+    };
   } catch (error) {
-    console.error('Error importing data:', error);
+    console.error(`Error importing ${entityType} data:`, error);
     return {
       success: false,
-      message: `Error importing data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: `Failed to import ${entityType} data: ${error instanceof Error ? error.message : String(error)}`,
+      entityType,
       recordsProcessed: 0,
       recordsImported: 0,
-      recordsSkipped: 0,
-      errors: [],
+      errors: [error instanceof Error ? error.message : String(error)],
+      warnings
     };
   }
-}
-
-/**
- * Bulk import data from multiple CSV files
- * @param importConfigs - Array of import configurations
- * @param userId - User ID for logging
- * @returns Array of import results
- */
-export async function bulkImport(
-  importConfigs: { filePath: string; config: ImportConfig }[],
-  userId?: number
-): Promise<ImportResult[]> {
-  const results: ImportResult[] = [];
-  
-  for (const { filePath, config } of importConfigs) {
-    const result = await importData(filePath, config, userId);
-    results.push(result);
-  }
-  
-  return results;
 }

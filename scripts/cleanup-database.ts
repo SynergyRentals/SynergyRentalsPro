@@ -5,11 +5,25 @@
  * while preserving important system data and user accounts.
  */
 
-import { db } from '../server/db';
-import * as schema from '../shared/schema';
-import { sql } from 'drizzle-orm';
+import { db } from "../server/db";
+import { sql } from "drizzle-orm";
+import * as schema from "../shared/schema";
 
-// Interface for cleanup result
+const {
+  users,
+  units,
+  guests,
+  tasks,
+  maintenanceIssues,
+  inventoryItems,
+  vendors,
+  projects,
+  guestyProperties,
+  guestyReservations,
+  guestySyncLogs,
+  guestyWebhookEvents
+} = schema;
+
 interface CleanupResult {
   success: boolean;
   message: string;
@@ -22,176 +36,156 @@ interface CleanupResult {
  */
 export async function cleanupDatabase(): Promise<CleanupResult> {
   try {
-    // Keep track of deleted records
-    const deletedCounts: Record<string, number> = {};
+    console.log('Starting database cleanup...');
     
-    // Start a transaction
-    return await db.transaction(async (tx) => {
-      // Preserve admin users (don't delete them)
-      const adminUsers = await tx
-        .select({ id: schema.users.id })
-        .from(schema.users)
-        .where(sql`${schema.users.role} = 'admin'`);
+    // Get the list of tables that exist in the database
+    const { pool } = await import('../server/db');
+    const tablesResult = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    
+    const existingTables = tablesResult.rows.map(row => row.table_name);
+    console.log("Existing tables:", existingTables);
+    
+    // Start a transaction to ensure all operations succeed or fail together
+    const result = await db.transaction(async (tx) => {
+      let counts: Record<string, number> = {};
+      const processTable = async (tableName: string, schemaObj: any, displayName: string) => {
+        if (existingTables.includes(tableName)) {
+          try {
+            const deleted = await tx.delete(schemaObj).returning();
+            console.log(`Deleted ${deleted.length} ${displayName}`);
+            counts[displayName] = deleted.length;
+          } catch (err) {
+            console.error(`Error deleting from ${tableName}:`, err);
+            throw err;
+          }
+        }
+      };
+
+      // Delete data in reverse order of dependencies
       
-      const adminUserIds = adminUsers.map(user => user.id);
+      // First level - webhook events, logs, and task-related items
+      await processTable('guesty_webhook_events', guestyWebhookEvents, 'Guesty webhook events');
+      await processTable('guesty_sync_logs', guestySyncLogs, 'Guesty sync logs');
       
-      // 1. Clean up cleaning-related tables 
-      // (These need to be deleted first due to foreign key constraints)
-      deletedCounts['cleaning_checklist_completions'] = (await tx
-        .delete(schema.cleaningChecklistCompletions)
-        .returning()).length;
-      
-      deletedCounts['cleaning_flags'] = (await tx
-        .delete(schema.cleaningFlags)
-        .returning()).length;
-        
-      deletedCounts['cleaning_tasks'] = (await tx
-        .delete(schema.cleaningTasks)
-        .returning()).length;
-      
-      deletedCounts['cleaning_checklists'] = (await tx
-        .delete(schema.cleaningChecklists)
-        .returning()).length;
-      
-      deletedCounts['cleaning_checklist_items'] = (await tx
-        .delete(schema.cleaningChecklistItems)
-        .returning()).length;
-      
-      // 2. Clean up operational tables
-      deletedCounts['maintenance'] = (await tx
-        .delete(schema.maintenance)
-        .returning()).length;
-      
-      deletedCounts['inventory'] = (await tx
-        .delete(schema.inventory)
-        .returning()).length;
-      
-      deletedCounts['documents'] = (await tx
-        .delete(schema.documents)
-        .returning()).length;
-      
-      // 3. Clean up project and task tables
-      deletedCounts['tasks'] = (await tx
-        .delete(schema.tasks)
-        .returning()).length;
-      
-      deletedCounts['projects'] = (await tx
-        .delete(schema.projects)
-        .returning()).length;
-      
-      // 4. Clean up guest-related tables
-      deletedCounts['guest_notes'] = (await tx
-        .delete(schema.guestNotes)
-        .returning()).length;
-      
-      deletedCounts['guests'] = (await tx
-        .delete(schema.guests)
-        .returning()).length;
-      
-      // 5. Clean up Guesty integration tables
-      deletedCounts['guesty_reservations'] = (await tx
-        .delete(schema.guestyReservations)
-        .returning()).length;
-      
-      deletedCounts['guesty_properties'] = (await tx
-        .delete(schema.guestyProperties)
-        .returning()).length;
-      
-      deletedCounts['guesty_webhook_events'] = (await tx
-        .delete(schema.guestyWebhookEvents)
-        .returning()).length;
-      
-      // 6. Clean up property and unit tables
-      deletedCounts['properties'] = (await tx
-        .delete(schema.properties)
-        .returning()).length;
-      
-      deletedCounts['units'] = (await tx
-        .delete(schema.units)
-        .returning()).length;
-      
-      // 7. Clean up vendor tables
-      deletedCounts['vendors'] = (await tx
-        .delete(schema.vendors)
-        .returning()).length;
-      
-      // 8. Clean up user accounts, but preserve admin accounts
-      if (adminUserIds.length > 0) {
-        deletedCounts['users'] = (await tx
-          .delete(schema.users)
-          .where(sql`${schema.users.id} NOT IN (${adminUserIds.join(',')})`)
-          .returning()).length;
-      } else {
-        // If no admin users found, don't delete any users for safety
-        deletedCounts['users'] = 0;
+      // AI planner interactions
+      if (existingTables.includes('ai_planner_interactions')) {
+        await tx.execute(sql`DELETE FROM ai_planner_interactions`);
+        console.log('Deleted AI planner interactions');
+        counts['aiPlannerInteractions'] = 1;
       }
       
-      // 9. Clean up HostAI-related tables
-      deletedCounts['host_ai_autopilot_log'] = (await tx
-        .delete(schema.hostAiAutopilotLog)
-        .returning()).length;
+      // Host AI related tables
+      if (existingTables.includes('host_ai_tasks')) {
+        await tx.execute(sql`DELETE FROM host_ai_tasks`);
+        console.log('Deleted Host AI tasks');
+        counts['hostAiTasks'] = 1;
+      }
       
-      deletedCounts['host_ai_autopilot_settings'] = (await tx
-        .delete(schema.hostAiAutopilotSettings)
-        .returning()).length;
+      if (existingTables.includes('host_ai_autopilot_log')) {
+        await tx.execute(sql`DELETE FROM host_ai_autopilot_log`);
+        console.log('Deleted Host AI autopilot logs');
+        counts['hostAiAutopilotLog'] = 1;
+      }
       
-      deletedCounts['ai_planner_interactions'] = (await tx
-        .delete(schema.aiPlannerInteractions)
-        .returning()).length;
+      // Second level - task-related tables
+      if (existingTables.includes('cleaning_checklist_completions')) {
+        await tx.execute(sql`DELETE FROM cleaning_checklist_completions`);
+        console.log('Deleted cleaning checklist completions');
+        counts['cleaningChecklistCompletions'] = 1;
+      }
       
-      // 10. Clean up cleaner performance metrics
-      deletedCounts['cleaner_performance'] = (await tx
-        .delete(schema.cleanerPerformance)
-        .returning()).length;
+      if (existingTables.includes('cleaning_flags')) {
+        await tx.execute(sql`DELETE FROM cleaning_flags`);
+        console.log('Deleted cleaning flags');
+        counts['cleaningFlags'] = 1;
+      }
       
-      // Do not delete logs, as they can be useful for auditing
-      // Do not delete sessions, as they are needed for current users
+      if (existingTables.includes('task_comments')) {
+        await tx.execute(sql`DELETE FROM task_comments`);
+        console.log('Deleted task comments');
+        counts['taskComments'] = 1;
+      }
       
-      // Log the cleanup operation
-      await tx.insert(schema.logs).values({
-        action: 'DATABASE_CLEANUP',
-        notes: 'Database cleanup performed via admin interface',
-        targetTable: 'all',
-        createdAt: new Date(),
-      });
+      // Third level - tasks, reservations
+      if (existingTables.includes('cleaning_tasks')) {
+        await tx.execute(sql`DELETE FROM cleaning_tasks`);
+        console.log('Deleted cleaning tasks');
+        counts['cleaningTasks'] = 1;
+      }
       
-      // Calculate total records deleted
-      const totalDeleted = Object.values(deletedCounts).reduce((sum, count) => sum + count, 0);
+      await processTable('guesty_reservations', guestyReservations, 'Guesty reservations');
+      await processTable('tasks', tasks, 'tasks');
       
-      return {
-        success: true,
-        message: `Database cleanup successful. Deleted ${totalDeleted} records from ${Object.keys(deletedCounts).length} tables.`,
-        details: {
-          deletedCounts,
-          totalDeleted,
-          preservedAdminUsers: adminUserIds.length,
-        },
-      };
+      // Fourth level - projects, maintenance, inventory
+      if (existingTables.includes('project_milestones')) {
+        await tx.execute(sql`DELETE FROM project_milestones`);
+        console.log('Deleted project milestones');
+        counts['projectMilestones'] = 1;
+      }
+      
+      if (existingTables.includes('project_tasks')) {
+        await tx.execute(sql`DELETE FROM project_tasks`);
+        console.log('Deleted project tasks');
+        counts['projectTasks'] = 1;
+      }
+      
+      await processTable('projects', projects, 'projects');
+      await processTable('maintenance_issues', maintenanceIssues, 'maintenance issues');
+      await processTable('inventory_items', inventoryItems, 'inventory items');
+      
+      // Fifth level - properties, vendors
+      await processTable('guesty_properties', guestyProperties, 'Guesty properties');
+      
+      if (existingTables.includes('properties')) {
+        await tx.execute(sql`DELETE FROM properties`);
+        console.log('Deleted properties');
+        counts['properties'] = 1;
+      }
+      
+      await processTable('vendors', vendors, 'vendors');
+      
+      // Sixth level - guests
+      await processTable('guests', guests, 'guests');
+      
+      // Note: We do NOT delete units or users as these are core to the system
+      // and likely contain important configuration data
+      
+      return counts;
     });
+  
+    console.log('Database cleanup completed successfully');
+  
+    return {
+      success: true,
+      message: 'Sample data has been successfully removed from the database.',
+      details: result
+    };
   } catch (error) {
     console.error('Error cleaning up database:', error);
     return {
       success: false,
-      message: `Error cleaning up database: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: `Failed to clean up database: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
 
-// ES module doesn't have 'require.main === module', so we'll just export the function
-// If you want to run this directly, use: 
-// node --loader tsx scripts/cleanup-database.ts
-
-// For direct execution in the future
 export async function main() {
   try {
     const result = await cleanupDatabase();
-    console.log(result.message);
-    if (result.details) {
-      console.log('Details:', JSON.stringify(result.details, null, 2));
-    }
-    return result.success ? 0 : 1;
+    console.log('Cleanup result:', result);
+    process.exit(result.success ? 0 : 1);
   } catch (error) {
-    console.error('Unhandled error:', error);
-    return 1;
+    console.error('Unhandled error in cleanup script:', error);
+    process.exit(1);
   }
+}
+
+// For ES modules, we'll run the main function automatically when the file is executed directly
+// This will be ignored when imported as a module
+if (import.meta.url === import.meta.resolve('./cleanup-database.ts')) {
+  main();
 }

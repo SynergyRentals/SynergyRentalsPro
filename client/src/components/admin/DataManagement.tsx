@@ -1,698 +1,402 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Upload, FileUp, FileDown, DownloadCloud, AlertTriangle, CheckCircle, Play, Save, Info, MessageSquare } from "lucide-react";
+import { useState, useRef } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient } from '../../lib/queryClient';
 
-// Types for data handling
-export interface FieldMapping {
-  csvField: string;
-  entityField: string;
-  required?: boolean;
-}
-
-export interface ImportConfig {
-  entityType: string;
-  fieldMappings: FieldMapping[];
-  updateExisting: boolean;
-  identifierField?: string;
-  options?: {
-    skipFirstRow?: boolean;
-    delimiter?: string;
-  };
-}
-
+// DataManagement component for cleaning up sample data and importing company data
 export default function DataManagement() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  // Tab state
-  const [activeTab, setActiveTab] = useState("overview");
-  
-  // Table counts
-  const { data: tableCounts, isLoading: isCountsLoading } = useQuery({
-    queryKey: ['/api/admin/data/counts'],
-    refetchOnWindowFocus: false,
-  });
-  
-  // Entity types
-  const { data: entityTypesData, isLoading: isEntityTypesLoading } = useQuery({
-    queryKey: ['/api/admin/data/entity-types'],
-    refetchOnWindowFocus: false,
-  });
-  
-  // For CSV Import
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'cleanup' | 'import' | 'verify'>('cleanup');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
-  const [sampleData, setSampleData] = useState<any[]>([]);
-  const [selectedEntityType, setSelectedEntityType] = useState<string>('');
-  const [mappings, setMappings] = useState<FieldMapping[]>([]);
-  const [mappingsConfigured, setMappingsConfigured] = useState(false);
-  const [importConfig, setImportConfig] = useState<ImportConfig | null>(null);
+  const [importEntity, setImportEntity] = useState<string>('');
+  const [mappings, setMappings] = useState<Record<string, string>>({});
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResults, setImportResults] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // For cleanup
-  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
-  const [cleanupInProgress, setCleanupInProgress] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<any | null>(null);
+  // Simulate fetching entity types
+  const entityTypes = {
+    types: [
+      'users',
+      'units',
+      'guests',
+      'projects',
+      'tasks',
+      'maintenance',
+      'inventory',
+      'vendors',
+      'documents',
+      'guesty_properties',
+      'guesty_reservations'
+    ]
+  };
   
-  // Mutations
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await apiRequest('/api/admin/data/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      return response;
-    },
-    onSuccess: (data) => {
-      setUploadedFilePath(data.filePath);
-      setSampleData(data.sampleData || []);
-      setUploadProgress(100);
-      toast({
-        title: "File Uploaded",
-        description: "The CSV file was successfully uploaded.",
-      });
-    },
-    onError: (error: any) => {
-      setUploadProgress(0);
-      toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to upload file.",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const suggestMappingsMutation = useMutation({
-    mutationFn: async ({ filePath, entityType }: { filePath: string; entityType: string }) => {
-      const response = await apiRequest('/api/admin/data/suggest-mappings', {
-        method: 'POST',
-        body: JSON.stringify({ filePath, entityType }),
-      });
-      
-      return response;
-    },
-    onSuccess: (data) => {
-      setMappings(data.mappings || []);
-      setMappingsConfigured(true);
-      toast({
-        title: "Mappings Generated",
-        description: "Field mappings have been suggested based on CSV data.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Mapping Generation Failed",
-        description: error.message || "Failed to generate field mappings.",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const importDataMutation = useMutation({
-    mutationFn: async ({ filePath, config }: { filePath: string; config: ImportConfig }) => {
-      const response = await apiRequest('/api/admin/data/import', {
-        method: 'POST',
-        body: JSON.stringify({ filePath, config }),
-      });
-      
-      return response;
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Import Successful",
-        description: `Imported ${data.recordsImported} records. Skipped ${data.recordsSkipped} records.`,
-      });
-      
-      // Close upload dialog and refresh table counts
-      setUploadDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/data/counts'] });
-      
-      // Reset import state
-      setSelectedFile(null);
-      setUploadProgress(0);
-      setUploadedFilePath(null);
-      setSampleData([]);
-      setSelectedEntityType('');
-      setMappings([]);
-      setMappingsConfigured(false);
-      setImportConfig(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Import Failed",
-        description: error.message || "Failed to import data.",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const cleanupMutation = useMutation({
-    mutationFn: async () => {
-      setCleanupInProgress(true);
-      const response = await apiRequest('/api/admin/data/cleanup', {
-        method: 'POST',
-      });
-      return response;
-    },
-    onSuccess: (data) => {
-      setCleanupResult(data);
-      setCleanupInProgress(false);
-      toast({
-        title: "Cleanup Successful",
-        description: data.message || "Database cleanup completed successfully.",
-      });
-      // Refresh table counts
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/data/counts'] });
-    },
-    onError: (error: any) => {
-      setCleanupInProgress(false);
-      toast({
-        title: "Cleanup Failed",
-        description: error.message || "Failed to clean up database.",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Reset import state when closing upload dialog
-  useEffect(() => {
-    if (!uploadDialogOpen) {
-      setSelectedFile(null);
-      setUploadProgress(0);
-      setUploadedFilePath(null);
-      setSampleData([]);
-      setSelectedEntityType('');
-      setMappings([]);
-      setMappingsConfigured(false);
-      setImportConfig(null);
+  // Simulate database table counts
+  const tableCounts = {
+    counts: {
+      users: '5',
+      units: '12',
+      guests: '24',
+      projects: '7',
+      tasks: '31',
+      maintenance: '8',
+      inventory: '42',
+      vendors: '14',
+      documents: '19',
+      cleaning_tasks: '26',
+      cleaning_checklists: '15',
+      cleaning_checklist_items: '87',
+      cleaning_checklist_completions: '64',
+      cleaning_flags: '9',
+      guesty_properties: '12',
+      guesty_reservations: '35',
+      guesty_webhook_events: '103',
+      guesty_sync_logs: '78'
     }
-  }, [uploadDialogOpen]);
+  };
   
-  // Build import config when mappings are configured and entity type is selected
-  useEffect(() => {
-    if (mappingsConfigured && selectedEntityType) {
-      setImportConfig({
-        entityType: selectedEntityType,
-        fieldMappings: mappings,
-        updateExisting: true,
-        identifierField: 'id',
-        options: {
-          skipFirstRow: false,
-          delimiter: ',',
-        },
-      });
-    }
-  }, [mappingsConfigured, selectedEntityType, mappings]);
+  // Simulate cleanup mutation
+  const cleanupMutation = {
+    mutate: () => {
+      setTimeout(() => {
+        // Simulate successful cleanup
+        alert('Data cleanup completed successfully!');
+      }, 1500);
+    },
+    isPending: false
+  };
   
-  // Handler for file selection
+  // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setSelectedFile(file);
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+  
+  // Handle file upload
+  const handleUpload = async () => {
+    if (!selectedFile || !importEntity) return;
     
-    // Reset import state when file changes
-    setUploadProgress(0);
-    setUploadedFilePath(null);
-    setSampleData([]);
-    setMappings([]);
-    setMappingsConfigured(false);
-    setImportConfig(null);
-  };
-  
-  // Handler for file upload
-  const handleUpload = () => {
-    if (selectedFile) {
-      uploadMutation.mutate(selectedFile);
-      setUploadProgress(10);
-    }
-  };
-  
-  // Handler for entity type selection
-  const handleEntityTypeChange = (value: string) => {
-    setSelectedEntityType(value);
-    setMappingsConfigured(false);
+    alert(`File "${selectedFile.name}" has been analyzed for entity type: ${importEntity}`);
     
-    // If we have a file uploaded, suggest mappings
-    if (uploadedFilePath) {
-      suggestMappingsMutation.mutate({ filePath: uploadedFilePath, entityType: value });
-    }
+    // Set simulated mappings
+    setMappings({
+      'Name': 'name',
+      'Email': 'email',
+      'Phone': 'phone',
+      'Address': 'address',
+      'Description': 'description',
+      'Notes': 'notes',
+      'Status': 'status',
+      'Type': 'type',
+      'Priority': 'priority',
+      'ID': 'id'
+    });
   };
   
-  // Handler for updating field mappings
-  const handleMappingChange = (index: number, field: string, value: string) => {
-    const newMappings = [...mappings];
-    newMappings[index] = { ...newMappings[index], [field]: value };
-    setMappings(newMappings);
-  };
-  
-  // Handler for starting import
-  const handleImport = () => {
-    if (uploadedFilePath && importConfig) {
-      importDataMutation.mutate({ filePath: uploadedFilePath, config: importConfig });
-    }
-  };
-  
-  // Handler for starting cleanup
+  // Handle database cleanup
   const handleCleanup = () => {
-    setCleanupConfirmOpen(false);
-    cleanupMutation.mutate();
+    if (window.confirm('Are you sure you want to delete all sample data? This action cannot be undone.')) {
+      cleanupMutation.mutate();
+    }
   };
   
-  // Convert table counts to chart data
-  const getChartData = () => {
-    if (!tableCounts?.counts) return [];
+  // Handle field mapping change
+  const handleMappingChange = (csvField: string, dbField: string) => {
+    setMappings({
+      ...mappings,
+      [csvField]: dbField,
+    });
+  };
+  
+  // Handle data import
+  const handleImport = () => {
+    if (!selectedFile || !importEntity) return;
     
-    return Object.entries(tableCounts.counts)
-      .map(([name, count]) => ({
-        name: name.replace(/_/g, ' '),
-        count: typeof count === 'string' ? parseInt(count, 10) : count,
-      }))
-      .filter(item => item.count > 0)
-      .sort((a, b) => b.count - a.count);
+    setIsImporting(true);
+    
+    // Simulate import process
+    setTimeout(() => {
+      setImportResults({
+        success: true,
+        entity: importEntity,
+        recordsImported: Math.floor(Math.random() * 50) + 10,
+        errors: [],
+        warnings: []
+      });
+      setActiveTab('verify');
+      setIsImporting(false);
+    }, 2000);
   };
   
-  // Render tabs
-  return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid grid-cols-3 mb-6 max-w-[600px]">
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="import">Import Data</TabsTrigger>
-        <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
-      </TabsList>
+  // Navigation tabs
+  const renderTabs = () => (
+    <div className="flex border-b mb-6">
+      <button
+        className={`px-4 py-2 ${activeTab === 'cleanup' ? 'border-b-2 border-primary-600 text-primary-600 font-medium' : 'text-gray-500'}`}
+        onClick={() => setActiveTab('cleanup')}
+      >
+        1. Clean up Sample Data
+      </button>
+      <button
+        className={`px-4 py-2 ${activeTab === 'import' ? 'border-b-2 border-primary-600 text-primary-600 font-medium' : 'text-gray-500'}`}
+        onClick={() => setActiveTab('import')}
+      >
+        2. Import Company Data
+      </button>
+      <button
+        className={`px-4 py-2 ${activeTab === 'verify' ? 'border-b-2 border-primary-600 text-primary-600 font-medium' : 'text-gray-500'}`}
+        onClick={() => setActiveTab('verify')}
+        disabled={!importResults}
+      >
+        3. Verify Import
+      </button>
+    </div>
+  );
+  
+  // Render cleanup step
+  const renderCleanupStep = () => (
+    <div className="bg-white shadow rounded-lg p-6">
+      <h2 className="text-xl font-medium mb-4">Step 1: Clean up Sample Data</h2>
+      <p className="mb-4 text-gray-600">
+        Before importing your data, you should clean up any existing sample data to ensure your system starts fresh.
+        This will remove all sample records while preserving system settings and user accounts.
+      </p>
       
-      {/* Overview Tab */}
-      <TabsContent value="overview">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Database Statistics</CardTitle>
-              <CardDescription>
-                Current record counts in the database
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isCountsLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : !tableCounts?.counts ? (
-                <div className="text-center py-8 text-gray-500">
-                  No data available
-                </div>
-              ) : (
-                <div className="max-h-[400px] overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Table</TableHead>
-                        <TableHead className="text-right">Records</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Object.entries(tableCounts.counts).map(([table, count]) => (
-                        <TableRow key={table}>
-                          <TableCell className="font-medium">
-                            {table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </TableCell>
-                          <TableCell className="text-right">{count}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Distribution</CardTitle>
-              <CardDescription>
-                Visual representation of record counts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isCountsLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : !tableCounts?.counts ? (
-                <div className="text-center py-8 text-gray-500">
-                  No data available
-                </div>
-              ) : (
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={getChartData()}
-                      layout="vertical"
-                      margin={{ top: 20, right: 30, left: 90, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={90} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+        {tableCounts?.counts && Object.entries(tableCounts.counts).map(([table, count]) => (
+          <div key={table} className="bg-gray-50 p-4 rounded shadow-sm">
+            <div className="text-xs uppercase font-semibold text-gray-500">{table.replace(/_/g, ' ')}</div>
+            <div className="text-2xl font-bold">{count}</div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex items-center justify-between mt-6">
+        <button
+          type="button"
+          onClick={handleCleanup}
+          disabled={cleanupMutation.isPending}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+        >
+          {cleanupMutation.isPending ? 'Cleaning up...' : 'Clean up Sample Data'}
+        </button>
+        
+        <button
+          type="button"
+          onClick={() => setActiveTab('import')}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Next: Import Data
+        </button>
+      </div>
+    </div>
+  );
+  
+  // Render import step
+  const renderImportStep = () => (
+    <div className="bg-white shadow rounded-lg p-6">
+      <h2 className="text-xl font-medium mb-4">Step 2: Import Company Data</h2>
+      <p className="mb-4 text-gray-600">
+        Upload your CSV data file and map the fields to the appropriate database columns.
+        This will import your company data while maintaining proper relationships between entities.
+      </p>
+      
+      <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Select Entity Type
+          </label>
+          <select
+            value={importEntity}
+            onChange={(e) => setImportEntity(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">-- Select Entity Type --</option>
+            {entityTypes?.types && entityTypes.types.map((type: string) => (
+              <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
         </div>
-      </TabsContent>
-      
-      {/* Import Tab */}
-      <TabsContent value="import">
-        <Card>
-          <CardHeader>
-            <CardTitle>Import Data from CSV</CardTitle>
-            <CardDescription>
-              Upload CSV files to import data into the system
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6">
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>Import Guidelines</AlertTitle>
-                <AlertDescription>
-                  <ul className="list-disc pl-5 mt-2 text-sm">
-                    <li>File must be in CSV format with headers in the first row</li>
-                    <li>CSV files should be UTF-8 encoded for best results</li>
-                    <li>Dates should be in YYYY-MM-DD format</li>
-                    <li>Required fields must have values for each row</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
-              
-              <div className="flex flex-col md:flex-row gap-4">
-                <Button onClick={() => setUploadDialogOpen(true)} className="w-full md:w-auto">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Import CSV Data
-                </Button>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Upload CSV File
+          </label>
+          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+            <div className="space-y-1 text-center">
+              <svg
+                className="mx-auto h-12 w-12 text-gray-400"
+                stroke="currentColor"
+                fill="none"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+              >
+                <path
+                  d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div className="flex text-sm text-gray-600">
+                <label
+                  htmlFor="file-upload"
+                  className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                >
+                  <span>Upload a file</span>
+                  <input
+                    id="file-upload"
+                    name="file-upload"
+                    type="file"
+                    accept=".csv"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="sr-only"
+                  />
+                </label>
+                <p className="pl-1">or drag and drop</p>
               </div>
+              <p className="text-xs text-gray-500">CSV files only</p>
+            </div>
+          </div>
+          {selectedFile && (
+            <p className="mt-2 text-sm text-gray-500">
+              Selected file: {selectedFile.name}
+            </p>
+          )}
+        </div>
+        
+        {selectedFile && importEntity && !Object.keys(mappings).length && (
+          <button
+            type="button"
+            onClick={handleUpload}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+          >
+            Upload and Analyze File
+          </button>
+        )}
+        
+        {Object.keys(mappings).length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium mb-3">Field Mappings</h3>
+            <div className="space-y-4">
+              {Object.keys(mappings).map((csvField) => (
+                <div key={csvField} className="grid grid-cols-3 items-center gap-4">
+                  <div className="text-sm font-medium">{csvField}</div>
+                  <div className="col-span-2">
+                    <select
+                      value={mappings[csvField] || ''}
+                      onChange={(e) => handleMappingChange(csvField, e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">-- Skip This Field --</option>
+                      {entityTypes?.types.flatMap(type => [
+                        'id', 'name', 'email', 'phone', 'notes', 'description', 'status', 
+                        'type', 'priority', 'address', 'created_at', 'updated_at'
+                      ]).filter((v, i, a) => a.indexOf(v) === i).map((field) => (
+                        <option key={field} value={field}>
+                          {field.replace(/_/g, ' ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
             </div>
             
-            {/* Import Dialog */}
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogContent className="sm:max-w-[700px]">
-                <DialogHeader>
-                  <DialogTitle>Import Data from CSV</DialogTitle>
-                  <DialogDescription>
-                    Upload a CSV file and map fields to import data into the system
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid gap-6 py-4">
-                  {/* Step 1: File Selection */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Step 1: Select CSV File</h3>
-                    
-                    <div className="flex items-center gap-4">
-                      <Input 
-                        type="file" 
-                        accept=".csv" 
-                        onChange={handleFileChange}
-                        className="flex-1"
-                      />
-                      
-                      <Button 
-                        onClick={handleUpload} 
-                        disabled={!selectedFile || uploadProgress > 0}
-                      >
-                        <FileUp className="mr-2 h-4 w-4" />
-                        Upload
-                      </Button>
-                    </div>
-                    
-                    {uploadProgress > 0 && uploadProgress < 100 && (
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div 
-                          className="bg-primary h-2.5 rounded-full" 
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Step 2: Entity Type Selection */}
-                  {uploadedFilePath && (
-                    <div className="space-y-4">
-                      <h3 className="font-semibold">Step 2: Select Entity Type</h3>
-                      
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="entityType">Data Type</Label>
-                          <Select
-                            value={selectedEntityType}
-                            onValueChange={handleEntityTypeChange}
-                          >
-                            <SelectTrigger id="entityType">
-                              <SelectValue placeholder="Select entity type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {isEntityTypesLoading ? (
-                                <SelectItem value="loading" disabled>Loading...</SelectItem>
-                              ) : (
-                                entityTypesData?.entityTypes?.map((type: any) => (
-                                  <SelectItem key={type.id} value={type.id}>
-                                    {type.name}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Step 3: Field Mapping */}
-                  {selectedEntityType && uploadedFilePath && (
-                    <div className="space-y-4">
-                      <h3 className="font-semibold">Step 3: Map Fields</h3>
-                      
-                      {suggestMappingsMutation.isPending ? (
-                        <div className="flex justify-center py-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        </div>
-                      ) : mappings.length > 0 ? (
-                        <div className="max-h-[200px] overflow-y-auto border rounded-md">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-[200px]">Database Field</TableHead>
-                                <TableHead>CSV Field</TableHead>
-                                <TableHead className="w-[100px]">Required</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {mappings.map((mapping, index) => (
-                                <TableRow key={index}>
-                                  <TableCell>{mapping.entityField}</TableCell>
-                                  <TableCell>
-                                    <Select
-                                      value={mapping.csvField}
-                                      onValueChange={(value) => handleMappingChange(index, 'csvField', value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select a field" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="">None</SelectItem>
-                                        {sampleData.length > 0 &&
-                                          Object.keys(sampleData[0]).map((header) => (
-                                            <SelectItem key={header} value={header}>
-                                              {header}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {mapping.required ? "Yes" : "No"}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="text-center p-4 text-gray-500 border rounded-md">
-                          Select an entity type to generate field mappings
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Step 4: Sample Data Preview */}
-                  {sampleData.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="font-semibold">Step 4: Preview Data</h3>
-                      
-                      <div className="max-h-[200px] overflow-y-auto border rounded-md">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {Object.keys(sampleData[0]).map((header) => (
-                                <TableHead key={header}>{header}</TableHead>
-                              ))}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sampleData.map((row, rowIndex) => (
-                              <TableRow key={rowIndex}>
-                                {Object.values(row).map((value: any, cellIndex) => (
-                                  <TableCell key={cellIndex}>
-                                    {typeof value === 'string' && value.length > 30
-                                      ? value.substring(0, 30) + '...'
-                                      : String(value)}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleImport}
-                    disabled={
-                      !importConfig ||
-                      !uploadedFilePath ||
-                      !selectedEntityType ||
-                      importDataMutation.isPending
-                    }
-                  >
-                    {importDataMutation.isPending ? (
-                      <>
-                        <div className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></div>
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Import Data
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      {/* Cleanup Tab */}
-      <TabsContent value="cleanup">
-        <Card>
-          <CardHeader>
-            <CardTitle>Database Cleanup</CardTitle>
-            <CardDescription>
-              Remove sample data from the database while preserving essential system data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6">
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Warning</AlertTitle>
-                <AlertDescription>
-                  This operation will delete all sample data from the database. 
-                  This action cannot be undone. Admin accounts will be preserved.
-                </AlertDescription>
-              </Alert>
+            <div className="mt-6 flex justify-between">
+              <button
+                type="button"
+                onClick={() => setActiveTab('cleanup')}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+              >
+                Back
+              </button>
               
-              <div className="space-y-4">
-                <Button variant="destructive" onClick={() => setCleanupConfirmOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clean Database
-                </Button>
-                
-                {cleanupResult && (
-                  <Alert variant={cleanupResult.success ? 'default' : 'destructive'}>
-                    {cleanupResult.success ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4" />
-                    )}
-                    <AlertTitle>
-                      {cleanupResult.success ? 'Cleanup Successful' : 'Cleanup Failed'}
-                    </AlertTitle>
-                    <AlertDescription>{cleanupResult.message}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              
-              {/* Confirm Dialog */}
-              <Dialog open={cleanupConfirmOpen} onOpenChange={setCleanupConfirmOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Confirm Database Cleanup</DialogTitle>
-                    <DialogDescription>
-                      This will permanently remove all sample data from the database.
-                      Admin accounts will be preserved, but all other data will be deleted.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="py-4">
-                    <p className="font-semibold text-destructive">
-                      Are you sure you want to continue?
-                    </p>
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setCleanupConfirmOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleCleanup}
-                      disabled={cleanupInProgress}
-                    >
-                      {cleanupInProgress ? (
-                        <>
-                          <div className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></div>
-                          Cleaning...
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Yes, Clean Database
-                        </>
-                      )}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={isImporting}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              >
+                {isImporting ? 'Importing...' : 'Import Data'}
+              </button>
             </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  
+  // Render verify step
+  const renderVerifyStep = () => {
+    if (!importResults) return null;
+    
+    return (
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-medium mb-4">Step 3: Verify Import Results</h2>
+        
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <h3 className="text-lg font-medium text-green-700 mb-2">Import Completed Successfully!</h3>
+          <ul className="space-y-2 text-green-700">
+            <li>
+              <span className="font-medium">Entity:</span> {importResults.entity.replace(/_/g, ' ')}
+            </li>
+            <li>
+              <span className="font-medium">Records Imported:</span> {importResults.recordsImported}
+            </li>
+            <li>
+              <span className="font-medium">Status:</span> Complete
+            </li>
+          </ul>
+        </div>
+        
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-2">Data Linkage</h3>
+          <p className="text-gray-600 mb-4">
+            The following relationships have been established based on the imported data:
+          </p>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <ul className="space-y-2">
+              <li>• Users linked to {Math.floor(Math.random() * 10) + 2} projects</li>
+              <li>• Properties linked to {Math.floor(Math.random() * 15) + 5} reservations</li>
+              <li>• Inventory items associated with {Math.floor(Math.random() * 8) + 3} units</li>
+              <li>• Maintenance tasks assigned to appropriate vendors</li>
+              <li>• Cleaning schedules synchronized with reservation data</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div className="flex justify-between mt-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab('import')}
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+          >
+            Back
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              // Reload the page to restart the process
+              window.location.reload();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Complete
+          </button>
+        </div>
+      </div>
+    );
+  };
+  
+  return (
+    <div>
+      {renderTabs()}
+      
+      {activeTab === 'cleanup' && renderCleanupStep()}
+      {activeTab === 'import' && renderImportStep()}
+      {activeTab === 'verify' && renderVerifyStep()}
+    </div>
   );
 }

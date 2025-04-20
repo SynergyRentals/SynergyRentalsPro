@@ -7,16 +7,12 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { db } from "./db";
 import { eq } from 'drizzle-orm';
-import { 
-  insertTaskSchema, insertUnitSchema, insertGuestSchema, 
-  insertMaintenanceSchema, insertInventorySchema, insertVendorSchema,
-  insertProjectSchema, insertDocumentSchema, insertLogSchema,
-  insertCleaningTaskSchema, insertCleaningChecklistSchema, 
-  insertCleaningChecklistItemSchema, insertCleaningChecklistCompletionSchema,
+import {
+  insertTaskSchema, insertUnitSchema, insertGuestSchema,
+  insertMaintenanceIssueSchema, insertInventoryItemSchema, insertVendorSchema,
+  insertProjectSchema,
   guestyProperties, guestyReservations, guestySyncLogs, guestyWebhookEvents,
-  InsertGuestyWebhookEvent,
-  insights as insightsTable, unitHealthScores, insightLogs,
-  insertAiPlannerInteractionSchema, AiPlannerInteraction
+  InsertGuestyWebhookEvent
 } from "@shared/schema";
 import { sendSlackMessage } from "./slack";
 import { z } from "zod";

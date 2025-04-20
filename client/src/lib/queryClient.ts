@@ -1,48 +1,45 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient } from '@tanstack/react-query';
 
-// Create a client
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
       refetchOnWindowFocus: true,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+      staleTime: 30 * 1000, // 30 seconds
     },
   },
 });
 
-export const apiRequest = async (
-  url: string,
-  options?: RequestInit
-): Promise<any> => {
+// Helper function for API requests
+export async function apiRequest(url: string, options: RequestInit = {}) {
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...options?.headers,
-    },
-    credentials: "same-origin",
     ...options,
+    headers: {
+      ...(options.headers || {}),
+      // Add default headers for JSON except when using FormData
+      ...(!options.body || typeof options.body !== 'object' || !(options.body instanceof FormData)
+        ? { 'Content-Type': 'application/json' }
+        : {}),
+    },
   });
 
   if (!response.ok) {
-    // Try to parse error message from response
+    // Handle API error responses
+    let errorMessage;
     try {
-      const data = await response.json();
-      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+      const errorData = await response.json();
+      errorMessage = errorData.message || `HTTP error ${response.status}`;
     } catch (e) {
-      if (e instanceof Error) throw e;
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+      errorMessage = `HTTP error ${response.status}`;
     }
+    throw new Error(errorMessage);
   }
 
-  // Return null for 204 No Content
-  if (response.status === 204) return null;
-
-  // Try to parse as JSON, fallback to text
-  try {
+  // Parse JSON response if Content-Type is application/json
+  const contentType = response.headers.get('Content-Type');
+  if (contentType && contentType.includes('application/json')) {
     return await response.json();
-  } catch (e) {
-    return await response.text();
   }
-};
+
+  return response;
+}
