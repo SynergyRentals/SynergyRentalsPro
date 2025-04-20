@@ -289,7 +289,7 @@ export async function syncProperties(): Promise<SyncResponse> {
     }
     
     // Mark as completed
-    await completeSyncLog(syncLogId, processedCount, totalCount);
+    await completeSyncLog(syncLogId, processedCount, totalCount, SyncType.PROPERTIES);
     
     return {
       success: true,
@@ -465,7 +465,8 @@ export async function syncAllReservations(): Promise<SyncResponse> {
     await completeSyncLog(
       syncLogId,
       processedPropertyCount,
-      properties.length
+      properties.length,
+      SyncType.RESERVATIONS
     );
     
     return {
@@ -622,7 +623,7 @@ export async function syncPropertyReservations(propertyId: number): Promise<Sync
     }
     
     // Mark as completed
-    await completeSyncLog(syncLogId, processedCount, totalCount);
+    await completeSyncLog(syncLogId, processedCount, totalCount, SyncType.RESERVATIONS);
     
     return {
       success: true,
