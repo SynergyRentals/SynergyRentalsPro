@@ -94,7 +94,6 @@ app.use((req, res, next) => {
   setupRoutes(app);
   setupAdminDataRoutes(app);
   setupGuestySyncRoutes(app);
-  setupGuestySyncRoutes(app); // Added Guesty sync routes setup
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
