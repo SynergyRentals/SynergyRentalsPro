@@ -158,8 +158,29 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                   const isLastDay = isSameDay(day, actualCheckoutDay);
                                   const isWithinEvent = !isFirstDay && !isLastDay;
                                   
-                                  // Bar color is always yellow
-                                  const barColorClass = "bg-yellow-400";
+                                  // Bar color based on status
+                                  let barColorClass = "bg-yellow-400"; // Default color
+                                  
+                                  // Status-based color coding
+                                  if (event.status) {
+                                    switch(event.status.toLowerCase()) {
+                                      case 'confirmed':
+                                        barColorClass = "bg-green-500";
+                                        break;
+                                      case 'tentative':
+                                        barColorClass = "bg-amber-400";
+                                        break;
+                                      case 'cancelled':
+                                      case 'canceled':
+                                        barColorClass = "bg-red-500";
+                                        break;
+                                      case 'pending':
+                                        barColorClass = "bg-blue-400";
+                                        break;
+                                      default:
+                                        barColorClass = "bg-yellow-400";
+                                    }
+                                  }
                                   
                                   // Calculate positioning based on number of events
                                   const eventHeight = 20; // pixels

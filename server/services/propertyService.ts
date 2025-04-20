@@ -147,10 +147,14 @@ export async function validateIcalUrl(url: string) {
         valid: true,
         message: `Successfully validated iCal URL with ${events.length} events`,
         eventCount: events.length,
+        firstEventDate: firstEvent.start.toISOString().split('T')[0],
+        lastEventDate: events[events.length - 1].start.toISOString().split('T')[0],
         sampleEvent: {
           title: firstEvent.title,
           start: firstEvent.start,
-          end: firstEvent.end
+          end: firstEvent.end,
+          checkout: firstEvent.checkout, // Include explicit checkout date
+          status: firstEvent.status || 'confirmed'
         }
       };
     } else {
@@ -159,7 +163,8 @@ export async function validateIcalUrl(url: string) {
         message: isIcsFile ? 
           "Valid iCal URL but no events found. The calendar may be empty." : 
           "URL accepted but no events found. The calendar may be empty or the URL might not point to a valid iCal feed.",
-        eventCount: 0
+        eventCount: 0,
+        warning: "No events were found in this calendar feed"
       };
     }
   } catch (error) {
