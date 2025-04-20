@@ -249,3 +249,6 @@ class GuestyApiClient {
 
 // Export a singleton instance
 export const guestyApiClient = new GuestyApiClient();
+
+// Alias so files can import { guestyClient }
+export const guestyClient = guestyApiClient;
