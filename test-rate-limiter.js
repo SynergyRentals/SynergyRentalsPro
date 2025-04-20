@@ -4,8 +4,18 @@
  * This script tests the rate limiter by adding test records
  * and checking the rate limit status.
  */
-import { pool } from './server/db.js';
-import { sql } from 'drizzle-orm';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import dotenv from 'dotenv';
+import ws from 'ws';
+
+// Load environment variables
+dotenv.config();
+
+// Configure Neon WebSockets
+neonConfig.webSocketConstructor = ws;
+
+// Create a new pool
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Function to add a test request record
 async function addTestRequest() {
@@ -17,7 +27,7 @@ async function addTestRequest() {
     
     const result = await pool.query(`
       INSERT INTO guesty_rate_limits 
-      (endpoint, request_timestamp, request_type, response_status)
+      (endpoint, "requestTimestamp", "requestType", "responseStatus")
       VALUES ($1, $2, $3, $4)
       RETURNING id
     `, [endpoint, timestamp, requestType, responseStatus]);
@@ -36,7 +46,7 @@ async function checkRateLimitStatus() {
     const result = await pool.query(`
       SELECT COUNT(*) AS request_count 
       FROM guesty_rate_limits
-      WHERE request_timestamp > $1
+      WHERE "requestTimestamp" > $1
     `, [oneDayAgo]);
     
     const requestCount = parseInt(result.rows[0].request_count, 10);
@@ -51,14 +61,14 @@ async function checkRateLimitStatus() {
     
     if (remainingRequests === 0) {
       const oldestRequest = await pool.query(`
-        SELECT request_timestamp
+        SELECT "requestTimestamp"
         FROM guesty_rate_limits
-        ORDER BY request_timestamp ASC
+        ORDER BY "requestTimestamp" ASC
         LIMIT 1
       `);
       
       if (oldestRequest.rows.length > 0) {
-        const oldestTimestamp = new Date(oldestRequest.rows[0].request_timestamp);
+        const oldestTimestamp = new Date(oldestRequest.rows[0].requestTimestamp);
         const nextAvailableTime = new Date(oldestTimestamp.getTime() + 24 * 60 * 60 * 1000);
         
         console.log(`Next available request time: ${nextAvailableTime.toISOString()}`);
