@@ -61,12 +61,22 @@ export function GuestyCSVImport() {
       }, 100);
       
       // Using fetch directly for FormData since apiRequest doesn't handle it well
-      const response = await fetch("/api/guesty/import-csv", {
+      const response = await fetch("/api/guesty/import-csv-upload", {
         method: "POST",
         body: formData,
         credentials: "same-origin"
       });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
+      
+      // Add additional validation of the response
+      if (!result) {
+        throw new Error("Server returned an empty response");
+      }
       
       clearInterval(progressInterval);
       setUploadProgress(100);
