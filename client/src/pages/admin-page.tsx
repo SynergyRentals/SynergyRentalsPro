@@ -13,6 +13,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { GuestyCSVImport } from "@/components/guesty/GuestyCSVImport";
+import { GuestyBatchSync } from "@/components/guesty";
 
 function GuestyHealthCheck() {
   const { toast } = useToast();
@@ -472,6 +473,10 @@ export default function AdminPage() {
                           <p className="text-xs text-muted-foreground">
                             Import properties from CSV when Guesty API rate limits are reached
                           </p>
+                        </div>
+                        
+                        <div className="pt-3">
+                          <GuestyBatchSync />
                         </div>
                       </div>
                     </div>

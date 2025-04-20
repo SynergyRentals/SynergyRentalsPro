@@ -4,12 +4,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { DatePicker } from "@/components/ui/date-picker"; 
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { IconAlertTriangle, IconInfoCircle, IconRefresh, IconCheck } from "@tabler/icons-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AlertTriangle, Info, RefreshCw, CheckCircle } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -119,7 +119,7 @@ export function GuestyBatchSync() {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl flex items-center gap-2">
-          <IconRefresh size={20} className="text-primary" />
+          <RefreshCw size={20} className="text-primary" />
           Guesty Batch Sync
         </CardTitle>
         <CardDescription>
@@ -158,7 +158,7 @@ export function GuestyBatchSync() {
 
         {rateLimitStatus?.isRateLimited && (
           <Alert variant="destructive" className="mb-4">
-            <IconAlertTriangle className="h-4 w-4" />
+            <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Rate Limited</AlertTitle>
             <AlertDescription>
               You've reached the Guesty API rate limit. Please wait until {rateLimitStatus.nextAvailableTimestamp ? new Date(rateLimitStatus.nextAvailableTimestamp).toLocaleString() : 'tomorrow'} to try again.
