@@ -1,23 +1,36 @@
+
 import { useState, useEffect } from "react";
+
+export type Breakpoint = "xs" | "sm" | "md" | "lg" | "xl";
 
 export function useMobile() {
   const [isMobile, setIsMobile] = useState(false);
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>("lg");
 
   useEffect(() => {
-    // Function to check if screen width is mobile
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024); // 1024px is the lg breakpoint in Tailwind
+      const width = window.innerWidth;
+      setIsMobile(width < 1024);
+      
+      if (width < 640) setBreakpoint("xs");
+      else if (width < 768) setBreakpoint("sm");
+      else if (width < 1024) setBreakpoint("md");
+      else if (width < 1280) setBreakpoint("lg");
+      else setBreakpoint("xl");
     };
 
-    // Check on initial load
     checkMobile();
-
-    // Listen for window resize
     window.addEventListener("resize", checkMobile);
-
-    // Clean up event listener
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  return isMobile;
+  return {
+    isMobile,
+    breakpoint,
+    isXs: breakpoint === "xs",
+    isSm: breakpoint === "sm",
+    isMd: breakpoint === "md",
+    isLg: breakpoint === "lg",
+    isXl: breakpoint === "xl"
+  };
 }
