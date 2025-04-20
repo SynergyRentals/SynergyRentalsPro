@@ -29,12 +29,22 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const endOfCalendar = new Date(today.getFullYear(), today.getMonth() + 2, 0); // Show current month + next month
   
-  // Convert string dates to Date objects
-  const processedEvents = events.map(event => ({
-    ...event,
-    start: event.start instanceof Date ? event.start : parseISO(event.start as string),
-    end: event.end instanceof Date ? event.end : parseISO(event.end as string),
-  }));
+  // Convert string dates to Date objects and normalize them
+  const processedEvents = events.map(event => {
+    // Ensure dates are properly parsed from strings or kept as Date objects
+    const startDate = event.start instanceof Date ? event.start : parseISO(event.start as string);
+    const endDate = event.end instanceof Date ? event.end : parseISO(event.end as string);
+    
+    // Normalize dates to start at 00:00:00 to ensure proper comparisons
+    const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    return {
+      ...event,
+      start: normalizedStart,
+      end: normalizedEnd
+    };
+  });
 
   // Generate all days to display in the calendar
   const calendarDays = eachDayOfInterval({
@@ -42,21 +52,26 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
     end: endOfCalendar
   });
 
-  // Find events for a specific day - improved to handle edge cases better
+  // Find events for a specific day - improved handling of iCal date format
   const getEventsForDay = (day: Date) => {
     return processedEvents.filter(event => {
       const startDate = event.start as Date;
-      // Get the actual checkout day (1 day before the end date in iCal)
+      
+      // In iCal format, the end date is exclusive (the day AFTER the last day)
+      // So we subtract one day to get the actual checkout date
       const actualCheckoutDay = addDays(event.end as Date, -1);
       
-      // Make sure we're working with midnight-to-midnight comparison
-      const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-      const reservationStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-      const reservationEnd = new Date(actualCheckoutDay.getFullYear(), actualCheckoutDay.getMonth(), actualCheckoutDay.getDate());
+      // Normalize all dates to midnight for proper comparison
+      const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
       
-      // Include the day if it's on or between the start and end dates
+      // Check if the day is within the reservation period (inclusive of start and actual checkout)
       return (
-        dayStart >= reservationStart && dayStart <= reservationEnd
+        isWithinInterval(normalizedDay, {
+          start: startDate,
+          end: actualCheckoutDay
+        }) || 
+        isSameDay(normalizedDay, startDate) || 
+        isSameDay(normalizedDay, actualCheckoutDay)
       );
     });
   };
