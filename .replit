@@ -14,8 +14,12 @@ run = ["npm", "run", "start"]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 35445
+externalPort = 3000
+
 [workflows]
-runButton = "Dev Server (Dynamic Port)"
+runButton = "Dev Server with Guesty Credentials"
 
 [[workflows.workflow]]
 name = "Project"
@@ -51,19 +55,10 @@ task = "shell.exec"
 args = "npm run dev"
 
 [[workflows.workflow]]
-name = "Dev Server (Dynamic Port)"
+name = "Dev Server with Guesty Credentials"
 author = 41304928
 mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=0 npm run dev"
-
-[[workflows.workflow]]
-name = "Dev Server (Port 5002)"
-author = 41304928
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=5002 npm run dev"
+args = "GUESTY_CLIENT_ID=0oaoaalj2bD2CaF4B5d7 GUESTY_CLIENT_SECRET=AJ9Li2ZbRUX5Td8ldPjs_BwTLJHH3aQIa1yJ2y-qvIPYAE_nk1ppaaaxAGilBZVK npm run dev"
