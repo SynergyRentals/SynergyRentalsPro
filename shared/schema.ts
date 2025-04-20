@@ -352,6 +352,21 @@ export const insertGuestyWebhookEventSchema = createInsertSchema(guestyWebhookEv
 export type InsertGuestyWebhookEvent = z.infer<typeof insertGuestyWebhookEventSchema>;
 export type GuestyWebhookEvent = typeof guestyWebhookEvents.$inferSelect;
 
+// Guesty Rate Limits table
+export const guestyRateLimits = pgTable('guesty_rate_limits', {
+  id: serial('id').primaryKey(),
+  endpoint: text('endpoint').notNull(),
+  requestTimestamp: timestamp('request_timestamp').notNull(),
+  requestType: text('request_type').notNull(),
+  responseStatus: integer('response_status'),
+  responseData: json('response_data'),
+});
+
+// Schema for Guesty Rate Limits
+export const insertGuestyRateLimitSchema = createInsertSchema(guestyRateLimits).omit({ id: true });
+export type InsertGuestyRateLimit = z.infer<typeof insertGuestyRateLimitSchema>;
+export type GuestyRateLimit = typeof guestyRateLimits.$inferSelect;
+
 // Relations for Guesty entities
 export const guestyPropertiesRelations = relations(guestyProperties, ({ many }) => ({
   reservations: many(guestyReservations),

@@ -5,7 +5,8 @@
  * to respect their strict 5 requests per 24 hours limit.
  */
 import { db } from "../db";
-import { sql } from "drizzle-orm";
+import { eq, gt, sql, asc } from "drizzle-orm";
+import { guestyRateLimits, InsertGuestyRateLimit } from "../../shared/schema";
 
 interface RateLimitStatus {
   isRateLimited: boolean;
@@ -19,10 +20,12 @@ const RATE_LIMIT_TABLE = 'guesty_rate_limits';
 
 /**
  * Ensures the rate limit table exists
+ * Note: This is no longer needed with Drizzle schema migrations,
+ * but keeping it for backwards compatibility and as safety check
  */
 export async function ensureRateLimitTableExists(): Promise<void> {
   try {
-    // Check if the table exists
+    // Check if the table exists using Drizzle
     const tableExists = await db.execute(sql`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -30,23 +33,13 @@ export async function ensureRateLimitTableExists(): Promise<void> {
       )
     `);
     
-    // If the table doesn't exist, create it
     if (!tableExists.rows[0].exists) {
-      await db.execute(sql`
-        CREATE TABLE ${sql.identifier(RATE_LIMIT_TABLE)} (
-          id SERIAL PRIMARY KEY,
-          endpoint TEXT NOT NULL,
-          request_timestamp TIMESTAMP NOT NULL,
-          request_type TEXT NOT NULL,
-          response_status INTEGER,
-          response_data JSONB
-        )
-      `);
-      console.log(`Created ${RATE_LIMIT_TABLE} table`);
+      console.log(`Rate limit table does not exist. It will be created via db:push command.`);
+      // We no longer create the table here as it's defined in the Drizzle schema
     }
   } catch (error) {
-    console.error('Error ensuring rate limit table exists:', error);
-    throw error;
+    console.error('Error checking rate limit table:', error);
+    // Don't throw, just log the error
   }
 }
 
@@ -60,17 +53,16 @@ export async function recordApiRequest(
   responseData?: any
 ): Promise<void> {
   try {
-    await db.execute(sql`
-      INSERT INTO ${sql.identifier(RATE_LIMIT_TABLE)} 
-      (endpoint, request_timestamp, request_type, response_status, response_data)
-      VALUES (
-        ${endpoint},
-        ${new Date()},
-        ${requestType},
-        ${responseStatus || null},
-        ${responseData ? JSON.stringify(responseData) : null}
-      )
-    `);
+    // Insert using Drizzle schema
+    await db.insert(guestyRateLimits).values({
+      endpoint: endpoint,
+      requestTimestamp: new Date(),
+      requestType: requestType,
+      responseStatus: responseStatus,
+      responseData: responseData || null
+    });
+    
+    console.log(`[${new Date().toISOString()}] Recorded API request to ${endpoint}`);
   } catch (error) {
     console.error('Error recording API request:', error);
     // Don't throw here to avoid disrupting the main flow if logging fails
@@ -89,27 +81,24 @@ export async function checkRateLimit(): Promise<RateLimitStatus> {
     // Count requests in the last 24 hours
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     
-    const result = await db.execute(sql`
-      SELECT COUNT(*) as request_count 
-      FROM ${sql.identifier(RATE_LIMIT_TABLE)}
-      WHERE request_timestamp > ${oneDayAgo}
-    `);
+    // Count using Drizzle schema
+    const recentRequests = await db.select({ count: sql<number>`count(*)` })
+      .from(guestyRateLimits)
+      .where(gt(guestyRateLimits.requestTimestamp, oneDayAgo));
     
-    const requestCount = parseInt(result.rows[0].request_count, 10);
+    const requestCount = recentRequests[0]?.count || 0;
     const MAX_REQUESTS_PER_DAY = 5;
     const remainingRequests = Math.max(0, MAX_REQUESTS_PER_DAY - requestCount);
     
     if (remainingRequests === 0) {
       // If rate limited, find out when the next request will be available
-      const oldestRequest = await db.execute(sql`
-        SELECT request_timestamp
-        FROM ${sql.identifier(RATE_LIMIT_TABLE)}
-        ORDER BY request_timestamp ASC
-        LIMIT 1
-      `);
+      const oldestRequests = await db.select()
+        .from(guestyRateLimits)
+        .orderBy(asc(guestyRateLimits.requestTimestamp))
+        .limit(1);
       
-      if (oldestRequest.rows.length > 0) {
-        const oldestTimestamp = new Date(oldestRequest.rows[0].request_timestamp);
+      if (oldestRequests.length > 0) {
+        const oldestTimestamp = oldestRequests[0].requestTimestamp;
         const nextAvailableTime = new Date(oldestTimestamp.getTime() + 24 * 60 * 60 * 1000);
         
         return {
