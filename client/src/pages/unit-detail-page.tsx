@@ -365,7 +365,7 @@ export default function UnitDetailPage() {
             type: "checkin", // Use specific type for check-in
             label: `Check-in: ${guest.name}`,
             startDate: checkInDate,
-            endDate: guest.checkOut ? new Date(guest.checkOut) : new Date(checkInDate.getTime() + 86400000), // Next day if no checkout
+            endDate: guest.checkOut ? new Date(guest.checkOut) : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1)), // Next day if no checkout
             reservationId: guestStayId
           });
         }
@@ -376,7 +376,7 @@ export default function UnitDetailPage() {
             date: checkOutDate,
             type: "checkout", // Use specific type for check-out
             label: `Check-out: ${guest.name}`,
-            startDate: guest.checkIn ? new Date(guest.checkIn) : new Date(checkOutDate.getTime() - 86400000), // Previous day if no checkin
+            startDate: guest.checkIn ? new Date(guest.checkIn) : new Date(new Date(checkOutDate).setDate(checkOutDate.getDate() - 1)), // Previous day if no checkin
             endDate: checkOutDate,
             reservationId: guestStayId
           });
