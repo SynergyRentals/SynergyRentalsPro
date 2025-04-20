@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { format, parseISO, addDays, eachDayOfInterval, isSameDay, isWithinInterval } from "date-fns";
+import { toZonedTime, format as formatTZ } from "date-fns-tz";
 import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import {
   Tooltip,
@@ -41,13 +42,14 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
       (event.checkout instanceof Date ? event.checkout : parseISO(event.checkout as string)) :
       null;
     
-    // Normalize dates to start at 00:00:00 to ensure proper comparisons
-    const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    // Normalize dates to UTC midnight to ensure consistent timezone handling
+    // Create new dates with just the date part in UTC timezone
+    const normalizedStart = new Date(`${startDate.toISOString().split('T')[0]}T00:00:00Z`);
+    const normalizedEnd = new Date(`${endDate.toISOString().split('T')[0]}T00:00:00Z`);
     
-    // Normalize checkout date if available
+    // Normalize checkout date if available using the same approach
     const normalizedCheckout = checkoutDate ? 
-      new Date(checkoutDate.getFullYear(), checkoutDate.getMonth(), checkoutDate.getDate()) :
+      new Date(`${checkoutDate.toISOString().split('T')[0]}T00:00:00Z`) :
       null;
     
     return {
@@ -73,8 +75,8 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
       // Otherwise fall back to calculating it from the end date (iCal standard - exclusive end date)
       const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
       
-      // Normalize all dates to midnight for proper comparison
-      const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      // Normalize the day to UTC midnight for consistent comparison with event dates
+      const normalizedDay = new Date(`${day.toISOString().split('T')[0]}T00:00:00Z`);
       
       // Check if the day is within the reservation period (inclusive of start and checkout)
       return (

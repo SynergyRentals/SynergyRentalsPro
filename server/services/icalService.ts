@@ -25,13 +25,40 @@ export interface CalendarEvent {
  * @param endDate The end date from the iCal feed
  * @returns The actual checkout date (end date - 1 day)
  */
+// Default timezone for the application
+export const DEFAULT_TIMEZONE = 'UTC';
+
+/**
+ * Normalize a date to midnight in UTC to avoid timezone issues
+ * Ensures consistent date handling across frontend and backend
+ * @param date Input date object
+ * @returns Date normalized to UTC midnight
+ */
+export function normalizeToUTCMidnight(date: Date): Date {
+  if (!isValid(date)) {
+    throw new Error("Invalid date provided to normalizeToUTCMidnight");
+  }
+  
+  // Convert to ISO string, then extract just the date part (YYYY-MM-DD)
+  const dateString = date.toISOString().split('T')[0];
+  
+  // Create a new UTC date at midnight
+  return new Date(`${dateString}T00:00:00Z`);
+}
+
+/**
+ * Get the actual checkout date from an iCal end date
+ * In iCal standard, the end date is exclusive (the day AFTER the last day of the event)
+ * @param endDate The end date from the iCal feed
+ * @returns The actual checkout date (end date - 1 day)
+ */
 export function getCheckoutDate(endDate: Date): Date {
   if (!isValid(endDate)) {
     throw new Error("Invalid date provided to getCheckoutDate");
   }
   
-  // First normalize the date to midnight
-  const normalizedDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  // First normalize the date to midnight in UTC
+  const normalizedDate = normalizeToUTCMidnight(endDate);
   
   // Then subtract one day to get the actual checkout date
   return subDays(normalizedDate, 1);
@@ -203,18 +230,9 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
           // In iCal format, DTSTART is the first day of the reservation (check-in)
           // DTEND is the day AFTER the last day (exclusive end date)
           
-          // Normalize dates to midnight for consistent comparisons
-          const normalizedStart = new Date(
-            validStart.getFullYear(), 
-            validStart.getMonth(), 
-            validStart.getDate()
-          );
-          
-          const normalizedEnd = new Date(
-            validEnd.getFullYear(), 
-            validEnd.getMonth(), 
-            validEnd.getDate()
-          );
+          // Use our standardized UTC normalization function
+          const normalizedStart = normalizeToUTCMidnight(validStart);
+          const normalizedEnd = normalizeToUTCMidnight(validEnd);
           
           // Calculate checkout date as the day before the end date (since end date is exclusive in iCal)
           const checkoutDate = getCheckoutDate(normalizedEnd);
