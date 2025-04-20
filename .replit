@@ -39,7 +39,7 @@ localPort = 46357
 externalPort = 4200
 
 [workflows]
-runButton = "Dev Server with Guesty Credentials"
+runButton = "Dev Server"
 
 [[workflows.workflow]]
 name = "Project"
@@ -73,12 +73,3 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
-
-[[workflows.workflow]]
-name = "Dev Server with Guesty Credentials"
-author = 41304928
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "GUESTY_CLIENT_ID=0oaoaalj2bD2CaF4B5d7 GUESTY_CLIENT_SECRET=AJ9Li2ZbRUX5Td8ldPjs_BwTLJHH3aQIa1yJ2y-qvIPYAE_nk1ppaaaxAGilBZVK npm run dev"

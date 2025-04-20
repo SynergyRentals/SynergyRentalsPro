@@ -75,7 +75,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = Number(process.env.PORT) || 0; // Use 0 to let the OS assign an available port
+  const port = Number(process.env.PORT) || 5000; // Use port 5000 by default for Replit
   server.listen({
     port,
     host: "0.0.0.0",
