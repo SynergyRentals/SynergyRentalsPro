@@ -9,7 +9,7 @@ import {
   SelectGuestyProperty
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { guestyClient } from "../lib/guestyApiClient";
+import { guestyApiClient as guestyClient } from "../lib/guestyApiClient";
 
 /**
  * Clean and transform a Guesty property object to match our schema
