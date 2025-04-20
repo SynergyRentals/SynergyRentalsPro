@@ -4,17 +4,33 @@ import {
   InsertGuestyProperty, InsertGuestyReservation, InsertGuestySyncLog
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
-import { guestyClient } from "./lib/guestyApiClient";
+import { guestyApiClient } from "./lib/guestyApiClient";
+import { syncAllGuestyData } from "./services/guestySyncService";
+
+// Initialize Guesty API client with environment variables
+function initGuestyClient() {
+  const clientId = process.env.GUESTY_CLIENT_ID;
+  const clientSecret = process.env.GUESTY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.warn("GUESTY_CLIENT_ID or GUESTY_CLIENT_SECRET environment variables are not set");
+    return false;
+  }
+
+  try {
+    guestyApiClient.setCredentials(clientId, clientSecret);
+    return true;
+  } catch (error) {
+    console.error("Failed to initialize Guesty API client:", error);
+    return false;
+  }
+}
 
 /**
  * Get a valid OAuth2 access token, retrieving a new one if necessary
  * @returns A valid access token
  */
 export async function getAccessToken(): Promise<string> {
-  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
-    throw new Error("Guesty OAuth credentials are not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.");
-  }
-
   // Since we have pre-configured the token and know it's valid,
   // just return it directly during development
   if (tokenCache && tokenCache.access_token) {
@@ -22,7 +38,7 @@ export async function getAccessToken(): Promise<string> {
   }
 
   // The code below is kept for production use when the token expires
-  
+
   // Check if we have a valid cached token
   const now = Date.now();
   if (tokenCache && tokenCache.expires_at > now + 60000) { // Add 1 minute buffer
@@ -70,7 +86,7 @@ async function getNewAccessToken(): Promise<string> {
     }
 
     const data = await response.json();
-    
+
     // Cache the token
     tokenCache = {
       access_token: data.access_token,
@@ -112,7 +128,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
     }
 
     const data = await response.json();
-    
+
     // Update the token cache
     tokenCache = {
       access_token: data.access_token,
@@ -147,16 +163,16 @@ export async function healthCheck(): Promise<{
   try {
     // We're using the listings endpoint with a limit of 1 for lightweight check
     const healthCheckUrl = "https://open-api.guesty.com/api/v1/listings?limit=1";
-    
+
     console.log(`Performing Guesty API health check to ${healthCheckUrl}...`);
-    
+
     const response = await fetch(healthCheckUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
       },
     });
-    
+
     // Handle rate limiting separately
     if (response.status === 429) {
       console.log("Rate limit hit during health check. Need to wait before trying again.");
@@ -167,12 +183,12 @@ export async function healthCheck(): Promise<{
         rateLimit: true
       };
     }
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Health check failed with status ${response.status}: ${errorText}`);
     }
-    
+
     return {
       success: true,
       message: `Guesty API domain is reachable`,
@@ -181,10 +197,10 @@ export async function healthCheck(): Promise<{
     };
   } catch (error) {
     console.error(`Guesty API health check failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    
+
     // Check if the error is rate limit related
     const isRateLimit = error instanceof Error && error.message.includes("429");
-    
+
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred during health check",
@@ -197,7 +213,7 @@ export async function healthCheck(): Promise<{
 export async function makeGuestyRequest(endpoint: string, method: string = "GET", data: any = null) {
   // Get a valid access token
   const accessToken = await getAccessToken();
-  
+
   const url = `${BASE_URL}${endpoint}`;
   const options: any = {
     method,
@@ -206,48 +222,48 @@ export async function makeGuestyRequest(endpoint: string, method: string = "GET"
       "Authorization": `Bearer ${accessToken}`
     },
   };
-  
+
   if (data && (method === "POST" || method === "PUT")) {
     options.body = JSON.stringify(data);
   }
-  
+
   try {
     const response = await fetch(url, options);
-    
+
     // Handle rate limiting specially
     if (response.status === 429) {
       console.log("Rate limit hit. Need to wait before trying again.");
-      
+
       // Try to get retry-after header, default to 60 seconds if not present
       const retryAfter = response.headers.get('retry-after') || '60';
       const waitTime = parseInt(retryAfter, 10) * 1000;
-      
+
       throw new Error(`Rate limit exceeded. Please wait ${Math.ceil(waitTime/1000)} seconds before trying again.`);
     }
-    
+
     if (!response.ok) {
       // If unauthorized, try to refresh the token and retry once
       if (response.status === 401) {
         // Clear token cache to force a new token request
         tokenCache = null;
         const newAccessToken = await getAccessToken();
-        
+
         // Retry the request with the new token
         options.headers.Authorization = `Bearer ${newAccessToken}`;
         const retryResponse = await fetch(url, options);
-        
+
         if (!retryResponse.ok) {
           const errorText = await retryResponse.text();
           throw new Error(`Guesty API error after token refresh (${retryResponse.status}): ${errorText}`);
         }
-        
+
         return await retryResponse.json();
       }
-      
+
       const errorText = await response.text();
       throw new Error(`Guesty API error (${response.status}): ${errorText}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error(`Guesty API request failed: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -297,52 +313,35 @@ export async function syncProperties(): Promise<{
   properties_synced?: number;
   errors?: string[];
 }> {
-  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
-    const syncResult: InsertGuestySyncLog = {
-      syncType: "properties",
-      status: "failed",
-      errorMessage: "Guesty OAuth credentials not configured",
-      propertiesCount: 0,
-      reservationsCount: null
-    };
-    
-    await db.insert(guestySyncLogs).values(syncResult);
-    
-    return {
-      success: false,
-      message: "Guesty OAuth credentials not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.",
-    };
-  }
-  
   try {
     // Start sync log
     const startTime = new Date();
     console.log("Starting Guesty properties sync at:", startTime.toISOString());
-    
+
     // Fetch properties from Guesty API using the new endpoint
     const response = await makeGuestyRequest("/properties?limit=100");
     const properties = response.data || [];
-    
+
     if (!Array.isArray(properties)) {
       throw new Error("Invalid response format from Guesty API");
     }
-    
+
     console.log(`Retrieved ${properties.length} properties from Guesty API`);
-    
+
     // Process each property
     const errors: string[] = [];
     let successCount = 0;
-    
+
     for (const property of properties) {
       try {
         const cleanedProperty = cleanPropertyData(property);
-        
+
         // Check if property already exists
         const existingProperty = await db.select()
           .from(guestyProperties)
           .where(eq(guestyProperties.propertyId, cleanedProperty.propertyId))
           .limit(1);
-        
+
         if (existingProperty.length > 0) {
           // Update existing property
           await db.update(guestyProperties)
@@ -355,7 +354,7 @@ export async function syncProperties(): Promise<{
           // Insert new property
           await db.insert(guestyProperties).values(cleanedProperty);
         }
-        
+
         successCount++;
       } catch (error) {
         const errorMessage = `Error processing property ${property._id}: ${error instanceof Error ? error.message : "Unknown error"}`;
@@ -363,10 +362,10 @@ export async function syncProperties(): Promise<{
         errors.push(errorMessage);
       }
     }
-    
+
     // Complete sync log
     const endTime = new Date();
-    
+
     const syncResult: InsertGuestySyncLog = {
       syncType: "properties",
       status: errors.length > 0 ? "partial" : "success",
@@ -374,9 +373,9 @@ export async function syncProperties(): Promise<{
       reservationsCount: null,
       errorMessage: errors.length > 0 ? errors.join("; ") : null
     };
-    
+
     await db.insert(guestySyncLogs).values(syncResult);
-    
+
     return {
       success: true,
       message: `Successfully synced ${successCount} of ${properties.length} properties`,
@@ -385,7 +384,7 @@ export async function syncProperties(): Promise<{
     };
   } catch (error) {
     console.error("Error syncing properties:", error);
-    
+
     const syncResult: InsertGuestySyncLog = {
       syncType: "properties",
       status: "failed",
@@ -393,9 +392,9 @@ export async function syncProperties(): Promise<{
       reservationsCount: null,
       errorMessage: error instanceof Error ? error.message : "Unknown error"
     };
-    
+
     await db.insert(guestySyncLogs).values(syncResult);
-    
+
     return {
       success: false,
       message: `Error syncing properties: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -414,61 +413,44 @@ export async function syncReservations(): Promise<{
   reservations_synced?: number;
   errors?: string[];
 }> {
-  if (!GUESTY_CLIENT_ID || !GUESTY_CLIENT_SECRET) {
-    const syncResult: InsertGuestySyncLog = {
-      syncType: "reservations",
-      status: "failed",
-      errorMessage: "Guesty OAuth credentials not configured",
-      propertiesCount: null,
-      reservationsCount: 0
-    };
-    
-    await db.insert(guestySyncLogs).values(syncResult);
-    
-    return {
-      success: false,
-      message: "Guesty OAuth credentials not configured. Please set GUESTY_CLIENT_ID and GUESTY_CLIENT_SECRET environment variables.",
-    };
-  }
-  
   try {
     // Start sync log
     const startTime = new Date();
     console.log("Starting Guesty reservations sync at:", startTime.toISOString());
-    
+
     // Calculate date ranges for recent and upcoming reservations
     const now = new Date();
     const oneMonthAgo = new Date(now);
     oneMonthAgo.setMonth(now.getMonth() - 1);
-    
+
     const sixMonthsAhead = new Date(now);
     sixMonthsAhead.setMonth(now.getMonth() + 6);
-    
+
     // Fetch reservations from Guesty API with date filtering using the new endpoint
     const queryParams = `?checkIn[$gte]=${oneMonthAgo.toISOString()}&checkOut[$lte]=${sixMonthsAhead.toISOString()}&limit=100`;
     const response = await makeGuestyRequest(`/reservations${queryParams}`);
     const reservations = response.data || [];
-    
+
     if (!Array.isArray(reservations)) {
       throw new Error("Invalid response format from Guesty API");
     }
-    
+
     console.log(`Retrieved ${reservations.length} reservations from Guesty API`);
-    
+
     // Process each reservation
     const errors: string[] = [];
     let successCount = 0;
-    
+
     for (const reservation of reservations) {
       try {
         const cleanedReservation = cleanReservationData(reservation);
-        
+
         // Check if reservation already exists
         const existingReservation = await db.select()
           .from(guestyReservations)
           .where(eq(guestyReservations.reservationId, cleanedReservation.reservationId))
           .limit(1);
-        
+
         if (existingReservation.length > 0) {
           // Update existing reservation
           await db.update(guestyReservations)
@@ -481,7 +463,7 @@ export async function syncReservations(): Promise<{
           // Insert new reservation
           await db.insert(guestyReservations).values(cleanedReservation);
         }
-        
+
         successCount++;
       } catch (error) {
         const errorMessage = `Error processing reservation ${reservation._id}: ${error instanceof Error ? error.message : "Unknown error"}`;
@@ -489,10 +471,10 @@ export async function syncReservations(): Promise<{
         errors.push(errorMessage);
       }
     }
-    
+
     // Complete sync log
     const endTime = new Date();
-    
+
     const syncResult: InsertGuestySyncLog = {
       syncType: "reservations",
       status: errors.length > 0 ? "partial" : "success",
@@ -500,9 +482,9 @@ export async function syncReservations(): Promise<{
       reservationsCount: successCount,
       errorMessage: errors.length > 0 ? errors.join("; ") : null
     };
-    
+
     await db.insert(guestySyncLogs).values(syncResult);
-    
+
     return {
       success: true,
       message: `Successfully synced ${successCount} of ${reservations.length} reservations`,
@@ -511,7 +493,7 @@ export async function syncReservations(): Promise<{
     };
   } catch (error) {
     console.error("Error syncing reservations:", error);
-    
+
     const syncResult: InsertGuestySyncLog = {
       syncType: "reservations",
       status: "failed",
@@ -519,9 +501,9 @@ export async function syncReservations(): Promise<{
       reservationsCount: 0,
       errorMessage: error instanceof Error ? error.message : "Unknown error"
     };
-    
+
     await db.insert(guestySyncLogs).values(syncResult);
-    
+
     return {
       success: false,
       message: `Error syncing reservations: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -530,42 +512,38 @@ export async function syncReservations(): Promise<{
   }
 }
 
-/**
- * Run a full sync of both properties and reservations
- * @returns Object with combined sync results
- */
-export async function syncAll(): Promise<{
-  success: boolean;
-  message: string;
-  properties_synced: number;
-  reservations_synced: number;
-  sync_status: string;
-}> {
+// Trigger a full sync of Guesty data
+export async function syncAll() {
   try {
-    const propertiesResult = await syncProperties();
-    const reservationsResult = await syncReservations();
-    
-    const success = propertiesResult.success || reservationsResult.success;
-    let status = "failed";
-    
-    if (propertiesResult.success && reservationsResult.success) {
-      status = "complete";
-    } else if (propertiesResult.success || reservationsResult.success) {
-      status = "partial";
+    // Attempt to initialize the Guesty API client
+    const initialized = initGuestyClient();
+    if (!initialized) {
+      return {
+        success: false,
+        message: "Error during full sync: GUESTY_CLIENT_ID or GUESTY_CLIENT_SECRET environment variables are not set",
+        properties_synced: 0,
+        reservations_synced: 0,
+        sync_status: "failed"
+      };
     }
-    
+
+    // Perform the sync
+    const result = await syncAllGuestyData();
+
     return {
-      success,
-      message: `Properties: ${propertiesResult.message}. Reservations: ${reservationsResult.message}`,
-      properties_synced: propertiesResult.properties_synced || 0,
-      reservations_synced: reservationsResult.reservations_synced || 0,
-      sync_status: status
+      success: result.success,
+      message: result.message,
+      properties_synced: result.propertiesResult?.propertiesCount || 0,
+      reservations_synced: result.reservationsResult?.reservationsCount || 0,
+      sync_status: result.success ? "success" : "failed"
     };
   } catch (error) {
-    console.error("Error during full Guesty sync:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    console.error("Error during Guesty sync:", errorMessage);
+
     return {
       success: false,
-      message: `Error during full sync: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: `Error during full sync: ${errorMessage}`,
       properties_synced: 0,
       reservations_synced: 0,
       sync_status: "failed"
@@ -573,65 +551,23 @@ export async function syncAll(): Promise<{
   }
 }
 
-/**
- * Get the latest sync log
- * @returns The latest sync log entry
- */
-export async function getLatestSyncLog(): Promise<any> {
+// Get the latest sync log
+export async function getLatestSyncLog() {
   try {
-    const logs = await db
-      .select()
+    const logs = await db.select()
       .from(guestySyncLogs)
       .orderBy(desc(guestySyncLogs.syncDate))
       .limit(5);
-    
-    if (logs.length === 0) {
-      return null;
-    }
-    
-    // Calculate overall status
-    const latestPropertiesSync = logs.find(log => log.syncType === "properties");
-    const latestReservationsSync = logs.find(log => log.syncType === "reservations");
-    
-    const now = new Date();
-    const oneDayAgo = new Date(now);
-    oneDayAgo.setDate(now.getDate() - 1);
-    
-    // Check if syncs are recent (within last 24 hours)
-    const propertiesRecent = latestPropertiesSync && latestPropertiesSync.syncDate 
-      && new Date(latestPropertiesSync.syncDate) > oneDayAgo;
-    const reservationsRecent = latestReservationsSync && latestReservationsSync.syncDate 
-      && new Date(latestReservationsSync.syncDate) > oneDayAgo;
-    
-    // Check if syncs were successful
-    const propertiesSuccess = latestPropertiesSync && latestPropertiesSync.status !== "failed";
-    const reservationsSuccess = latestReservationsSync && latestReservationsSync.status !== "failed";
-    
-    let overallStatus = "unknown";
-    
-    if (propertiesRecent && reservationsRecent) {
-      if (propertiesSuccess && reservationsSuccess) {
-        overallStatus = "healthy";
-      } else if (propertiesSuccess || reservationsSuccess) {
-        overallStatus = "partial";
-      } else {
-        overallStatus = "error";
-      }
-    } else if (propertiesRecent || reservationsRecent) {
-      overallStatus = "stale";
-    } else {
-      overallStatus = "outdated";
-    }
-    
-    return {
-      latest_logs: logs,
-      properties_sync: latestPropertiesSync,
-      reservations_sync: latestReservationsSync,
-      status: overallStatus,
-      last_sync: logs[0].syncDate
-    };
+
+    return logs;
   } catch (error) {
     console.error("Error fetching sync logs:", error);
     return null;
   }
 }
+
+let tokenCache: any = null;
+const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
+const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
+const OAUTH_URL = "https://auth.guesty.com/connect/token";
+const BASE_URL = "https://open-api.guesty.com/api/v1";
