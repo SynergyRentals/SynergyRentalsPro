@@ -477,6 +477,44 @@ async function refreshCacheInBackground(url: string, propertyId?: number): Promi
 }
 
 /**
+ * Get events from a URL with date range filtering
+ * @param url The URL of the iCal feed
+ * @param startDate Optional start date filter
+ * @param endDate Optional end date filter
+ * @returns Array of calendar events within the date range
+ */
+export async function getEventsFromUrl(url: string, startDate?: Date, endDate?: Date): Promise<CalendarEvent[]> {
+  try {
+    // Set default date range if not provided
+    const start = startDate || new Date();
+    const end = endDate || new Date(start.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days from start
+    
+    console.log(`Fetching iCal events from ${url} for date range ${start.toISOString()} to ${end.toISOString()}`);
+    
+    // Get events from cache or fetch them
+    const events = await getCachedCalendarEvents(url);
+    
+    // Filter events within date range
+    const filteredEvents = events.filter(event => {
+      // Normalize dates for consistent comparison
+      const eventStart = normalizeToUTCMidnight(event.start);
+      const eventCheckout = event.checkout ? normalizeToUTCMidnight(event.checkout) : getCheckoutDate(event.end);
+      
+      // Event overlaps with date range if:
+      // 1. Event start is before end of range AND
+      // 2. Event checkout is after start of range
+      return eventStart <= end && eventCheckout >= start;
+    });
+    
+    console.log(`Found ${filteredEvents.length} events in specified date range`);
+    return filteredEvents;
+  } catch (error) {
+    console.error(`Error getting events from URL: ${url}`, error);
+    throw error;
+  }
+}
+
+/**
  * Main function to process an iCal URL and return calendar events
  * @param url The URL of the iCal feed
  * @param propertyId Optional property ID for adaptive caching

@@ -1,69 +1,78 @@
 /**
- * Configuration service for property-specific settings
- * This provides a centralized way to manage property-specific configurations
+ * Configuration service for properties
+ * Provides utility functions to determine property attributes for adaptive caching and other features
  */
 
-export interface PropertyConfig {
-  id: number;
-  icalUrl?: string;
-  refreshInterval?: number; // in minutes
-  special?: boolean;
-  highTraffic?: boolean;
-}
+// High-traffic property IDs that need special handling
+const HIGH_TRAFFIC_PROPERTY_IDS = [18, 5, 10]; // Add commonly booked property IDs
 
-// Property configuration that can be extended as needed
-// This replaces hardcoded special cases in the codebase
-const propertyConfigs: PropertyConfig[] = [
-  {
-    id: 18,
-    icalUrl: 'https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb',
-    refreshInterval: 10, // Refresh every 10 minutes
-    special: true,
-    highTraffic: true
-  }
-];
+// Properties with custom/legacy behavior
+const SPECIAL_PROPERTY_IDS = [18]; // Property ID 18 has special Guesty URL handling
+
+// Maintenance mode configuration
+let GLOBAL_MAINTENANCE_MODE = false;
 
 /**
- * Get configuration for a specific property
- * @param id The property ID
- * @returns The property configuration or undefined if not found
+ * Set the global maintenance mode
+ * @param enabled Whether maintenance mode is enabled
  */
-export function getPropertyConfig(id: number): PropertyConfig | undefined {
-  return propertyConfigs.find(config => config.id === id);
+export function setMaintenanceMode(enabled: boolean): void {
+  GLOBAL_MAINTENANCE_MODE = enabled;
+  console.log(`Maintenance mode ${enabled ? 'enabled' : 'disabled'}`);
 }
 
 /**
- * Check if a property is considered high traffic (frequent bookings)
+ * Check if the system is in maintenance mode
+ * @returns True if maintenance mode is active
+ */
+export function isMaintenanceMode(): boolean {
+  return GLOBAL_MAINTENANCE_MODE;
+}
+
+/**
+ * Check if a property requires special handling
+ * This includes properties with known issues or legacy integration patterns
  * @param propertyId The property ID to check
- * @returns True if the property is high traffic
+ * @returns True if the property needs special handling
+ */
+export function isSpecialProperty(propertyId?: number): boolean {
+  if (!propertyId) return false;
+  return SPECIAL_PROPERTY_IDS.includes(propertyId);
+}
+
+/**
+ * Determine if a property is considered high-traffic 
+ * High-traffic properties have different caching and polling strategies
+ * @param propertyId The property ID to check
+ * @returns True if the property is high-traffic
  */
 export function isHighTrafficProperty(propertyId?: number): boolean {
   if (!propertyId) return false;
-  const config = getPropertyConfig(propertyId);
-  return config?.highTraffic === true;
+  return HIGH_TRAFFIC_PROPERTY_IDS.includes(propertyId);
 }
 
 /**
- * Get all property IDs that are configured as high traffic
- * @returns Array of high traffic property IDs
+ * Get the appropriate polling interval for a property
+ * @param propertyId The property ID
+ * @returns The polling interval in milliseconds
  */
-export function getHighTrafficPropertyIds(): number[] {
-  return propertyConfigs
-    .filter(config => config.highTraffic)
-    .map(config => config.id);
-}
-
-/**
- * Add a new property configuration
- * @param config The property configuration to add
- */
-export function addPropertyConfig(config: PropertyConfig): void {
-  // Remove any existing config for this property ID
-  const existingIndex = propertyConfigs.findIndex(c => c.id === config.id);
-  if (existingIndex >= 0) {
-    propertyConfigs.splice(existingIndex, 1);
+export function getPropertyPollingInterval(propertyId?: number): number {
+  if (isHighTrafficProperty(propertyId)) {
+    return 10 * 60 * 1000; // 10 minutes for high-traffic properties
   }
-  
-  // Add the new config
-  propertyConfigs.push(config);
+  return 30 * 60 * 1000; // 30 minutes for regular properties
+}
+
+/**
+ * Get feature flags for the application
+ * @returns Object with feature flags
+ */
+export function getFeatureFlags(): Record<string, boolean> {
+  return {
+    enableCalendarIntegration: true,
+    enableSlackNotifications: false,
+    enableAdvancedCaching: true,
+    showExperimentalFeatures: false,
+    useStandardizedDateHandling: true // Flag for our new standardized date handling
+  };
 }
