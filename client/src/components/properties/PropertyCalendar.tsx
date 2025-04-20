@@ -43,14 +43,40 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
       null;
     
     // Normalize dates to UTC midnight to ensure consistent timezone handling
-    // Create new dates with just the date part in UTC timezone
-    const normalizedStart = new Date(`${startDate.toISOString().split('T')[0]}T00:00:00Z`);
-    const normalizedEnd = new Date(`${endDate.toISOString().split('T')[0]}T00:00:00Z`);
-    
-    // Normalize checkout date if available using the same approach
-    const normalizedCheckout = checkoutDate ? 
-      new Date(`${checkoutDate.toISOString().split('T')[0]}T00:00:00Z`) :
-      null;
+    // Ensure we're working with valid dates
+    let normalizedStart: Date;
+    let normalizedEnd: Date;
+    let normalizedCheckout: Date | null = null;
+
+    try {
+      // Normalize dates - create new dates with just the date part
+      normalizedStart = new Date(Date.UTC(
+        startDate.getFullYear(), 
+        startDate.getMonth(), 
+        startDate.getDate()
+      ));
+      
+      normalizedEnd = new Date(Date.UTC(
+        endDate.getFullYear(), 
+        endDate.getMonth(), 
+        endDate.getDate()
+      ));
+      
+      // Normalize checkout date if available using the same approach
+      if (checkoutDate) {
+        normalizedCheckout = new Date(Date.UTC(
+          checkoutDate.getFullYear(), 
+          checkoutDate.getMonth(), 
+          checkoutDate.getDate()
+        ));
+      }
+    } catch (e) {
+      console.error("Error normalizing dates:", e);
+      // Fallback for any parsing errors
+      normalizedStart = startDate;
+      normalizedEnd = endDate;
+      normalizedCheckout = checkoutDate;
+    }
     
     return {
       ...event,
@@ -188,9 +214,19 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                               <div className="relative">
                                 {/* First render connecting bars */}
                                 {dayEvents.map((event, eventIndex) => {
-                                  const isFirstDay = isSameDay(day, event.start as Date);
+                                  // Ensure we're dealing with actual Date objects
+                                  const startDate = event.start as Date;
+                                  const endDate = event.end as Date;
+                                  
+                                  // Log dates for debugging
+                                  if (process.env.NODE_ENV === 'development') {
+                                    console.debug(`Event ${event.uid} - Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}, Checkout: ${event.checkout ? (event.checkout as Date).toISOString() : 'Not provided'}`);
+                                  }
+                                  
+                                  const isFirstDay = isSameDay(day, startDate);
+                                  
                                   // Use checkout date from backend when available, otherwise calculate it
-                                  const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
+                                  const checkoutDate = (event.checkout as Date) || addDays(endDate, -1);
                                   const isLastDay = isSameDay(day, checkoutDate);
                                   const isWithinEvent = !isFirstDay && !isLastDay;
                                   
