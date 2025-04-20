@@ -69,21 +69,21 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
     return processedEvents.filter(event => {
       const startDate = event.start as Date;
       
-      // In iCal format, the end date is exclusive (the day AFTER the last day)
-      // So we subtract one day to get the actual checkout date
-      const actualCheckoutDay = addDays(event.end as Date, -1);
+      // Use the checkout date provided by the backend when available
+      // Otherwise fall back to calculating it from the end date (iCal standard - exclusive end date)
+      const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
       
       // Normalize all dates to midnight for proper comparison
       const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
       
-      // Check if the day is within the reservation period (inclusive of start and actual checkout)
+      // Check if the day is within the reservation period (inclusive of start and checkout)
       return (
         isWithinInterval(normalizedDay, {
           start: startDate,
-          end: actualCheckoutDay
+          end: checkoutDate
         }) || 
         isSameDay(normalizedDay, startDate) || 
-        isSameDay(normalizedDay, actualCheckoutDay)
+        isSameDay(normalizedDay, checkoutDate)
       );
     });
   };
@@ -96,12 +96,13 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
   };
 
   // Find check-out events for a day (events that end on this day)
-  // Note: In iCal standard, the end date is the day AFTER the checkout day
-  // So we need to subtract one day to get the actual checkout date
+  // Use the checkout date provided by the backend when available
   const getCheckOutsForDay = (day: Date) => {
-    return processedEvents.filter(event => 
-      isSameDay(day, addDays(event.end as Date, -1))
-    );
+    return processedEvents.filter(event => {
+      // Use the checkout date from backend when available, otherwise calculate from end date
+      const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
+      return isSameDay(day, checkoutDate);
+    });
   };
 
   // Check if a day has a same-day transition (checkout from one reservation, checkin to another)
@@ -186,8 +187,9 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                 {/* First render connecting bars */}
                                 {dayEvents.map((event, eventIndex) => {
                                   const isFirstDay = isSameDay(day, event.start as Date);
-                                  const actualCheckoutDay = addDays(event.end as Date, -1);
-                                  const isLastDay = isSameDay(day, actualCheckoutDay);
+                                  // Use checkout date from backend when available, otherwise calculate it
+                                  const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
+                                  const isLastDay = isSameDay(day, checkoutDate);
                                   const isWithinEvent = !isFirstDay && !isLastDay;
                                   
                                   // Bar color based on status
@@ -269,8 +271,9 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                 {/* Then render dots on top of bars */}
                                 {dayEvents.map((event, eventIndex) => {
                                   const isFirstDay = isSameDay(day, event.start as Date);
-                                  const actualCheckoutDay = addDays(event.end as Date, -1);
-                                  const isLastDay = isSameDay(day, actualCheckoutDay);
+                                  // Use checkout date from backend when available, otherwise calculate it
+                                  const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
+                                  const isLastDay = isSameDay(day, checkoutDate);
                                   
                                   // Color the dots based on status too
                                   let dotColorClass = "bg-blue-500"; // Default color
@@ -356,19 +359,22 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                           <div>
                                             <p className="font-medium">{event.title}</p>
                                             <p className="text-xs">
-                                              {format(event.start as Date, 'MMM d, yyyy')} - {format(addDays(event.end as Date, -1), 'MMM d, yyyy')}
+                                              {format(event.start as Date, 'MMM d, yyyy')} - {format(
+                                                event.checkout as Date || addDays(event.end as Date, -1), 
+                                                'MMM d, yyyy'
+                                              )}
                                             </p>
                                             
                                             {/* Duration calculation */}
                                             <p className="text-xs mt-1">
                                               Duration: {
                                                 Math.ceil(
-                                                  (addDays(event.end as Date, -1).getTime() - (event.start as Date).getTime()) 
+                                                  ((event.checkout as Date || addDays(event.end as Date, -1)).getTime() - (event.start as Date).getTime()) 
                                                   / (1000 * 60 * 60 * 24)
                                                 ) + 1
                                               } {
                                                 Math.ceil(
-                                                  (addDays(event.end as Date, -1).getTime() - (event.start as Date).getTime()) 
+                                                  ((event.checkout as Date || addDays(event.end as Date, -1)).getTime() - (event.start as Date).getTime()) 
                                                   / (1000 * 60 * 60 * 24)
                                                 ) + 1 === 1 ? 'day' : 'days'
                                               }
