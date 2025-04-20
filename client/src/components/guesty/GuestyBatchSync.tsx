@@ -141,7 +141,6 @@ export function GuestyBatchSync() {
           <Progress 
             value={getRateLimitPercentage()} 
             className="h-2" 
-            indicatorClassName={getRateLimitColor()}
           />
           <p className="text-xs text-muted-foreground mt-1">
             {rateLimitStatus?.message || "Checking rate limit status..."}
@@ -207,28 +206,36 @@ export function GuestyBatchSync() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Check-in After</Label>
-                <DatePicker
-                  date={options.reservationTimeRange?.checkInAfter}
-                  onSelect={(date) => setOptions({
-                    ...options, 
-                    reservationTimeRange: {
-                      ...options.reservationTimeRange,
-                      checkInAfter: date
-                    }
-                  })}
+                <Input 
+                  type="date" 
+                  value={options.reservationTimeRange?.checkInAfter?.toISOString().split('T')[0]} 
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : undefined;
+                    setOptions({
+                      ...options, 
+                      reservationTimeRange: {
+                        ...options.reservationTimeRange,
+                        checkInAfter: date
+                      }
+                    });
+                  }}
                 />
               </div>
               <div>
                 <Label className="text-xs">Check-out Before</Label>
-                <DatePicker
-                  date={options.reservationTimeRange?.checkOutBefore}
-                  onSelect={(date) => setOptions({
-                    ...options, 
-                    reservationTimeRange: {
-                      ...options.reservationTimeRange,
-                      checkOutBefore: date
-                    }
-                  })}
+                <Input 
+                  type="date" 
+                  value={options.reservationTimeRange?.checkOutBefore?.toISOString().split('T')[0]} 
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : undefined;
+                    setOptions({
+                      ...options, 
+                      reservationTimeRange: {
+                        ...options.reservationTimeRange,
+                        checkOutBefore: date
+                      }
+                    });
+                  }}
                 />
               </div>
             </div>
@@ -244,7 +251,7 @@ export function GuestyBatchSync() {
               <Label htmlFor="force-sync">Force Sync (Override Rate Limits)</Label>
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <IconAlertTriangle size={14} className="text-yellow-500" />
+              <AlertTriangle size={14} className="text-yellow-500" />
               Use sparingly - this can potentially exceed Guesty's rate limits
             </p>
           </div>
@@ -254,7 +261,7 @@ export function GuestyBatchSync() {
         {syncResult && (
           <div className="mt-6 border rounded-md p-4">
             <h3 className="text-md font-medium mb-2 flex items-center gap-2">
-              <IconInfoCircle size={16} className="text-primary" />
+              <Info size={16} className="text-primary" />
               Last Sync Results
             </h3>
             <div className="space-y-2">
@@ -303,11 +310,11 @@ export function GuestyBatchSync() {
         >
           {isSyncing ? 
             <>
-              <IconRefresh className="animate-spin" size={18} />
+              <RefreshCw className="animate-spin" size={18} />
               Syncing...
             </> : 
             <>
-              <IconRefresh size={18} />
+              <RefreshCw size={18} />
               Start Batch Sync
             </>
           }
