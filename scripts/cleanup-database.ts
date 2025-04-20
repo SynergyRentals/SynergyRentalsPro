@@ -186,6 +186,11 @@ export async function main() {
 
 // For ES modules, we'll run the main function automatically when the file is executed directly
 // This will be ignored when imported as a module
+// Disable automatic execution to prevent running during server startup
+// To run the cleanup script directly use: npx tsx scripts/cleanup-database.ts
+// Uncomment the following if direct execution is needed
+/*
 if (import.meta.url === import.meta.resolve('./cleanup-database.ts')) {
   main();
 }
+*/
