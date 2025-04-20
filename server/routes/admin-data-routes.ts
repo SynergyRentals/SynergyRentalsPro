@@ -1,407 +1,272 @@
 /**
  * Admin Data Management Routes
  * 
- * These routes handle data import, export, and database cleanup operations
- * for the admin data management interface.
+ * This module provides routes for administrative data management operations:
+ * - Database cleanup (removing sample data)
+ * - Data import from CSV files
+ * - Data verification and validation
  */
 
-import { Express, Request, Response } from 'express';
-import * as schema from '../../shared/schema';
+import express, { Request, Response } from 'express';
+import fileUpload from 'express-fileupload';
 import { db } from '../db';
-import { storage } from '../storage';
-// Using the checkRole from server/routes.ts since there's no middleware/auth module
-// For the admin routes, we'll declare our own checkRole middleware
-const checkRole = (roles: string[]) => (req: any, res: any, next: any) => {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  if (!roles.includes(req.user?.role)) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-  next();
-};
+import { sql } from 'drizzle-orm';
+import * as schema from '@shared/schema';
+import { cleanupDatabase } from '../../scripts/cleanup-database';
 import { 
-  EntityType, 
-  generateFieldMappingTemplate, 
-  importFromCsv 
-} from '../lib/genericCsvImporter';
-import {
   saveUploadedFile,
   getSampleData,
   suggestFieldMappings,
   importData,
-  bulkImport,
+  bulkImport
 } from '../services/dataImportService';
-import { cleanupDatabase } from '../../scripts/cleanup-database';
-import path from 'path';
-import fs from 'fs';
+import { 
+  EntityType,
+  FieldMapping,
+  ImportConfig
+} from '../lib/genericCsvImporter';
 
-// Simple CSV stringify function since we can't use the csv-stringify package
-function stringify(records: any[], options: { header: boolean }): string {
-  if (!records || records.length === 0) {
-    return '';
-  }
-  
-  // Get headers from the first record
-  const headers = Object.keys(records[0]);
-  
-  // Create CSV content
-  let csv = '';
-  
-  // Add header row if requested
-  if (options.header) {
-    csv += headers.map(header => `"${header}"`).join(',') + '\n';
-  }
-  
-  // Add data rows
-  for (const record of records) {
-    const row = headers.map(header => {
-      const value = record[header];
-      // Handle different value types
-      if (value === null || value === undefined) {
-        return '';
-      } else if (typeof value === 'string') {
-        // Escape quotes and wrap in quotes
-        return `"${value.replace(/"/g, '""')}"`;
-      } else if (value instanceof Date) {
-        return `"${value.toISOString()}"`;
-      } else {
-        return `"${String(value)}"`;
-      }
-    }).join(',');
-    csv += row + '\n';
-  }
-  
-  return csv;
-}
-
-// Ensure tmp directory exists
-const TMP_DIR = './tmp';
-if (!fs.existsSync(TMP_DIR)) {
-  fs.mkdirSync(TMP_DIR, { recursive: true });
-}
-
-// Setup admin data routes
-export function setupAdminDataRoutes(app: Express) {
-  // Middleware to ensure only admins can access these routes
-  const adminOnly = checkRole(['admin']);
-  
-  // Analyze uploaded CSV file and suggest field mappings
-  app.post('/api/admin/data-import/analyze', adminOnly, async (req: Request, res: Response) => {
-    try {
-      // Validate request
-      if (!req.files || !req.files.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'No file was uploaded'
-        });
-      }
-      
-      if (!req.body.entityType) {
-        return res.status(400).json({
-          success: false,
-          message: 'No entity type specified'
-        });
-      }
-      
-      const entityType = req.body.entityType as EntityType;
-      const uploadedFile = req.files.file as any;
-      
-      // Save the uploaded file
-      const filePath = await saveUploadedFile(uploadedFile);
-      
-      // Get sample data from the file
-      const previewData = await getSampleData(filePath, 5);
-      
-      // Suggest field mappings
-      const suggestedMappings = await suggestFieldMappings(
-        filePath,
-        entityType
-      );
-      
-      // Return the results
-      res.json({
-        success: true,
-        message: 'File analyzed successfully',
-        previewData,
-        suggestedMappings,
-      });
-      
-      // Clean up the temporary file
-      fs.unlink(filePath, (err) => {
-        if (err) console.error('Error deleting temporary file:', err);
-      });
-    } catch (error) {
-      console.error('Error analyzing file:', error);
-      res.status(500).json({
-        success: false,
-        message: `Error analyzing file: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+/**
+ * Setup admin data management routes
+ * @param app - Express application
+ */
+export function setupAdminDataRoutes(app: express.Express) {
+  // Middleware to check if user is an admin
+  const checkAdmin = (req: Request, res: Response, next: express.NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
-  });
-  
-  // Import data from uploaded CSV file
-  app.post('/api/admin/data-import/import', adminOnly, async (req: Request, res: Response) => {
-    try {
-      // Validate request
-      if (!req.files || !req.files.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'No file was uploaded'
-        });
-      }
-      
-      if (!req.body.config) {
-        return res.status(400).json({
-          success: false,
-          message: 'No import configuration provided'
-        });
-      }
-      
-      const config = JSON.parse(req.body.config);
-      const uploadedFile = req.files.file as any;
-      
-      // Save the uploaded file
-      const filePath = await saveUploadedFile(uploadedFile);
-      
-      // Import the data
-      const result = await importData(
-        filePath,
-        config,
-        req.user?.id
-      );
-      
-      // Return the results
-      res.json({
-        success: result.success,
-        message: result.message,
-        recordsProcessed: result.recordsProcessed,
-        recordsImported: result.recordsImported,
-        recordsSkipped: result.recordsSkipped,
-        errors: result.errors,
-      });
-      
-      // Clean up the temporary file
-      fs.unlink(filePath, (err) => {
-        if (err) console.error('Error deleting temporary file:', err);
-      });
-    } catch (error) {
-      console.error('Error importing data:', error);
-      res.status(500).json({
-        success: false,
-        message: `Error importing data: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+    
+    // @ts-ignore - req.user may not be defined in the type
+    if (req.user && req.user.role === 'admin') {
+      return next();
     }
-  });
+    
+    return res.status(403).json({ success: false, message: 'Admin access required' });
+  };
   
-  // Export data to CSV
-  app.get('/api/admin/data-export/:entityType', adminOnly, async (req: Request, res: Response) => {
+  // Route for database cleanup
+  app.post('/api/admin/data/cleanup', checkAdmin, async (req: Request, res: Response) => {
     try {
-      const entityType = req.params.entityType as EntityType;
-      
-      // Get the table for this entity type
-      const table = getTableForEntityType(entityType);
-      
-      if (!table) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid entity type: ${entityType}`
-        });
-      }
-      
-      // Get all records from the table
-      const records = await db.select().from(table);
-      
-      if (records.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: `No records found for entity type: ${entityType}`
-        });
-      }
-      
-      // Convert records to CSV
-      const csv = stringify(records, {
-        header: true,
-      });
-      
-      // Set response headers for CSV download
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=${entityType}-export-${Date.now()}.csv`);
-      
-      // Send the CSV data
-      res.send(csv);
-      
-      // Log the export action
-      await db.insert(schema.logs).values({
-        action: `EXPORT_${entityType.toUpperCase()}`,
-        userId: req.user?.id,
-        notes: `Exported ${records.length} ${entityType} records to CSV`,
-        targetTable: getTableName(entityType),
-        timestamp: new Date(),
-      });
-    } catch (error) {
-      console.error('Error exporting data:', error);
-      res.status(500).json({
-        success: false,
-        message: `Error exporting data: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-    }
-  });
-  
-  // Clean up the database (delete all sample data)
-  app.post('/api/admin/data-import/cleanup', adminOnly, async (req: Request, res: Response) => {
-    try {
-      // Clean up the database
       const result = await cleanupDatabase();
       
-      // Return the results
-      res.json({
-        success: result.success,
-        message: result.message
-      });
+      return res.json(result);
     } catch (error) {
       console.error('Error cleaning up database:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: `Error cleaning up database: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     }
   });
   
-  // Get the database schema
-  app.get('/api/admin/data-schema', adminOnly, async (req: Request, res: Response) => {
+  // Route for getting entity types
+  app.get('/api/admin/data/entity-types', checkAdmin, (req: Request, res: Response) => {
     try {
-      // Get all entity types and their fields
-      const entitySchemas: Record<EntityType, any[]> = {} as Record<EntityType, any[]>;
+      const entityTypes = Object.keys(EntityType)
+        .filter(key => isNaN(Number(key)))
+        .map(key => ({
+          id: key,
+          name: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+        }));
       
-      // Add each entity type
-      Object.values(EntityType).forEach((entityType) => {
-        // Generate field mapping template for this entity type
-        const fieldMappings = generateFieldMappingTemplate(entityType);
-        
-        // Add to the schemas object
-        entitySchemas[entityType] = fieldMappings;
-      });
-      
-      // Return the schema information
-      res.json({
-        success: true,
-        schemas: entitySchemas
-      });
+      return res.json({ success: true, entityTypes });
     } catch (error) {
-      console.error('Error getting database schema:', error);
-      res.status(500).json({
+      console.error('Error getting entity types:', error);
+      return res.status(500).json({
         success: false,
-        message: `Error getting database schema: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Error getting entity types: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     }
   });
   
-  // Get database statistics
-  app.get('/api/admin/data-stats', adminOnly, async (req: Request, res: Response) => {
+  // Configure file upload middleware
+  app.use(fileUpload({
+    createParentPath: true,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
+    abortOnLimit: true,
+    useTempFiles: true,
+    tempFileDir: './tmp/'
+  }));
+  
+  // Route for uploading CSV files
+  app.post('/api/admin/data/upload', checkAdmin, async (req: Request, res: Response) => {
     try {
-      // Get record counts for each entity type
-      const stats: Record<string, number> = {};
-      
-      // Add counts for each entity type
-      for (const entityType of Object.values(EntityType)) {
-        const table = getTableForEntityType(entityType);
-        if (table) {
-          const [{ count }] = await db
-            .select({ count: db.fn.count<number>() })
-            .from(table);
-          
-          stats[entityType] = Number(count);
-        }
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ success: false, message: 'No files were uploaded' });
       }
       
-      // Return the statistics
-      res.json({
+      const csvFile = req.files.file as fileUpload.UploadedFile;
+      
+      // Check if it's a CSV file
+      if (!csvFile.name.endsWith('.csv')) {
+        return res.status(400).json({ success: false, message: 'Please upload a CSV file' });
+      }
+      
+      // Save the file
+      const filePath = await saveUploadedFile(csvFile);
+      
+      // Get sample data
+      const sampleData = await getSampleData(filePath);
+      
+      return res.json({
         success: true,
-        stats
+        message: 'File uploaded successfully',
+        filePath,
+        sampleData
       });
     } catch (error) {
-      console.error('Error getting database statistics:', error);
-      res.status(500).json({
+      console.error('Error uploading file:', error);
+      return res.status(500).json({
         success: false,
-        message: `Error getting database statistics: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Error uploading file: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     }
   });
-}
-
-/**
- * Get the database table for an entity type
- * @param entityType - Entity type
- * @returns Database table
- */
-function getTableForEntityType(entityType: EntityType): any {
-  switch (entityType) {
-    case EntityType.USER:
-      return schema.users;
-    case EntityType.UNIT:
-      return schema.units;
-    case EntityType.GUEST:
-      return schema.guests;
-    case EntityType.PROPERTY:
-      return schema.properties;
-    case EntityType.GUESTY_PROPERTY:
-      return schema.guestyProperties;
-    case EntityType.GUESTY_RESERVATION:
-      return schema.guestyReservations;
-    case EntityType.PROJECT:
-      return schema.projects;
-    case EntityType.TASK:
-      return schema.tasks;
-    case EntityType.MAINTENANCE:
-      return schema.maintenance;
-    case EntityType.INVENTORY:
-      return schema.inventory;
-    case EntityType.CLEANING_TASK:
-      return schema.cleaningTasks;
-    case EntityType.DOCUMENT:
-      return schema.documents;
-    case EntityType.VENDOR:
-      return schema.vendors;
-    default:
-      return null;
-  }
-}
-
-/**
- * Get the table name for an entity type
- * @param entityType - Entity type
- * @returns Table name
- */
-function getTableName(entityType: EntityType): string {
-  switch (entityType) {
-    case EntityType.USER:
-      return 'users';
-    case EntityType.UNIT:
-      return 'units';
-    case EntityType.GUEST:
-      return 'guests';
-    case EntityType.PROPERTY:
-      return 'properties';
-    case EntityType.GUESTY_PROPERTY:
-      return 'guesty_properties';
-    case EntityType.GUESTY_RESERVATION:
-      return 'guesty_reservations';
-    case EntityType.PROJECT:
-      return 'projects';
-    case EntityType.TASK:
-      return 'tasks';
-    case EntityType.MAINTENANCE:
-      return 'maintenance';
-    case EntityType.INVENTORY:
-      return 'inventory';
-    case EntityType.CLEANING_TASK:
-      return 'cleaning_tasks';
-    case EntityType.DOCUMENT:
-      return 'documents';
-    case EntityType.VENDOR:
-      return 'vendors';
-    default:
-      return entityType.toString();
-  }
+  
+  // Route for getting field mapping suggestions
+  app.post('/api/admin/data/suggest-mappings', checkAdmin, async (req: Request, res: Response) => {
+    try {
+      const { filePath, entityType } = req.body;
+      
+      if (!filePath || !entityType) {
+        return res.status(400).json({ success: false, message: 'File path and entity type are required' });
+      }
+      
+      // Get field mapping suggestions
+      const mappings = await suggestFieldMappings(filePath, entityType);
+      
+      return res.json({
+        success: true,
+        mappings
+      });
+    } catch (error) {
+      console.error('Error suggesting field mappings:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Error suggesting field mappings: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  });
+  
+  // Route for importing data
+  app.post('/api/admin/data/import', checkAdmin, async (req: Request, res: Response) => {
+    try {
+      const { filePath, config } = req.body;
+      
+      if (!filePath || !config) {
+        return res.status(400).json({ success: false, message: 'File path and import configuration are required' });
+      }
+      
+      // @ts-ignore - req.user may not be defined in the type
+      const userId = req.user?.id;
+      
+      // Import the data
+      const result = await importData(filePath, config, userId);
+      
+      return res.json(result);
+    } catch (error) {
+      console.error('Error importing data:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Error importing data: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  });
+  
+  // Route for bulk importing data
+  app.post('/api/admin/data/bulk-import', checkAdmin, async (req: Request, res: Response) => {
+    try {
+      const { imports } = req.body;
+      
+      if (!imports || !Array.isArray(imports)) {
+        return res.status(400).json({ success: false, message: 'Imports array is required' });
+      }
+      
+      // @ts-ignore - req.user may not be defined in the type
+      const userId = req.user?.id;
+      
+      // Bulk import the data
+      const results = await bulkImport(imports, userId);
+      
+      return res.json({
+        success: true,
+        results
+      });
+    } catch (error) {
+      console.error('Error bulk importing data:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Error bulk importing data: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  });
+  
+  // Route for getting database tables
+  app.get('/api/admin/data/tables', checkAdmin, async (req: Request, res: Response) => {
+    try {
+      // Query the database for a list of tables
+      const result = await db.execute(sql`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema='public' 
+        ORDER BY table_name
+      `);
+      
+      const tables = result.map((row: any) => row.table_name);
+      
+      return res.json({
+        success: true,
+        tables
+      });
+    } catch (error) {
+      console.error('Error getting database tables:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Error getting database tables: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  });
+  
+  // Route for getting data counts for each table
+  app.get('/api/admin/data/counts', checkAdmin, async (req: Request, res: Response) => {
+    try {
+      const counts: Record<string, number> = {};
+      
+      // Add count for each main entity
+      counts['users'] = (await db.select({ count: sql`count(*)` }).from(schema.users))[0].count.toString();
+      counts['units'] = (await db.select({ count: sql`count(*)` }).from(schema.units))[0].count.toString();
+      counts['guests'] = (await db.select({ count: sql`count(*)` }).from(schema.guests))[0].count.toString();
+      counts['projects'] = (await db.select({ count: sql`count(*)` }).from(schema.projects))[0].count.toString();
+      counts['tasks'] = (await db.select({ count: sql`count(*)` }).from(schema.tasks))[0].count.toString();
+      counts['maintenance'] = (await db.select({ count: sql`count(*)` }).from(schema.maintenance))[0].count.toString();
+      counts['inventory'] = (await db.select({ count: sql`count(*)` }).from(schema.inventory))[0].count.toString();
+      counts['documents'] = (await db.select({ count: sql`count(*)` }).from(schema.documents))[0].count.toString();
+      counts['vendors'] = (await db.select({ count: sql`count(*)` }).from(schema.vendors))[0].count.toString();
+      
+      // Add counts for cleaning-related tables
+      counts['cleaning_tasks'] = (await db.select({ count: sql`count(*)` }).from(schema.cleaningTasks))[0].count.toString();
+      counts['cleaning_checklists'] = (await db.select({ count: sql`count(*)` }).from(schema.cleaningChecklists))[0].count.toString();
+      counts['cleaning_checklist_items'] = (await db.select({ count: sql`count(*)` }).from(schema.cleaningChecklistItems))[0].count.toString();
+      counts['cleaning_checklist_completions'] = (await db.select({ count: sql`count(*)` }).from(schema.cleaningChecklistCompletions))[0].count.toString();
+      counts['cleaning_flags'] = (await db.select({ count: sql`count(*)` }).from(schema.cleaningFlags))[0].count.toString();
+      
+      // Add counts for Guesty-related tables
+      counts['guesty_properties'] = (await db.select({ count: sql`count(*)` }).from(schema.guestyProperties))[0].count.toString();
+      counts['guesty_reservations'] = (await db.select({ count: sql`count(*)` }).from(schema.guestyReservations))[0].count.toString();
+      counts['guesty_webhook_events'] = (await db.select({ count: sql`count(*)` }).from(schema.guestyWebhookEvents))[0].count.toString();
+      counts['guesty_sync_logs'] = (await db.select({ count: sql`count(*)` }).from(schema.guestySyncLogs))[0].count.toString();
+      
+      return res.json({
+        success: true,
+        counts
+      });
+    } catch (error) {
+      console.error('Error getting data counts:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Error getting data counts: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  });
 }

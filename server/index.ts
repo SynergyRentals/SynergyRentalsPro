@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes"; // Import the original routes
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { setupAuth } from "./auth";
+import { setupAdminDataRoutes } from "./routes/admin-data-routes";
 import { createServer } from "http";
 import { setupApiMiddleware, apiResponseMiddleware } from "./lib/apiMiddleware";
 
@@ -66,6 +67,9 @@ app.use((req, res, next) => {
   
   // Then set up new routes
   setupRoutes(app);
+  
+  // Set up admin data routes
+  setupAdminDataRoutes(app);
 
   // Apply API error handling middleware after routes
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

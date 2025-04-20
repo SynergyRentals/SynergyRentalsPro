@@ -16,7 +16,7 @@ import TeamPage from "@/pages/team-page-new";
 import CompanyPage from "@/pages/company-page";
 import AiToolsPage from "@/pages/ai-tools-page";
 import AdminPage from "@/pages/admin-page";
-import { AdminDataPage } from "@/pages/AdminDataPage";
+import AdminDataPage from "@/pages/AdminDataPage";
 // New properties pages
 import PropertiesNewPage from "@/pages/properties-new-page";
 import PropertyDetailNewPage from "@/pages/property-detail-new-page";
@@ -30,7 +30,7 @@ import HostAIInboxPage from "@/pages/hostai-inbox-page";
 import HostAIInboxSettingsPage from "@/pages/hostai-inbox-settings-page";
 import AiPlannerPage from "@/pages/ai-planner-page";
 import { ProtectedRoute } from "./lib/protected-route";
-import { AuthProvider } from "./hooks/use-auth";
+import { AuthProvider } from "./hooks/useAuth";
 
 function Router() {
   return (
