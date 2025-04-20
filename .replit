@@ -15,7 +15,7 @@ localPort = 5000
 externalPort = 80
 
 [workflows]
-runButton = "Dev Server (Alt Port)"
+runButton = "Dev Server"
 
 [[workflows.workflow]]
 name = "Project"
@@ -48,7 +48,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "PORT=0 npm run dev"
 
 [[workflows.workflow]]
 name = "Dev Server (Alt Port)"
