@@ -9,25 +9,6 @@ import { guestyApiClient } from "./lib/guestyApiClient";
 import { syncAllGuestyData } from "./services/guestySyncService";
 
 // Initialize Guesty API client with environment variables
-// Define the initGuestyClient function
-function initGuestyClient(): boolean {
-  try {
-    const clientId = process.env.GUESTY_CLIENT_ID;
-    const clientSecret = process.env.GUESTY_CLIENT_SECRET;
-    
-    if (!clientId || !clientSecret) {
-      console.error('Error during Guesty sync: GUESTY_CLIENT_ID or GUESTY_CLIENT_SECRET is not defined');
-      return false;
-    }
-    
-    // Set credentials in the API client
-    guestyApiClient.setCredentials(clientId, clientSecret);
-    return true;
-  } catch (error) {
-    console.error('Error initializing Guesty client:', error);
-    return false;
-  }
-}
 
 /**
  * Get a valid OAuth2 access token, retrieving a new one if necessary
