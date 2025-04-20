@@ -31,13 +31,13 @@ async function main() {
     
     // Insert sample property data
     await pool.query(`
-      INSERT INTO guesty_properties (id, name, address, city, state, zipcode, bedrooms, bathrooms, accommodates, ical_url, created_at, updated_at)
+      INSERT INTO guesty_properties (id, property_id, name, address, city, state, zipcode, bedrooms, bathrooms, accommodates, ical_url, created_at, updated_at)
       VALUES 
-        (18, 'Beachfront Villa', '123 Ocean Drive', 'Malibu', 'CA', '90210', 4, 3, 8, 'https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb', NOW(), NOW()),
-        (19, 'Mountain Cabin', '456 Pine Road', 'Aspen', 'CO', '81611', 3, 2, 6, NULL, NOW(), NOW()),
-        (20, 'Downtown Loft', '789 Main Street', 'New York', 'NY', '10001', 2, 2, 4, NULL, NOW(), NOW()),
-        (21, 'Lakeside Cottage', '101 Lake Shore Road', 'Lake Tahoe', 'CA', '96150', 2, 2, 5, NULL, NOW(), NOW()),
-        (22, 'Desert Oasis', '202 Palm Drive', 'Scottsdale', 'AZ', '85251', 3, 2, 6, NULL, NOW(), NOW())
+        (18, 'gp-18', 'Beachfront Villa', '123 Ocean Drive', 'Malibu', 'CA', '90210', 4, 3, 8, 'https://app.guesty.com/api/public/icalendar-dashboard-api/export/7c7a55f6-d047-462e-b848-d32f531d6fcb', NOW(), NOW()),
+        (19, 'gp-19', 'Mountain Cabin', '456 Pine Road', 'Aspen', 'CO', '81611', 3, 2, 6, NULL, NOW(), NOW()),
+        (20, 'gp-20', 'Downtown Loft', '789 Main Street', 'New York', 'NY', '10001', 2, 2, 4, NULL, NOW(), NOW()),
+        (21, 'gp-21', 'Lakeside Cottage', '101 Lake Shore Road', 'Lake Tahoe', 'CA', '96150', 2, 2, 5, NULL, NOW(), NOW()),
+        (22, 'gp-22', 'Desert Oasis', '202 Palm Drive', 'Scottsdale', 'AZ', '85251', 3, 2, 6, NULL, NOW(), NOW())
     `);
     
     console.log('Inserted sample property data');
