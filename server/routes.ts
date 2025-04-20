@@ -2895,10 +2895,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import the CSV importer function
       const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
       
-      // Process the CSV file
+      // Process the CSV file with error handling
       console.log("Starting CSV import process");
-      const result = await importGuestyPropertiesFromCSV(tempFilePath);
-      console.log("CSV import complete:", result);
+      try {
+        const result = await importGuestyPropertiesFromCSV(tempFilePath);
+        console.log("CSV import complete:", result);
+        
+        // Add detailed status information to response
+        if (result.errors && result.errors.length > 0) {
+          console.log("CSV import had some errors:", result.errors);
+          result.hadErrors = true;
+          result.errorCount = result.errors.length;
+          // Limit error output to prevent huge responses
+          if (result.errors.length > 5) {
+            result.errors = result.errors.slice(0, 5);
+            result.message += ` (Showing 5 of ${result.errorCount} errors)`;
+          }
+        }
+        return res.json(result);
+      } catch (importError) {
+        console.error("CSV import failed with error:", importError);
+        return res.status(500).json({
+          success: false,
+          message: `CSV import failed: ${importError instanceof Error ? importError.message : "Unknown error"}`,
+        });
+      }
+      
+      // If we reached here, it means the CSV import was successful and we already sent a response above
+      // No need to send another response here
       
       // Clean up the temp file
       try {
@@ -2914,14 +2938,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           action: "GUESTY_CSV_UPLOAD_IMPORT",
           userId: req.user?.id,
           targetTable: "guesty_properties",
-          notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV`,
+          notes: `Imported Guesty properties from uploaded CSV`,
           ipAddress: req.ip
         });
       } catch (logError) {
         console.error("Error logging CSV import:", logError);
       }
-      
-      res.json(result);
     } catch (error) {
       console.error("Error processing uploaded CSV:", error);
       

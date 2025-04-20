@@ -27,6 +27,9 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
       columns: true,
       skip_empty_lines: true,
       trim: true,
+      relax_quotes: true,      // Allow relaxed quote processing
+      relax_column_count: true, // Allow variable column counts across records
+      skip_records_with_error: true, // Skip records with syntax errors
     });
 
     const properties: InsertGuestyProperty[] = [];
@@ -101,15 +104,28 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
                 .from(guestyProperties)
                 .where(eq(guestyProperties.propertyId, property.propertyId));
 
+              // Create a sanitized property object with proper types for database
+              const sanitizedProperty: InsertGuestyProperty = {
+                propertyId: String(property.propertyId || '').substring(0, 255),
+                name: String(property.name || '').substring(0, 255),
+                address: String(property.address || '').substring(0, 500),
+                bedrooms: isNaN(Number(property.bedrooms)) ? 1 : Number(property.bedrooms),
+                bathrooms: isNaN(Number(property.bathrooms)) ? 1 : Number(property.bathrooms),
+                amenities: Array.isArray(property.amenities) ? 
+                  property.amenities.map(a => String(a).trim()).filter(Boolean) : [],
+                listingUrl: String(property.listingUrl || '').substring(0, 500),
+                icalUrl: property.icalUrl ? String(property.icalUrl).substring(0, 500) : null,
+              };
+              
               if (existingProperties.length > 0) {
                 // Update existing property
                 await db
                   .update(guestyProperties)
-                  .set(property)
+                  .set(sanitizedProperty)
                   .where(eq(guestyProperties.propertyId, property.propertyId));
               } else {
                 // Insert new property
-                await db.insert(guestyProperties).values(property);
+                await db.insert(guestyProperties).values(sanitizedProperty);
               }
               
               insertedCount++;

@@ -104,9 +104,20 @@ export function GuestyCSVImport() {
       }
     } catch (error) {
       console.error("Error importing from CSV:", error);
+      
+      // Get more detailed error information if possible
+      let errorMessage = "Unknown error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object') {
+        // Try to extract any useful information from the error object
+        errorMessage = JSON.stringify(error, null, 2);
+      }
+      
       toast({
         title: "CSV Import Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
