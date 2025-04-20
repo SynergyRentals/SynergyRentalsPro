@@ -3,6 +3,7 @@ import https from 'https';
 import http from 'http';
 import crypto from 'crypto';
 import { addDays, subDays, isValid } from 'date-fns';
+import { isHighTrafficProperty } from './configService';
 
 export interface CalendarEvent {
   start: Date;
@@ -134,8 +135,8 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
     console.log(`Fetching iCal data from: ${url}`);
     
     // First validate the URL
-    const isValid = await validateUrl(url);
-    if (!isValid) {
+    const isValidUrl = await validateUrl(url);
+    if (!isValidUrl) {
       console.error(`Invalid or inaccessible iCal URL: ${url}`);
       throw new Error('Invalid or inaccessible URL. Please check that the URL is correct and accessible.');
     }
@@ -265,23 +266,10 @@ const icalCache = new Map<string, {
   error?: { message: string, timestamp: number } 
 }>();
 
-// Cache TTL configuration
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes in milliseconds (default)
-const HIGH_TRAFFIC_CACHE_TTL = 10 * 60 * 1000; // 10 minutes for properties with frequent bookings
-const ERROR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds for errors
-
-// Configure high-traffic properties here - these will have shorter cache TTLs
-const HIGH_TRAFFIC_PROPERTY_IDS = [18]; // Example: Property ID 18 has frequent bookings
-
-/**
- * Helper function to determine if a property has high traffic
- * @param propertyId The property ID to check
- * @returns True if the property is considered high traffic
- */
-function isHighTrafficProperty(propertyId?: number): boolean {
-  if (!propertyId) return false;
-  return HIGH_TRAFFIC_PROPERTY_IDS.includes(propertyId);
-}
+// Cache TTL configuration based on property traffic profile
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes for regular properties
+const HIGH_TRAFFIC_CACHE_TTL = 10 * 60 * 1000; // 10 minutes for high traffic properties
+const ERROR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes for error cache
 
 /**
  * Determine the appropriate cache TTL based on property attributes
