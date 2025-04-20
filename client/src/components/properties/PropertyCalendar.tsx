@@ -224,7 +224,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                   const isFirstDay = isSameDay(day, startDate);
                                   
                                   // Use checkout date from backend when available, otherwise calculate it
-                                  const checkoutDate = (event.checkout as Date) || addDays(endDate, -1);
+                                  const checkoutDate = (event.checkout as Date) || getCheckoutDate(endDate);
                                   const isLastDay = isSameDay(day, checkoutDate);
                                   const isWithinEvent = !isFirstDay && !isLastDay;
                                   
@@ -308,7 +308,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                 {dayEvents.map((event, eventIndex) => {
                                   const isFirstDay = isSameDay(day, event.start as Date);
                                   // Use checkout date from backend when available, otherwise calculate it
-                                  const checkoutDate = event.checkout as Date || addDays(event.end as Date, -1);
+                                  const checkoutDate = event.checkout as Date || getCheckoutDate(event.end as Date);
                                   const isLastDay = isSameDay(day, checkoutDate);
                                   
                                   // Color the dots based on status too
@@ -396,7 +396,7 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             <p className="font-medium">{event.title}</p>
                                             <p className="text-xs">
                                               {format(event.start as Date, 'MMM d, yyyy')} - {format(
-                                                event.checkout as Date || addDays(event.end as Date, -1), 
+                                                event.checkout as Date || getCheckoutDate(event.end as Date), 
                                                 'MMM d, yyyy'
                                               )}
                                             </p>
@@ -405,12 +405,12 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
                                             <p className="text-xs mt-1">
                                               Duration: {
                                                 Math.ceil(
-                                                  ((event.checkout as Date || addDays(event.end as Date, -1)).getTime() - (event.start as Date).getTime()) 
+                                                  ((event.checkout as Date || getCheckoutDate(event.end as Date)).getTime() - (event.start as Date).getTime()) 
                                                   / (1000 * 60 * 60 * 24)
                                                 ) + 1
                                               } {
                                                 Math.ceil(
-                                                  ((event.checkout as Date || addDays(event.end as Date, -1)).getTime() - (event.start as Date).getTime()) 
+                                                  ((event.checkout as Date || getCheckoutDate(event.end as Date)).getTime() - (event.start as Date).getTime()) 
                                                   / (1000 * 60 * 60 * 24)
                                                 ) + 1 === 1 ? 'day' : 'days'
                                               }
