@@ -88,6 +88,22 @@ export function ensureValidDate(date: any, fallback: Date = new Date()): Date {
   return fallback;
 }
 
+/**
+ * Create properly formatted fallback dates for iCal events when the original dates are invalid
+ * Ensures consistent fallback behavior across the application for error cases
+ * @returns Object containing normalized start, end, and checkout dates
+ */
+export function createFallbackDates(): { start: Date, end: Date, checkout: Date } {
+  const start = normalizeToUTCMidnight(new Date());
+  const end = normalizeToUTCMidnight(new Date(start.getTime() + 86400000)); // Add one day (24 hours) in milliseconds
+  
+  return {
+    start,
+    end,
+    checkout: start // For fallback, checkout same as start (one-day event)
+  };
+}
+
 interface iCalEvent {
   type: string;
   uid?: string;

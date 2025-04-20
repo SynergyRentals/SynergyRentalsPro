@@ -467,15 +467,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // If checkout date is not available, calculate it from end date
               // Per iCal standard, end date is exclusive (day after last day)
               if (!(checkoutDate instanceof Date) || isNaN(checkoutDate.getTime())) {
-                checkoutDate = new Date(endDate);
-                checkoutDate.setDate(checkoutDate.getDate() - 1);
+                checkoutDate = getCheckoutDate(endDate);
                 console.log(`Using calculated checkout date for event ${event.uid}: ${checkoutDate.toISOString()}`);
               }
               
               // Ensure all dates are normalized to midnight for consistent comparison
-              startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-              endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-              checkoutDate = new Date(checkoutDate.getFullYear(), checkoutDate.getMonth(), checkoutDate.getDate());
+              startDate = normalizeToUTCMidnight(startDate);
+              endDate = normalizeToUTCMidnight(endDate);
+              checkoutDate = normalizeToUTCMidnight(checkoutDate);
               
               console.log(`Processed event ${event.uid}: 
                 Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
@@ -628,15 +627,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // If checkout date is not available, calculate it from end date
             // Per iCal standard, end date is exclusive (day after last day)
             if (!(checkoutDate instanceof Date) || isNaN(checkoutDate.getTime())) {
-              checkoutDate = new Date(endDate);
-              checkoutDate.setDate(checkoutDate.getDate() - 1);
+              checkoutDate = getCheckoutDate(endDate);
               console.log(`Using calculated checkout date for event ${event.uid}: ${checkoutDate.toISOString()}`);
             }
             
             // Ensure all dates are normalized to midnight for consistent comparison
-            startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-            endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-            checkoutDate = new Date(checkoutDate.getFullYear(), checkoutDate.getMonth(), checkoutDate.getDate());
+            startDate = normalizeToUTCMidnight(startDate);
+            endDate = normalizeToUTCMidnight(endDate);
+            checkoutDate = normalizeToUTCMidnight(checkoutDate);
             
             console.log(`Processed unit calendar event ${event.uid}: 
               Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
