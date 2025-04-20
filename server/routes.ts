@@ -2707,6 +2707,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Route to set Guesty API Credentials
+  app.post("/api/guesty/set-credentials", checkRole(["admin"]), async (req: Request, res: Response) => {
+    try {
+      // Validate the request body
+      if (!req.body.apiKey || !req.body.apiSecret) {
+        return res.status(400).json({
+          success: false,
+          message: "API key and secret are required"
+        });
+      }
+      
+      // Import the batch sync service
+      const { setApiCredentials } = await import('./services/guestyBatchSyncService');
+      
+      // Set the credentials
+      setApiCredentials(req.body.apiKey, req.body.apiSecret);
+      
+      // Log the credential update
+      try {
+        await storage.createLog({
+          action: "GUESTY_SET_CREDENTIALS",
+          userId: req.user?.id,
+          targetTable: "guesty_settings",
+          notes: "Guesty API credentials updated",
+          ipAddress: req.ip
+        });
+      } catch (logError) {
+        console.error("Error logging credential update:", logError);
+      }
+      
+      // Send success response
+      res.json({
+        success: true,
+        message: "Guesty API credentials updated successfully"
+      });
+    } catch (error) {
+      console.error("Error setting Guesty API credentials:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Unknown error occurred"
+      });
+    }
+  });
+  
   // Check Guesty rate limit status
   app.get("/api/guesty/rate-limit-status", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
@@ -2796,58 +2840,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSV File Upload Import route for properties
   // This endpoint allows uploading a CSV file directly via multipart/form-data
   app.post("/api/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    let tempFilePath = '';
+    
     try {
+      console.log("CSV upload request received");
+      
+      // Debug request information
+      console.log("Request files:", req.files ? Object.keys(req.files) : "No files");
+      console.log("Headers:", req.headers['content-type']);
+      
       // Check if the request includes a file
       if (!req.files || !req.files.file) {
-        console.log("No file found in request:", req.files);
+        console.log("No file found in request");
         return res.status(400).json({
           success: false,
-          message: "No file was uploaded"
+          message: "No file was uploaded. Please ensure you're sending a file with field name 'file'."
         });
       }
       
       const uploadedFile = req.files.file as fileUpload.UploadedFile;
+      console.log("File received:", uploadedFile.name, "Size:", uploadedFile.size, "MIME:", uploadedFile.mimetype);
       
       // Ensure it's a CSV file
       if (!uploadedFile.name.endsWith('.csv') && uploadedFile.mimetype !== 'text/csv') {
         return res.status(400).json({
           success: false,
-          message: "Uploaded file must be a CSV file"
+          message: `Uploaded file must be a CSV file. Received: ${uploadedFile.mimetype}`
         });
       }
       
       // Create temporary file to process
-      const tempFilePath = `./tmp/upload_${Date.now()}.csv`;
+      tempFilePath = `./tmp/upload_${Date.now()}.csv`;
       
       // Ensure tmp directory exists
       if (!fs.existsSync('./tmp')) {
         fs.mkdirSync('./tmp', { recursive: true });
       }
       
+      console.log("Moving file to:", tempFilePath);
+      
       // Move the uploaded file to the temp location
       await uploadedFile.mv(tempFilePath);
+      
+      // Check the file was moved successfully
+      if (!fs.existsSync(tempFilePath)) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to save uploaded file"
+        });
+      }
+      
+      console.log("File saved, checking file size:", fs.statSync(tempFilePath).size);
       
       // Import the CSV importer function
       const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
       
       // Process the CSV file
+      console.log("Starting CSV import process");
       const result = await importGuestyPropertiesFromCSV(tempFilePath);
+      console.log("CSV import complete:", result);
       
       // Clean up the temp file
-      fs.unlinkSync(tempFilePath);
+      try {
+        fs.unlinkSync(tempFilePath);
+        tempFilePath = '';
+      } catch (cleanupError) {
+        console.error("Error cleaning up temp file:", cleanupError);
+      }
       
       // Log the action
-      await storage.createLog({
-        action: "GUESTY_CSV_UPLOAD_IMPORT",
-        userId: req.user?.id,
-        targetTable: "guesty_properties",
-        notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV`,
-        ipAddress: req.ip
-      });
+      try {
+        await storage.createLog({
+          action: "GUESTY_CSV_UPLOAD_IMPORT",
+          userId: req.user?.id,
+          targetTable: "guesty_properties",
+          notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV`,
+          ipAddress: req.ip
+        });
+      } catch (logError) {
+        console.error("Error logging CSV import:", logError);
+      }
       
       res.json(result);
     } catch (error) {
       console.error("Error processing uploaded CSV:", error);
+      
+      // Clean up temp file if it exists
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp file after error:", cleanupError);
+        }
+      }
+      
       res.status(500).json({ 
         success: false,
         message: `Error processing uploaded CSV: ${error instanceof Error ? error.message : "Unknown error"}`

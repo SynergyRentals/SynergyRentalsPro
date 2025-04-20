@@ -37,19 +37,34 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
       .pipe(parser)
       .on('data', (row) => {
         try {
-          // Map CSV columns to property fields
-          // Generate a consistent property ID from the nickname
-          const propertyId = `csv-${row.NICKNAME.replace(/\s+/g, '-').toLowerCase()}`;
+          // Debug the CSV row format
+          console.log('CSV row:', JSON.stringify(row));
           
+          // Handle different possible column names by checking each one
+          const nickname = row.NICKNAME || row.Nickname || row.nickname || '';
+          if (!nickname) {
+            console.warn('Warning: Row missing nickname, using random ID', row);
+          }
+          
+          // Generate a consistent property ID from the nickname or a random value
+          const propertyId = nickname ? 
+            `csv-${nickname.replace(/\s+/g, '-').toLowerCase()}` : 
+            `csv-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          
+          // Map CSV columns to property fields with flexible column naming
           const property: InsertGuestyProperty = {
             propertyId: propertyId,
-            name: row.TITLE || row.NICKNAME || '',
-            address: row.ADDRESS || '',
-            bedrooms: parseInt(row.BEDROOMS || '1', 10), 
-            bathrooms: parseFloat(row.BATHROOMS || '1.0'),
-            amenities: row.AMENITIES ? row.AMENITIES.split(',') : [],
-            listingUrl: row.LISTING_URL || '',
-            icalUrl: row.ICAL_URL || null,
+            name: row.TITLE || row.Title || row.title || 
+                 row.NAME || row.Name || row.name || 
+                 nickname || 'Unnamed Property',
+            address: row.ADDRESS || row.Address || row.address || '',
+            bedrooms: parseInt(row.BEDROOMS || row.Bedrooms || row.bedrooms || '1', 10), 
+            bathrooms: parseFloat(row.BATHROOMS || row.Bathrooms || row.bathrooms || '1.0'),
+            amenities: row.AMENITIES ? row.AMENITIES.split(',') : 
+                      (row.Amenities ? row.Amenities.split(',') : 
+                      (row.amenities ? row.amenities.split(',') : [])),
+            listingUrl: row.LISTING_URL || row.ListingUrl || row.listingUrl || '',
+            icalUrl: row.ICAL_URL || row.IcalUrl || row.icalUrl || null,
           };
 
           properties.push(property);
