@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 interface CalendarEvent {
   start: string | Date;
   end: string | Date;
+  checkout?: string | Date; // Explicit checkout date, if provided by backend
   title: string;
   uid: string;
   status?: string;
@@ -35,14 +36,25 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
     const startDate = event.start instanceof Date ? event.start : parseISO(event.start as string);
     const endDate = event.end instanceof Date ? event.end : parseISO(event.end as string);
     
+    // Parse checkout date if available, otherwise it will be calculated from end date
+    const checkoutDate = event.checkout ? 
+      (event.checkout instanceof Date ? event.checkout : parseISO(event.checkout as string)) :
+      null;
+    
     // Normalize dates to start at 00:00:00 to ensure proper comparisons
     const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
     const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
     
+    // Normalize checkout date if available
+    const normalizedCheckout = checkoutDate ? 
+      new Date(checkoutDate.getFullYear(), checkoutDate.getMonth(), checkoutDate.getDate()) :
+      null;
+    
     return {
       ...event,
       start: normalizedStart,
-      end: normalizedEnd
+      end: normalizedEnd,
+      checkout: normalizedCheckout
     };
   });
 
