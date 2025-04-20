@@ -345,11 +345,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const events = await getCachedCalendarEvents(guestyProperty.icalUrl);
           console.log(`Retrieved ${events.length} calendar events for Guesty property`);
           
-          // Process events to ensure consistent formatting (same as the legacy endpoint)
+          // Process events to ensure consistent formatting and proper date handling
           const processedEvents = events.map(event => {
-            // Handle possible invalid dates
+            // Handle possible invalid dates with more robust validation
             let startDate = event.start;
             let endDate = event.end;
+            // Use checkout date if available (explicit checkout date provided by icalService)
+            let checkoutDate = event.checkout;
             
             try {
               // Validate that dates are properly parsed
@@ -364,17 +366,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 endDate.setDate(endDate.getDate() + 1);
                 console.warn(`Invalid end date in event ${event.uid}, using start date + 1 day`);
               }
+              
+              // If checkout date is not available, calculate it from end date
+              // Per iCal standard, end date is exclusive (day after last day)
+              if (!(checkoutDate instanceof Date) || isNaN(checkoutDate.getTime())) {
+                checkoutDate = new Date(endDate);
+                checkoutDate.setDate(checkoutDate.getDate() - 1);
+                console.log(`Using calculated checkout date for event ${event.uid}: ${checkoutDate.toISOString()}`);
+              }
+              
+              // Ensure all dates are normalized to midnight for consistent comparison
+              startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+              endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+              checkoutDate = new Date(checkoutDate.getFullYear(), checkoutDate.getMonth(), checkoutDate.getDate());
+              
+              console.log(`Processed event ${event.uid}: 
+                Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
             } catch (e) {
               console.error(`Error processing dates for event ${event.uid}:`, e);
               // Fallback to current date and next day if date processing fails
               startDate = new Date();
               endDate = new Date(startDate);
               endDate.setDate(endDate.getDate() + 1);
+              checkoutDate = new Date(startDate);
             }
             
             return {
               start: startDate,
               end: endDate,
+              checkout: checkoutDate, // Include explicit checkout date
               title: event.title || 'Reservation',
               uid: event.uid,
               status: event.status || 'confirmed'
@@ -423,11 +443,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const events = await getCachedCalendarEvents(unit.icalUrl);
           console.log(`Retrieved ${events.length} calendar events for regular unit`);
           
-          // Process events to ensure consistent formatting (same as the legacy endpoint)
+          // Process events to ensure consistent formatting and proper date handling
           const processedEvents = events.map(event => {
-            // Handle possible invalid dates
+            // Handle possible invalid dates with more robust validation
             let startDate = event.start;
             let endDate = event.end;
+            // Use checkout date if available (explicit checkout date provided by icalService)
+            let checkoutDate = event.checkout;
             
             try {
               // Validate that dates are properly parsed
@@ -442,17 +464,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 endDate.setDate(endDate.getDate() + 1);
                 console.warn(`Invalid end date in event ${event.uid}, using start date + 1 day`);
               }
+              
+              // If checkout date is not available, calculate it from end date
+              // Per iCal standard, end date is exclusive (day after last day)
+              if (!(checkoutDate instanceof Date) || isNaN(checkoutDate.getTime())) {
+                checkoutDate = new Date(endDate);
+                checkoutDate.setDate(checkoutDate.getDate() - 1);
+                console.log(`Using calculated checkout date for event ${event.uid}: ${checkoutDate.toISOString()}`);
+              }
+              
+              // Ensure all dates are normalized to midnight for consistent comparison
+              startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+              endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+              checkoutDate = new Date(checkoutDate.getFullYear(), checkoutDate.getMonth(), checkoutDate.getDate());
+              
+              console.log(`Processed event ${event.uid}: 
+                Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
             } catch (e) {
               console.error(`Error processing dates for event ${event.uid}:`, e);
               // Fallback to current date and next day if date processing fails
               startDate = new Date();
               endDate = new Date(startDate);
               endDate.setDate(endDate.getDate() + 1);
+              checkoutDate = new Date(startDate);
             }
             
             return {
               start: startDate,
               end: endDate,
+              checkout: checkoutDate, // Include explicit checkout date
               title: event.title || 'Reservation',
               uid: event.uid,
               status: event.status || 'confirmed'

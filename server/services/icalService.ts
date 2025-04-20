@@ -28,7 +28,12 @@ export function getCheckoutDate(endDate: Date): Date {
   if (!isValid(endDate)) {
     throw new Error("Invalid date provided to getCheckoutDate");
   }
-  return subDays(endDate, 1);
+  
+  // First normalize the date to midnight
+  const normalizedDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  
+  // Then subtract one day to get the actual checkout date
+  return subDays(normalizedDate, 1);
 }
 
 /**
@@ -190,11 +195,35 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
             continue;
           }
           
-          // Create a sanitized event object
+          // Ensure dates are valid and normalized to midnight
+          const validStart = ensureValidDate(event.start);
+          const validEnd = ensureValidDate(event.end);
+          
+          // Normalize dates to midnight for consistent comparisons
+          const normalizedStart = new Date(
+            validStart.getFullYear(), 
+            validStart.getMonth(), 
+            validStart.getDate()
+          );
+          
+          const normalizedEnd = new Date(
+            validEnd.getFullYear(), 
+            validEnd.getMonth(), 
+            validEnd.getDate()
+          );
+          
+          // Log date processing for debugging
+          console.log(`Processing event ${event.uid || 'unknown'}: 
+            Original dates: start=${validStart.toISOString()}, end=${validEnd.toISOString()}
+            Normalized dates: start=${normalizedStart.toISOString()}, end=${normalizedEnd.toISOString()}
+            Checkout date: ${getCheckoutDate(normalizedEnd).toISOString()}
+          `);
+          
+          // Create a sanitized event object with normalized dates
           const calendarEvent: CalendarEvent = {
-            start: ensureValidDate(event.start),
-            end: ensureValidDate(event.end),
-            checkout: getCheckoutDate(ensureValidDate(event.end)), // Add explicit checkout date
+            start: normalizedStart,
+            end: normalizedEnd,
+            checkout: getCheckoutDate(normalizedEnd), // Add explicit checkout date
             title: (event.summary && typeof event.summary === 'string') 
               ? event.summary 
               : 'Reservation',
