@@ -833,10 +833,11 @@ export async function performBatchSync(options: {
     // Get the current rate limit status
     const finalRateLimitStatus = await checkBatchRateLimit(1);
     
-    // Update the sync log
+    // Update the sync log - convert boolean result to number (1 for success, 0 for failure)
+    const successStatus = (propertiesResult?.success && reservationsResult?.success) ? 1 : 0;
     await completeSyncLog(
       syncLogId,
-      propertiesResult?.success && reservationsResult?.success,
+      successStatus,
       errors.length > 0 ? errors.join('; ') : undefined,
       SyncType.ALL
     );
