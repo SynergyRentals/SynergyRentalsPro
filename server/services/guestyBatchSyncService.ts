@@ -150,11 +150,25 @@ async function canInitiateSync(requiredApiCalls: number): Promise<RateLimitStatu
 function formatGuestyProperty(data: any): InsertGuestyProperty {
   return {
     guestyId: data._id,
-    propertyName: data.title || 'Unnamed Property',
+    name: data.title || 'Unnamed Property',
     address: data.address?.full || '',
-    active: data.active || true,
+    city: data.address?.city || null,
+    state: data.address?.state || null,
+    zipCode: data.address?.zipcode || null,
+    country: data.address?.country || null,
+    bedrooms: data.bedrooms || null,
+    bathrooms: data.bathrooms || null,
+    beds: data.beds || null,
+    accommodates: data.accommodates || null,
+    propertyType: data.propertyType || null,
+    roomType: data.roomType || null,
+    listingUrl: data.listingUrl || null,
+    picture: data.picture?.regular || null,
+    latitude: data.address?.location?.lat || null,
+    longitude: data.address?.location?.lng || null,
     propertyData: JSON.stringify(data),
-    lastSyncedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 }
 
@@ -165,15 +179,28 @@ function formatGuestyReservation(data: any, propertyId: string): InsertGuestyRes
   return {
     guestyId: data._id,
     guestyPropertyId: propertyId,
-    checkIn: new Date(data.checkIn),
-    checkOut: new Date(data.checkOut),
-    status: data.status || 'unknown',
+    propertyId: data.listing?.id || null,
+    guestId: data.guest?._id || null,
+    reservationId: data.reservationId || null,
+    confirmationCode: data.confirmationCode || null,
     guestName: data.guest?.fullName || 'Unknown Guest',
     guestEmail: data.guest?.email || null,
     guestPhone: data.guest?.phone || null,
-    numberOfGuests: data.numberOfGuests || 1,
+    checkIn: new Date(data.checkIn),
+    checkOut: new Date(data.checkOut),
+    status: data.status || 'unknown',
+    source: data.source || null,
+    channel: data.channel || null,
+    totalPrice: data.money?.netAmount || null,
+    money: data.money || null,
+    adults: data.guests?.adults || 0,
+    children: data.guests?.children || 0,
+    infants: data.guests?.infants || 0,
+    pets: data.guests?.pets || 0,
+    totalGuests: data.guests?.total || 1,
     reservationData: JSON.stringify(data),
-    lastSyncedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date()
   };
 }
 
@@ -229,11 +256,13 @@ export async function syncProperties(): Promise<SyncResponse> {
       if (existingProperty) {
         // Update existing property
         await storage.updateGuestyProperty(existingProperty.id, {
-          propertyName: propertyData.title || existingProperty.propertyName,
+          name: propertyData.title || existingProperty.name,
           address: propertyData.address?.full || existingProperty.address,
-          active: propertyData.active !== undefined ? propertyData.active : existingProperty.active,
+          city: propertyData.address?.city || existingProperty.city,
+          state: propertyData.address?.state || existingProperty.state,
+          zipCode: propertyData.address?.zipcode || existingProperty.zipCode,
           propertyData: JSON.stringify(propertyData),
-          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
         });
       } else {
         // Create new property
@@ -388,9 +417,16 @@ export async function syncAllReservations(): Promise<SyncResponse> {
               guestName: reservationData.guest?.fullName || existingReservation.guestName,
               guestEmail: reservationData.guest?.email || existingReservation.guestEmail,
               guestPhone: reservationData.guest?.phone || existingReservation.guestPhone,
-              numberOfGuests: reservationData.numberOfGuests || existingReservation.numberOfGuests,
+              adults: reservationData.guests?.adults || existingReservation.adults,
+              children: reservationData.guests?.children || existingReservation.children,
+              infants: reservationData.guests?.infants || existingReservation.infants,
+              pets: reservationData.guests?.pets || existingReservation.pets,
+              totalGuests: reservationData.guests?.total || 1,
+              source: reservationData.source || existingReservation.source,
+              channel: reservationData.channel || existingReservation.channel,
+              totalPrice: reservationData.money?.netAmount || existingReservation.totalPrice,
               reservationData: JSON.stringify(reservationData),
-              lastSyncedAt: new Date(),
+              updatedAt: new Date(),
             });
           } else {
             // Create new reservation
@@ -411,7 +447,7 @@ export async function syncAllReservations(): Promise<SyncResponse> {
         });
       } catch (error: any) {
         // Log the error but continue with other properties
-        console.error(`Error syncing reservations for property ${property.propertyName}:`, error);
+        console.error(`Error syncing reservations for property ${property.name}:`, error);
       }
     }
     
@@ -547,9 +583,16 @@ export async function syncPropertyReservations(propertyId: number): Promise<Sync
           guestName: reservationData.guest?.fullName || existingReservation.guestName,
           guestEmail: reservationData.guest?.email || existingReservation.guestEmail,
           guestPhone: reservationData.guest?.phone || existingReservation.guestPhone,
-          numberOfGuests: reservationData.numberOfGuests || existingReservation.numberOfGuests,
+          adults: reservationData.guests?.adults || existingReservation.adults,
+          children: reservationData.guests?.children || existingReservation.children,
+          infants: reservationData.guests?.infants || existingReservation.infants,
+          pets: reservationData.guests?.pets || existingReservation.pets,
+          totalGuests: reservationData.guests?.total || 1,
+          source: reservationData.source || existingReservation.source,
+          channel: reservationData.channel || existingReservation.channel,
+          totalPrice: reservationData.money?.netAmount || existingReservation.totalPrice,
           reservationData: JSON.stringify(reservationData),
-          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
         });
       } else {
         // Create new reservation
@@ -573,7 +616,7 @@ export async function syncPropertyReservations(propertyId: number): Promise<Sync
     
     return {
       success: true,
-      message: `Successfully synced ${processedCount} reservations for property ${property.propertyName}`,
+      message: `Successfully synced ${processedCount} reservations for property ${property.name}`,
       syncLogId,
     };
   } catch (error: any) {
@@ -631,7 +674,10 @@ export async function getSyncStatus(): Promise<any> {
     const latestLogs: Record<string, any> = {};
     
     for (const log of allLogs) {
-      if (!latestLogs[log.syncType] || new Date(log.startTime) > new Date(latestLogs[log.syncType].startTime)) {
+      if (!log.syncType) continue;
+      if (!latestLogs[log.syncType] || 
+          (log.startedAt && latestLogs[log.syncType]?.startedAt && 
+           new Date(log.startedAt) > new Date(latestLogs[log.syncType].startedAt))) {
         latestLogs[log.syncType] = log;
       }
     }
