@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { addDays, subDays, isValid, parseISO } from 'date-fns';
 import { utcToZonedTime, zonedTimeToUtc, format as formatTZ } from 'date-fns-tz';
 import { isHighTrafficProperty } from './configService';
+import { normalizeToUTCMidnight, getCheckoutDate, createFallbackDates } from '../../shared/utils/dateUtils';
 
 export interface CalendarEvent {
   start: Date;
@@ -16,53 +17,13 @@ export interface CalendarEvent {
 }
 
 /**
- * Utility functions for date handling to ensure consistency between frontend and backend
+ * Date handling utility definitions
+ * Note: The actual implementation is now imported from shared/utils/dateUtils.ts
+ * to ensure consistency between client and server code
  */
 
-/**
- * Get the actual checkout date from an iCal end date
- * In iCal standard, the end date is exclusive (the day AFTER the last day of the event)
- * @param endDate The end date from the iCal feed
- * @returns The actual checkout date (end date - 1 day)
- */
 // Default timezone for the application
 export const DEFAULT_TIMEZONE = 'UTC';
-
-/**
- * Normalize a date to midnight in UTC to avoid timezone issues
- * Ensures consistent date handling across frontend and backend
- * @param date Input date object
- * @returns Date normalized to UTC midnight
- */
-export function normalizeToUTCMidnight(date: Date): Date {
-  if (!isValid(date)) {
-    throw new Error("Invalid date provided to normalizeToUTCMidnight");
-  }
-  
-  // Convert to ISO string, then extract just the date part (YYYY-MM-DD)
-  const dateString = date.toISOString().split('T')[0];
-  
-  // Create a new UTC date at midnight
-  return new Date(`${dateString}T00:00:00Z`);
-}
-
-/**
- * Get the actual checkout date from an iCal end date
- * In iCal standard, the end date is exclusive (the day AFTER the last day of the event)
- * @param endDate The end date from the iCal feed
- * @returns The actual checkout date (end date - 1 day)
- */
-export function getCheckoutDate(endDate: Date): Date {
-  if (!isValid(endDate)) {
-    throw new Error("Invalid date provided to getCheckoutDate");
-  }
-  
-  // First normalize the date to midnight in UTC
-  const normalizedDate = normalizeToUTCMidnight(endDate);
-  
-  // Then subtract one day to get the actual checkout date
-  return subDays(normalizedDate, 1);
-}
 
 /**
  * Ensures a date is valid, returning a fallback if necessary
@@ -86,22 +47,6 @@ export function ensureValidDate(date: any, fallback: Date = new Date()): Date {
   
   // Return fallback if all else fails
   return fallback;
-}
-
-/**
- * Create properly formatted fallback dates for iCal events when the original dates are invalid
- * Ensures consistent fallback behavior across the application for error cases
- * @returns Object containing normalized start, end, and checkout dates
- */
-export function createFallbackDates(): { start: Date, end: Date, checkout: Date } {
-  const start = normalizeToUTCMidnight(new Date());
-  const end = normalizeToUTCMidnight(new Date(start.getTime() + 86400000)); // Add one day (24 hours) in milliseconds
-  
-  return {
-    start,
-    end,
-    checkout: start // For fallback, checkout same as start (one-day event)
-  };
 }
 
 interface iCalEvent {
