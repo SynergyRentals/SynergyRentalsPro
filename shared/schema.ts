@@ -333,11 +333,7 @@ export type InsertGuestyWebhookEvent = z.infer<typeof insertGuestyWebhookEventSc
 export type GuestyWebhookEvent = typeof guestyWebhookEvents.$inferSelect;
 
 // Relations for Guesty entities
-export const guestyPropertiesRelations = relations(guestyProperties, ({ one, many }) => ({
-  unit: one(units, {
-    fields: [guestyProperties.unitId],
-    references: [units.id],
-  }),
+export const guestyPropertiesRelations = relations(guestyProperties, ({ many }) => ({
   reservations: many(guestyReservations),
 }));
 
