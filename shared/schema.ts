@@ -31,6 +31,19 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Login schema for user authentication
+export const loginUserSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+// AI prompt schema for generating content using AI
+export const aiPromptSchema = z.object({
+  prompt: z.string().min(10, "Prompt must be at least 10 characters")
+});
+
+export type AiPromptFormValues = z.infer<typeof aiPromptSchema>;
+
 // Units table
 export const units = pgTable('units', {
   id: serial('id').primaryKey(),
@@ -109,6 +122,10 @@ export const insertMaintenanceIssueSchema = createInsertSchema(maintenanceIssues
 export type InsertMaintenanceIssue = z.infer<typeof insertMaintenanceIssueSchema>;
 export type MaintenanceIssue = typeof maintenanceIssues.$inferSelect;
 
+// Alias for backward compatibility
+export const insertMaintenanceSchema = insertMaintenanceIssueSchema;
+export type Maintenance = MaintenanceIssue;
+
 // Inventory items table
 export const inventoryItems = pgTable('inventory_items', {
   id: serial('id').primaryKey(),
@@ -126,6 +143,9 @@ export const inventoryItems = pgTable('inventory_items', {
 export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({ id: true });
 export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
 export type InventoryItem = typeof inventoryItems.$inferSelect;
+
+// Alias for backward compatibility
+export const insertInventorySchema = insertInventoryItemSchema;
 
 // Vendors table
 export const vendors = pgTable('vendors', {

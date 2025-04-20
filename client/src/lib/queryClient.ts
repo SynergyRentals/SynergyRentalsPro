@@ -11,17 +11,25 @@ export const queryClient = new QueryClient({
 });
 
 // Helper function for API requests
-export async function apiRequest(url: string, options: RequestInit = {}) {
-  const response = await fetch(url, {
+export async function apiRequest(url: string, method: string = 'GET', data?: any, options: RequestInit = {}) {
+  const requestOptions: RequestInit = {
+    method,
     ...options,
     headers: {
       ...(options.headers || {}),
       // Add default headers for JSON except when using FormData
-      ...(!options.body || typeof options.body !== 'object' || !(options.body instanceof FormData)
+      ...(!data || typeof data !== 'object' || !(data instanceof FormData)
         ? { 'Content-Type': 'application/json' }
         : {}),
     },
-  });
+  };
+
+  // Add body if there's data and it's not a GET request
+  if (data && method !== 'GET') {
+    requestOptions.body = data instanceof FormData ? data : JSON.stringify(data);
+  }
+
+  const response = await fetch(url, requestOptions);
 
   if (!response.ok) {
     // Handle API error responses
@@ -42,4 +50,24 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
   }
 
   return response;
+}
+
+// Get query function for React Query
+interface QueryFnOptions {
+  on401?: 'redirect' | 'returnNull';
+}
+
+export function getQueryFn(options: QueryFnOptions = {}) {
+  return async ({ queryKey }: { queryKey: (string | object)[] }) => {
+    try {
+      const url = queryKey[0] as string;
+      const data = await apiRequest(url, 'GET');
+      return data;
+    } catch (error: any) {
+      if (error.message === 'HTTP error 401' && options.on401 === 'returnNull') {
+        return null;
+      }
+      throw error;
+    }
+  };
 }
