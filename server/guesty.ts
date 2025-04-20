@@ -9,6 +9,7 @@ import { guestyApiClient } from "./lib/guestyApiClient";
 import { syncAllGuestyData } from "./services/guestySyncService";
 
 // Initialize Guesty API client with environment variables
+// Define the initGuestyClient function
 function initGuestyClient(): boolean {
   try {
     const clientId = process.env.GUESTY_CLIENT_ID;
@@ -575,7 +576,14 @@ export async function getLatestSyncLog() {
   }
 }
 
-let tokenCache: any = null;
+// Define variables for OAuth and API access
+interface TokenCache {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
+let tokenCache: TokenCache | null = null;
 const GUESTY_CLIENT_ID = process.env.GUESTY_CLIENT_ID;
 const GUESTY_CLIENT_SECRET = process.env.GUESTY_CLIENT_SECRET;
 const OAUTH_URL = "https://auth.guesty.com/connect/token";
