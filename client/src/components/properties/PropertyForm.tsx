@@ -152,7 +152,8 @@ export default function PropertyForm({
     // Clean up the data before submitting
     const submissionData = {
       ...data,
-      icalUrl: data.icalUrl && data.icalUrl.trim() ? data.icalUrl : null,
+      // Convert empty string to empty string (not null) to match expected type
+      icalUrl: data.icalUrl && data.icalUrl.trim() ? data.icalUrl : "",
     };
     
     mutation.mutate(submissionData);

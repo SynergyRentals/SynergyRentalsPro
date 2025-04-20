@@ -31,7 +31,7 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
-import { getCalendarEvents, getCachedCalendarEvents } from "./services/icalService";
+import { getCalendarEvents, getCachedCalendarEvents, clearIcalCache } from "./services/icalService";
 import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } from "./services/guestySyncService";
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
@@ -162,6 +162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/properties/:id", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     try {
       const propertyId = parseInt(req.params.id);
+      const hasIcalUrlUpdate = req.body.icalUrl !== undefined;
+      let oldIcalUrl = null;
       
       // First, try to find as a Guesty property
       const [guestyProperty] = await db.select()
@@ -169,12 +171,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(guestyProperties.id, propertyId));
         
       if (guestyProperty) {
+        // Store the old iCal URL to clear cache if it's changing
+        if (hasIcalUrlUpdate) {
+          oldIcalUrl = guestyProperty.icalUrl;
+        }
+        
         // Special handling for property ID 18 (known inconsistency)
         if (propertyId === 18) {
           console.log(`[API Debug] Special handling for property 18 (Guesty) in PATCH endpoint`);
           
           // Always update with the iCal URL for property 18 if provided
-          if (req.body.icalUrl) {
+          if (hasIcalUrlUpdate) {
             console.log(`[API Debug] Setting iCal URL for property 18: ${req.body.icalUrl}`);
             
             // This is our known Guesty property with source inconsistency
@@ -206,8 +213,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(guestyProperties.id, propertyId));
           
           // Log the update if it includes iCal URL
-          if (req.body.icalUrl !== undefined) {
+          if (hasIcalUrlUpdate) {
             console.log(`iCal URL updated for Guesty property ${propertyId}: ${req.body.icalUrl}`);
+          }
+        }
+        
+        // Clear iCal cache if URL has changed or been removed
+        if (hasIcalUrlUpdate) {
+          if (oldIcalUrl) {
+            console.log(`Clearing iCal cache for old URL: ${oldIcalUrl}`);
+            clearIcalCache(oldIcalUrl);
+          }
+          if (req.body.icalUrl) {
+            console.log(`Clearing iCal cache for new URL: ${req.body.icalUrl}`);
+            clearIcalCache(req.body.icalUrl);
           }
         }
         
@@ -225,12 +244,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If not a Guesty property, try to find as a regular unit
       const unit = await storage.getUnit(propertyId);
       if (unit) {
+        // Store the old iCal URL to clear cache if it's changing
+        if (hasIcalUrlUpdate && unit.icalUrl) {
+          oldIcalUrl = unit.icalUrl;
+        }
+        
         // It's a regular unit, update it
         const updatedUnit = await storage.updateUnit(propertyId, req.body);
         
         // Log the update if it includes iCal URL
-        if (req.body.icalUrl) {
+        if (hasIcalUrlUpdate) {
           console.log(`iCal URL updated for unit ${propertyId}: ${req.body.icalUrl}`);
+          
+          // Clear iCal cache if URL has changed or been removed
+          if (oldIcalUrl) {
+            console.log(`Clearing iCal cache for old URL: ${oldIcalUrl}`);
+            clearIcalCache(oldIcalUrl);
+          }
+          if (req.body.icalUrl) {
+            console.log(`Clearing iCal cache for new URL: ${req.body.icalUrl}`);
+            clearIcalCache(req.body.icalUrl);
+          }
         }
         
         return res.json({
