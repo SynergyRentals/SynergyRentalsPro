@@ -3,35 +3,41 @@ import { useLocation } from 'wouter';
 import { useAuth } from '../hooks/use-auth';
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  children?: ReactNode;
+  component?: React.ComponentType<any>;
+  path?: string;
   requiredRole?: string;
 }
 
-export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, status } = useAuth();
+export function ProtectedRoute({ 
+  children, 
+  component: Component,
+  requiredRole 
+}: ProtectedRouteProps) {
+  const { user, isLoading, error } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (status === 'loading') {
+    if (isLoading) {
       // Wait for authentication status to be determined
       return;
     }
 
-    if (status === 'unauthenticated') {
-      // Redirect to login if not authenticated
-      navigate('/login');
+    if (!user) {
+      // Redirect to auth if not authenticated
+      navigate('/auth');
       return;
     }
 
     if (requiredRole && user?.role !== requiredRole) {
       // Redirect to dashboard if user doesn't have required role
-      navigate('/dashboard');
+      navigate('/');
       return;
     }
-  }, [user, status, navigate, requiredRole]);
+  }, [user, isLoading, navigate, requiredRole]);
 
   // Show loading state
-  if (status === 'loading') {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -39,11 +45,14 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // If authenticated and has required role, render children
+  // If authenticated and has required role, render children or component
   if (
-    status === 'authenticated' && 
+    user && 
     (!requiredRole || user?.role === requiredRole)
   ) {
+    if (Component) {
+      return <Component />;
+    }
     return <>{children}</>;
   }
 
