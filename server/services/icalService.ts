@@ -2,13 +2,56 @@ import ical from 'node-ical';
 import https from 'https';
 import http from 'http';
 import crypto from 'crypto';
+import { addDays, subDays, isValid } from 'date-fns';
 
 export interface CalendarEvent {
   start: Date;
   end: Date;
+  checkout?: Date; // Explicit checkout date (end date - 1 day)
   title: string;
   uid: string;
   status?: string;
+}
+
+/**
+ * Utility functions for date handling to ensure consistency between frontend and backend
+ */
+
+/**
+ * Get the actual checkout date from an iCal end date
+ * In iCal standard, the end date is exclusive (the day AFTER the last day of the event)
+ * @param endDate The end date from the iCal feed
+ * @returns The actual checkout date (end date - 1 day)
+ */
+export function getCheckoutDate(endDate: Date): Date {
+  if (!isValid(endDate)) {
+    throw new Error("Invalid date provided to getCheckoutDate");
+  }
+  return subDays(endDate, 1);
+}
+
+/**
+ * Ensures a date is valid, returning a fallback if necessary
+ * @param date The date to validate
+ * @param fallback Optional fallback date (defaults to current date)
+ * @returns A valid date
+ */
+export function ensureValidDate(date: any, fallback: Date = new Date()): Date {
+  if (!date) return fallback;
+  if (date instanceof Date && isValid(date)) return date;
+  
+  // Try to parse the date if it's a string
+  if (typeof date === 'string') {
+    try {
+      const parsedDate = new Date(date);
+      if (isValid(parsedDate)) return parsedDate;
+    } catch (e) {
+      console.warn(`Failed to parse date string: ${date}`);
+    }
+  }
+  
+  // Return fallback if all else fails
+  return fallback;
 }
 
 interface iCalEvent {
@@ -148,8 +191,9 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
           
           // Create a sanitized event object
           const calendarEvent: CalendarEvent = {
-            start: event.start,
-            end: event.end,
+            start: ensureValidDate(event.start),
+            end: ensureValidDate(event.end),
+            checkout: getCheckoutDate(ensureValidDate(event.end)), // Add explicit checkout date
             title: (event.summary && typeof event.summary === 'string') 
               ? event.summary 
               : 'Reservation',
@@ -211,16 +255,42 @@ export async function getCalendarEvents(url: string): Promise<CalendarEvent[]> {
 }
 
 /**
- * Simple cache implementation for iCal data
- * Caches results for 60 minutes to avoid overloading external services
+ * Improved cache implementation for iCal data with adaptive TTL
+ * Caches results with variable TTL based on property characteristics
  */
 const icalCache = new Map<string, { 
   data: CalendarEvent[], 
   timestamp: number,
+  propertyId?: number,
   error?: { message: string, timestamp: number } 
 }>();
-const CACHE_TTL = 60 * 60 * 1000; // 60 minutes in milliseconds
+
+// Cache TTL configuration
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes in milliseconds (default)
+const HIGH_TRAFFIC_CACHE_TTL = 10 * 60 * 1000; // 10 minutes for properties with frequent bookings
 const ERROR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds for errors
+
+// Configure high-traffic properties here - these will have shorter cache TTLs
+const HIGH_TRAFFIC_PROPERTY_IDS = [18]; // Example: Property ID 18 has frequent bookings
+
+/**
+ * Helper function to determine if a property has high traffic
+ * @param propertyId The property ID to check
+ * @returns True if the property is considered high traffic
+ */
+function isHighTrafficProperty(propertyId?: number): boolean {
+  if (!propertyId) return false;
+  return HIGH_TRAFFIC_PROPERTY_IDS.includes(propertyId);
+}
+
+/**
+ * Determine the appropriate cache TTL based on property attributes
+ * @param propertyId The property ID to get the TTL for
+ * @returns The cache TTL in milliseconds
+ */
+function getCacheTTL(propertyId?: number): number {
+  return isHighTrafficProperty(propertyId) ? HIGH_TRAFFIC_CACHE_TTL : CACHE_TTL;
+}
 
 /**
  * Clear the iCal cache for a specific URL or all URLs
@@ -237,11 +307,12 @@ export function clearIcalCache(url?: string): void {
 }
 
 /**
- * Get calendar events with caching
+ * Get calendar events with adaptive caching
  * @param url The URL of the iCal feed
+ * @param propertyId Optional property ID for adaptive cache TTL
  * @returns Array of calendar events
  */
-export async function getCachedCalendarEvents(url: string): Promise<CalendarEvent[]> {
+export async function getCachedCalendarEvents(url: string, propertyId?: number): Promise<CalendarEvent[]> {
   // Validate URL
   if (!url || typeof url !== 'string' || url.trim() === '') {
     console.error('Empty or invalid iCal URL provided to getCachedCalendarEvents');
@@ -258,9 +329,19 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
     throw new Error(`${cachedData.error.message} (cached error, will retry after ${Math.ceil((ERROR_CACHE_TTL - (now - cachedData.error.timestamp)) / 60000)} minutes)`);
   }
   
+  // Determine appropriate cache TTL based on property attributes
+  const cacheTTL = getCacheTTL(propertyId || cachedData?.propertyId);
+  
   // Return cached data if it exists and is still valid
-  if (cachedData?.data && (now - cachedData.timestamp < CACHE_TTL)) {
+  if (cachedData?.data && (now - cachedData.timestamp < cacheTTL)) {
     console.log(`Using cached iCal data for: ${url} (${cachedData.data.length} events, cached ${Math.floor((now - cachedData.timestamp) / 60000)} minutes ago)`);
+    
+    // Start a background refresh if cache is getting stale (> 75% of TTL)
+    if (now - cachedData.timestamp > cacheTTL * 0.75) {
+      console.log(`Starting background refresh for: ${url}`);
+      refreshCacheInBackground(url, propertyId);
+    }
+    
     return cachedData.data;
   }
   
@@ -273,8 +354,8 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
     icalCache.set(url, { 
       data: events, 
       timestamp: now,
-      // Clear any previous error
-      error: undefined 
+      propertyId, // Store the property ID for future TTL calculations
+      error: undefined // Clear any previous error
     });
     
     return events;
@@ -300,6 +381,7 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
     icalCache.set(url, { 
       data: [], 
       timestamp: now,
+      propertyId,
       error: { message: errorMessage, timestamp: now } 
     });
     
@@ -308,14 +390,44 @@ export async function getCachedCalendarEvents(url: string): Promise<CalendarEven
 }
 
 /**
+ * Refreshes the cache in the background without blocking the user request
+ * @param url The URL of the iCal feed
+ * @param propertyId Optional property ID for cache
+ */
+async function refreshCacheInBackground(url: string, propertyId?: number): Promise<void> {
+  // We use setTimeout to run this asynchronously without blocking
+  setTimeout(async () => {
+    try {
+      console.log(`Executing background refresh for: ${url}`);
+      const events = await getCalendarEvents(url);
+      
+      // Update cache with fresh data
+      const now = Date.now();
+      icalCache.set(url, { 
+        data: events, 
+        timestamp: now,
+        propertyId,
+        error: undefined 
+      });
+      
+      console.log(`Background refresh completed for: ${url}, got ${events.length} events`);
+    } catch (error) {
+      console.error(`Background refresh failed for: ${url}`, error);
+      // Don't update cache on error during background refresh
+    }
+  }, 100); // Start after a small delay
+}
+
+/**
  * Main function to process an iCal URL and return calendar events
  * @param url The URL of the iCal feed
+ * @param propertyId Optional property ID for adaptive caching
  * @returns Array of calendar events
  */
-export async function processIcalURL(url: string): Promise<CalendarEvent[]> {
+export async function processIcalURL(url: string, propertyId?: number): Promise<CalendarEvent[]> {
   try {
-    // Get calendar events using the cached function
-    const events = await getCachedCalendarEvents(url);
+    // Get calendar events using the cached function - pass propertyId for adaptive caching
+    const events = await getCachedCalendarEvents(url, propertyId);
     
     // Only return future and current events (events that end after now)
     const now = new Date();

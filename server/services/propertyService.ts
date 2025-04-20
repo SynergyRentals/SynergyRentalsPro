@@ -91,7 +91,7 @@ export async function getPropertyCalendar(id: number, refresh: boolean = false) 
     const property = await getPropertyById(id);
     
     if (!property || !property.icalUrl) {
-      return []; // Return empty array if property has no iCal URL
+      throw new Error("No iCal URL configured for this property");
     }
     
     // Clear cache if refresh is requested
@@ -100,8 +100,8 @@ export async function getPropertyCalendar(id: number, refresh: boolean = false) 
       clearIcalCache(property.icalUrl);
     }
     
-    // Process the iCal URL and return events
-    const events = await processIcalURL(property.icalUrl);
+    // Process the iCal URL and return events - passing property ID for adaptive caching
+    const events = await processIcalURL(property.icalUrl, id);
     return events;
   } catch (error) {
     console.error(`Error fetching calendar for property ${id}:`, error);
@@ -112,17 +112,80 @@ export async function getPropertyCalendar(id: number, refresh: boolean = false) 
 // Validate iCal URL by attempting to fetch and parse it
 export async function validateIcalUrl(url: string) {
   try {
+    // First check if URL is in a valid format
+    try {
+      new URL(url);
+    } catch (e) {
+      return {
+        valid: false,
+        message: "Invalid URL format. Please enter a valid URL.",
+        eventCount: 0
+      };
+    }
+    
+    // Check protocol
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return {
+        valid: false,
+        message: `Unsupported URL protocol: ${parsedUrl.protocol}. Only HTTP and HTTPS are supported.`,
+        eventCount: 0
+      };
+    }
+    
+    // Check if URL ends with .ics which is common for iCal files
+    const isIcsFile = parsedUrl.pathname.toLowerCase().endsWith('.ics');
+    
+    // Try to fetch and parse the iCal data
+    console.log(`Validating iCal URL: ${url}`);
     const events = await processIcalURL(url);
-    return {
-      valid: true,
-      message: `Successfully validated iCal URL with ${events.length} events`,
-      eventCount: events.length
-    };
+    
+    // Enhanced validation with sample event data
+    if (events.length > 0) {
+      const firstEvent = events[0];
+      return {
+        valid: true,
+        message: `Successfully validated iCal URL with ${events.length} events`,
+        eventCount: events.length,
+        sampleEvent: {
+          title: firstEvent.title,
+          start: firstEvent.start,
+          end: firstEvent.end
+        }
+      };
+    } else {
+      return {
+        valid: true,
+        message: isIcsFile ? 
+          "Valid iCal URL but no events found. The calendar may be empty." : 
+          "URL accepted but no events found. The calendar may be empty or the URL might not point to a valid iCal feed.",
+        eventCount: 0
+      };
+    }
   } catch (error) {
     console.error("Error validating iCal URL:", error);
+    
+    // More descriptive error messages based on error type
+    let errorMessage = "Failed to validate iCal URL";
+    if (error instanceof Error) {
+      if (error.message.includes("ENOTFOUND") || error.message.includes("ECONNREFUSED")) {
+        errorMessage = "Cannot connect to calendar server. Please check the URL domain is correct.";
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "Connection to calendar server timed out. The server may be slow or unresponsive.";
+      } else if (error.message.includes("401") || error.message.includes("403")) {
+        errorMessage = "Calendar URL requires authentication. Please use a public iCal URL.";
+      } else if (error.message.includes("404")) {
+        errorMessage = "Calendar feed not found. Please check the URL is correct.";
+      } else if (error.message.includes("parse")) {
+        errorMessage = "Not a valid iCal feed. Please ensure the URL points to an iCal (.ics) resource.";
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     return {
       valid: false,
-      message: `Failed to validate iCal URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: errorMessage,
       eventCount: 0
     };
   }
