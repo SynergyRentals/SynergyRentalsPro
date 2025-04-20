@@ -27,7 +27,7 @@ import {
   makeGuestyRequest, healthCheck
 } from "./guesty-updated";
 import { guestyClient } from "./lib/guestyApiClient";
-import { getCalendarEvents, getCachedCalendarEvents, clearIcalCache, getCheckoutDate, normalizeToUTCMidnight } from "./services/icalService";
+import { getCalendarEvents, getCachedCalendarEvents, clearIcalCache, getCheckoutDate, normalizeToUTCMidnight, createFallbackDates } from "./services/icalService";
 import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } from "./services/guestySyncService";
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
@@ -383,11 +383,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
             } catch (e) {
               console.error(`Error processing dates for event ${event.uid}:`, e);
-              // Fallback to current date and next day if date processing fails
-              startDate = new Date();
-              endDate = new Date(startDate);
-              endDate.setDate(endDate.getDate() + 1);
-              checkoutDate = new Date(startDate);
+              // Use standardized fallback date utility for consistent error handling
+              const fallbackDates = createFallbackDates();
+              startDate = fallbackDates.start;
+              endDate = fallbackDates.end;
+              checkoutDate = fallbackDates.checkout;
             }
             
             return {
@@ -480,11 +480,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
             } catch (e) {
               console.error(`Error processing dates for event ${event.uid}:`, e);
-              // Fallback to current date and next day if date processing fails
-              startDate = new Date();
-              endDate = new Date(startDate);
-              endDate.setDate(endDate.getDate() + 1);
-              checkoutDate = new Date(startDate);
+              // Use standardized fallback date utility for consistent error handling
+              const fallbackDates = createFallbackDates();
+              startDate = fallbackDates.start;
+              endDate = fallbackDates.end;
+              checkoutDate = fallbackDates.checkout;
             }
             
             return {
@@ -640,11 +640,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               Dates: start=${startDate.toISOString()}, end=${endDate.toISOString()}, checkout=${checkoutDate.toISOString()}`);
           } catch (e) {
             console.error(`Error processing dates for event ${event.uid}:`, e);
-            // Fallback to current date and next day if date processing fails
-            startDate = new Date();
-            endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + 1);
-            checkoutDate = new Date(startDate);
+            // Use standardized fallback date utility for consistent error handling
+              const fallbackDates = createFallbackDates();
+              startDate = fallbackDates.start;
+              endDate = fallbackDates.end;
+              checkoutDate = fallbackDates.checkout;
           }
           
           return {

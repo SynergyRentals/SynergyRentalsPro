@@ -72,10 +72,27 @@ export default function PropertyCalendar({ events, isLoading }: PropertyCalendar
       }
     } catch (e) {
       console.error("Error normalizing dates:", e);
-      // Fallback for any parsing errors
-      normalizedStart = startDate;
-      normalizedEnd = endDate;
-      normalizedCheckout = checkoutDate;
+      // Fallback for any parsing errors using a standardized approach
+      // Create consistent fallback dates that match the server's implementation
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Create normalized UTC midnight versions
+      normalizedStart = new Date(Date.UTC(
+        today.getFullYear(), 
+        today.getMonth(), 
+        today.getDate()
+      ));
+      
+      normalizedEnd = new Date(Date.UTC(
+        tomorrow.getFullYear(), 
+        tomorrow.getMonth(), 
+        tomorrow.getDate()
+      ));
+      
+      // For fallback, checkout is same as start (one-day event)
+      normalizedCheckout = normalizedStart;
     }
     
     return {
