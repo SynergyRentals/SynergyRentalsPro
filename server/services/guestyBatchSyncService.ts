@@ -761,7 +761,8 @@ export async function performBatchSync(options: {
     
     // Check if we can perform the sync (rate limit check)
     if (!options.forceSync) {
-      const rateLimitStatus = await checkBatchRateLimit();
+      // We need at least 2 requests for a basic sync (1 for properties, 1 for reservations)
+      const rateLimitStatus = await checkBatchRateLimit(2);
       if (rateLimitStatus.isRateLimited) {
         return {
           success: false,
@@ -830,7 +831,7 @@ export async function performBatchSync(options: {
     }
     
     // Get the current rate limit status
-    const finalRateLimitStatus = await checkBatchRateLimit();
+    const finalRateLimitStatus = await checkBatchRateLimit(1);
     
     // Update the sync log
     await completeSyncLog(

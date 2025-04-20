@@ -60,7 +60,12 @@ export function GuestyCSVImport() {
         setUploadProgress(prev => Math.min(prev + 5, 90));
       }, 100);
       
-      const response = await apiRequest("POST", "/api/guesty/import-csv-upload", formData);
+      // Using fetch directly for FormData since apiRequest doesn't handle it well
+      const response = await fetch("/api/guesty/import-csv", {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin"
+      });
       const result = await response.json();
       
       clearInterval(progressInterval);

@@ -217,6 +217,8 @@ export default function AdminPage() {
   const [apiKeys, setApiKeys] = useState({
     openai: "",
     slack: "",
+    guestyKey: "",
+    guestySecret: "",
   });
 
   const [isUpdatingKeys, setIsUpdatingKeys] = useState(false);
@@ -224,8 +226,22 @@ export default function AdminPage() {
   const updateAPIKeys = async () => {
     setIsUpdatingKeys(true);
     try {
-      // Simulated API call - in a real app this would update the API keys
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Make API call to update the API keys
+      const response = await apiRequest('POST', '/api/settings/update-api-keys', {
+        openAiKey: apiKeys.openai,
+        slackToken: apiKeys.slack,
+        guestyApiKey: apiKeys.guestyKey,
+        guestyApiSecret: apiKeys.guestySecret
+      });
+      
+      // If Guesty API keys were provided, update the client
+      if (apiKeys.guestyKey && apiKeys.guestySecret) {
+        // Update Guesty API credentials
+        await apiRequest('POST', '/api/guesty/set-credentials', {
+          apiKey: apiKeys.guestyKey,
+          apiSecret: apiKeys.guestySecret
+        });
+      }
       
       toast({
         title: "API Keys Updated",
@@ -234,7 +250,7 @@ export default function AdminPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update API keys. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update API keys. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -448,6 +464,34 @@ export default function AdminPage() {
                     <div>
                       <Label>Guesty API Integration</Label>
                       <div className="flex flex-col space-y-4 mt-2">
+                        <div>
+                          <Label htmlFor="guesty-key">Guesty API Key</Label>
+                          <Input
+                            id="guesty-key"
+                            type="password"
+                            placeholder="Your Guesty API key"
+                            value={apiKeys.guestyKey}
+                            onChange={(e) => setApiKeys(prev => ({ ...prev, guestyKey: e.target.value }))}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Required for Guesty API integration. Enter your API key from the Guesty developer portal.
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="guesty-secret">Guesty API Secret</Label>
+                          <Input
+                            id="guesty-secret"
+                            type="password"
+                            placeholder="Your Guesty API secret"
+                            value={apiKeys.guestySecret}
+                            onChange={(e) => setApiKeys(prev => ({ ...prev, guestySecret: e.target.value }))}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Required for Guesty API integration. Enter your API secret from the Guesty developer portal.
+                          </p>
+                        </div>
+
                         <div className="flex flex-col space-y-2">
                           <div className="flex items-center space-x-2">
                             <GuestyHealthCheck />
