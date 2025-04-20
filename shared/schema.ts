@@ -146,13 +146,19 @@ export type Vendor = typeof vendors.$inferSelect;
 // Projects table
 export const projects = pgTable('projects', {
   id: serial('id').primaryKey(),
-  title: text('title').notNull(),
+  title: text('title'),
   description: text('description'),
-  status: text('status').notNull(),
-  deadline: timestamp('deadline'),
-  createdAt: timestamp('created_at').defaultNow(),
+  status: text('status'),
+  dueDate: timestamp('due_date'),
+  startDate: timestamp('start_date'),
+  unitId: integer('unit_id').references(() => units.id),
+  budgetEstimate: integer('budget_estimate'),
+  actualSpend: real('actual_spend'),
+  category: text('category'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at'),
   createdBy: integer('created_by').references(() => users.id),
-  lastUpdated: timestamp('last_updated'),
+  updatedAt: timestamp('updated_at'),
 });
 
 // Project schema for insert
@@ -214,13 +220,16 @@ export const projectsRelations = relations(projects, ({ one }) => ({
     fields: [projects.createdBy],
     references: [users.id],
   }),
+  unit: one(units, {
+    fields: [projects.unitId],
+    references: [units.id],
+  }),
 }));
 
 // Guesty Properties table
 export const guestyProperties = pgTable('guesty_properties', {
   id: serial('id').primaryKey(),
-  guestyId: varchar('guesty_id', { length: 255 }).notNull(),
-  unitId: integer('unit_id').references(() => units.id),
+  guestyId: varchar('guesty_id', { length: 255 }),
   nickname: varchar('nickname', { length: 255 }),
   name: text('name'),
   address: text('address'),
@@ -243,7 +252,7 @@ export const guestyProperties = pgTable('guesty_properties', {
   amenities: text('amenities').array(), // This is an ARRAY type in the database
   images: json('images'),
   propertyData: json('property_data'),
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at'),
   updatedAt: timestamp('updated_at'),
 });
 
