@@ -1,18 +1,21 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, FileText } from "lucide-react";
+import { Loader2, Upload, FileText, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function GuestyCSVImport() {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -20,6 +23,9 @@ export function GuestyCSVImport() {
       const file = e.target.files[0];
       if (file.type === "text/csv" || file.name.endsWith('.csv')) {
         setSelectedFile(file);
+        // Clear any previous errors or results
+        setImportError(null);
+        setImportResult(null);
       } else {
         toast({
           title: "Invalid File Type",
@@ -37,6 +43,15 @@ export function GuestyCSVImport() {
     }
   };
 
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setImportError(null);
+    setImportResult(null);
+  };
+
   const importFromCSV = async () => {
     if (!selectedFile) {
       toast({
@@ -49,6 +64,8 @@ export function GuestyCSVImport() {
 
     setIsImporting(true);
     setUploadProgress(0);
+    setImportError(null);
+    setImportResult(null);
     
     try {
       // Create a FormData object to send the file
@@ -57,10 +74,13 @@ export function GuestyCSVImport() {
       
       // Simulated progress for better UX
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 5, 90));
-      }, 100);
+        setUploadProgress(prev => {
+          // Only increase if we're not already at 100%
+          return prev < 90 ? Math.min(prev + 5, 90) : prev;
+        });
+      }, 150);
       
-      // Use a non-API route to completely bypass all middleware
+      // Use the direct upload endpoint
       const response = await fetch("/csv_direct_upload", {
         method: "POST",
         body: formData,
@@ -71,85 +91,65 @@ export function GuestyCSVImport() {
         }
       });
       
-      // Get the response text first
+      clearInterval(progressInterval);
+      
+      // Get the response text first for better error handling
       const text = await response.text();
       
-      // Check if this is an HTML response (which means it's an error)
+      // Try to parse as JSON, handle HTML responses as errors
+      let result;
       if (text.trim().startsWith('<!DOCTYPE html>') || text.includes('<html')) {
         console.error("Received HTML response instead of JSON");
-        console.log("Response was:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
-        
-        // Create a simulated error result that the component can handle
-        return {
-          success: false,
-          message: "Server returned an HTML page instead of JSON. This likely means the file couldn't be processed correctly. Please try again with a different CSV file."
-        };
+        throw new Error("Server returned HTML instead of JSON. This usually indicates a server-side error. Please check server logs or try again.");
       }
       
-      // Try to parse as JSON
-      let result;
       try {
         result = JSON.parse(text);
       } catch (parseError) {
         console.error("Failed to parse server response as JSON:", parseError);
-        console.log("Response was:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
         throw new Error(`Invalid response format from server. Please try again with a different CSV file.`);
       }
       
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${result.message || response.statusText}`);
+        throw new Error(result?.message || `Server error: ${response.status} ${response.statusText}`);
       }
       
-      // Add additional validation of the response
-      if (!result) {
-        throw new Error("Server returned an empty response");
-      }
-      
-      clearInterval(progressInterval);
+      // Set progress to 100%
       setUploadProgress(100);
       
-      if (result.success) {
-        toast({
-          title: "CSV Import Successful",
-          description: `Imported ${result.propertiesCount} properties from CSV`,
-        });
-        
-        // Reset the form
-        setSelectedFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-        
-        // Invalidate the properties cache to refresh the list
-        queryClient.invalidateQueries({ queryKey: ["/api/guesty/properties"] });
-      } else {
-        toast({
-          title: "CSV Import Failed",
-          description: result.message || "Unknown error occurred",
-          variant: "destructive",
-        });
-      }
+      // Store the result
+      setImportResult(result);
+      
+      // Show success toast
+      toast({
+        title: "CSV Import Successful",
+        description: `Imported ${result.propertiesCount || 0} properties from CSV`,
+      });
+      
+      // Invalidate the properties cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["/api/guesty/properties"] });
+      
     } catch (error) {
       console.error("Error importing from CSV:", error);
       
-      // Get more detailed error information if possible
+      // Get more detailed error information
       let errorMessage = "Unknown error occurred";
       
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (error && typeof error === 'object') {
-        // Try to extract any useful information from the error object
-        errorMessage = JSON.stringify(error, null, 2);
+        errorMessage = JSON.stringify(error);
       }
+      
+      setImportError(errorMessage);
       
       toast({
         title: "CSV Import Failed",
-        description: errorMessage,
+        description: errorMessage.substring(0, 150) + (errorMessage.length > 150 ? '...' : ''),
         variant: "destructive",
       });
     } finally {
       setIsImporting(false);
-      setUploadProgress(0);
     }
   };
 
@@ -167,13 +167,24 @@ export function GuestyCSVImport() {
               accept=".csv"
               className="hidden"
             />
+            
             {selectedFile ? (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm bg-secondary/50 p-2 rounded-md">
                 <FileText className="h-4 w-4" />
                 <span className="font-medium">{selectedFile.name}</span>
                 <span className="text-muted-foreground">
                   ({Math.round(selectedFile.size / 1024)} KB)
                 </span>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="ml-auto h-6 w-6" 
+                  onClick={clearSelectedFile}
+                  disabled={isImporting}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             ) : null}
             
@@ -214,9 +225,32 @@ export function GuestyCSVImport() {
               </div>
             )}
             
+            {importError && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertTitle>Import Failed</AlertTitle>
+                <AlertDescription className="text-xs whitespace-pre-wrap">
+                  {importError}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {importResult && importResult.success && (
+              <Alert variant="success" className="mt-2 bg-green-50 border-green-200">
+                <AlertTitle>Import Successful</AlertTitle>
+                <AlertDescription className="text-xs">
+                  Successfully imported {importResult.propertiesCount || 0} properties.
+                  {importResult.hadWarnings && (
+                    <div className="mt-1">
+                      {importResult.warningCount} warning(s) occurred during import.
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <p className="text-xs text-muted-foreground mt-2">
-              Upload a CSV file exported from Guesty containing property data. 
-              This is useful when API rate limits are reached.
+              Upload a CSV file containing property data. The file should have columns for at least NAME, 
+              along with optional BEDROOMS, BATHROOMS, ADDRESS, LISTING_URL, and ICAL_URL.
             </p>
           </div>
         </div>

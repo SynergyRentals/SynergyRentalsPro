@@ -25,7 +25,7 @@ async function validateCSVStructure(filePath: string): Promise<{
     let firstRow: any = null;
     let errors: string[] = [];
     let missingRequired = false;
-    
+
     // Create a parser just to check the header row
     const headerParser = parse({
       delimiter: ',',
@@ -35,7 +35,7 @@ async function validateCSVStructure(filePath: string): Promise<{
       relax_quotes: true,
       to: 1 // Only parse the first row to check headers
     });
-    
+
     fs.createReadStream(filePath)
       .pipe(headerParser)
       .on('readable', function() {
@@ -54,28 +54,28 @@ async function validateCSVStructure(filePath: string): Promise<{
           resolve({ valid: false, errors });
           return;
         }
-        
+
         // Get all column headers from the first row
         const columnHeaders = Object.keys(firstRow).map(h => h.toLowerCase());
-        
+
         // Check if we have any recognized columns
         const hasAnyValidColumn = EXPECTED_COLUMNS.some(col => 
           columnHeaders.includes(col.toLowerCase())
         );
-        
+
         if (!hasAnyValidColumn) {
           errors.push('CSV file has no recognized property columns. Expected at least one of: ' + 
             EXPECTED_COLUMNS.join(', '));
           missingRequired = true;
         }
-        
+
         // Must have either name/title and some form of unique identifier
         const hasName = columnHeaders.some(h => ['name', 'title'].includes(h.toLowerCase()));
         if (!hasName) {
           errors.push('CSV must have a NAME or TITLE column to identify properties');
           missingRequired = true;
         }
-        
+
         resolve({ 
           valid: !missingRequired, 
           errors: errors.length > 0 ? errors : [],
@@ -104,21 +104,21 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
         reject(new Error(`File not found: ${filePath}`));
         return;
       }
-      
+
       // Check file size
       const stats = fs.statSync(filePath);
       if (stats.size === 0) {
         reject(new Error('CSV file is empty'));
         return;
       }
-      
+
       // Validate the CSV structure first
       const validation = await validateCSVStructure(filePath);
       if (!validation.valid) {
         reject(new Error(`Invalid CSV format: ${validation.errors.join(', ')}`));
         return;
       }
-      
+
       console.log('CSV validation passed. Found columns:', validation.columns);
 
       const parser = parse({
@@ -144,10 +144,10 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
             const rowPreview = Object.keys(row).slice(0, 3)
               .reduce((obj, key) => ({ ...obj, [key]: row[key] }), {});
             console.log('Processing CSV row:', JSON.stringify(rowPreview) + '...');
-            
+
             // Handle different possible column names by checking each one
             const nickname = row.NICKNAME || row.Nickname || row.nickname || '';
-            
+
             // Get a name for the property (required)
             const name = row.TITLE || row.Title || row.title || row.NAME || row.Name || row.name;
             if (!name) {
@@ -155,7 +155,7 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
               warnings.push(`Skipping row without a name/title: ${JSON.stringify(row).substring(0, 100)}...`);
               return;
             }
-            
+
             // Generate a consistent property ID from the nickname, name, or a random value
             let propertyId;
             if (nickname) {
@@ -166,7 +166,7 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
               propertyId = `csv-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
               warnings.push(`Generated random ID for row with no name or nickname: ${propertyId}`);
             }
-            
+
             // Parse amenities - handle different formats
             let amenities = [];
             const amenitiesField = row.AMENITIES || row.Amenities || row.amenities;
@@ -193,24 +193,56 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
                 amenities = amenitiesField.map(item => String(item).trim()).filter(Boolean);
               }
             }
-            
+
             // Handle various URL formats
             const listingUrl = row.LISTING_URL || row.ListingUrl || row.listingUrl || row.listing_url || '';
             const icalUrl = row.ICAL_URL || row.IcalUrl || row.icalUrl || row.ical_url || null;
-            
-            // Map CSV columns to property fields with flexible column naming
+
+            try {
+            // Additional validation for required fields
+            if (!name || name.trim() === '') {
+              warnings.push(`Row skipped: Missing name/title field: ${JSON.stringify(row).substring(0, 100)}...`);
+              continue;
+            }
+
+            // Normalize and validate bedrooms
+            let bedrooms = 1; // Default value
+            const bedroomValue = row.BEDROOMS || row.Bedrooms || row.bedrooms;
+            if (bedroomValue !== undefined && bedroomValue !== null && bedroomValue !== '') {
+              const parsedBedrooms = parseInt(String(bedroomValue), 10);
+              if (!isNaN(parsedBedrooms) && parsedBedrooms >= 0) {
+                bedrooms = parsedBedrooms;
+              } else {
+                warnings.push(`Invalid bedroom value "${bedroomValue}" for property "${name}", using default: 1`);
+              }
+            }
+
+            // Normalize and validate bathrooms
+            let bathrooms = 1.0; // Default value
+            const bathroomValue = row.BATHROOMS || row.Bathrooms || row.bathrooms;
+            if (bathroomValue !== undefined && bathroomValue !== null && bathroomValue !== '') {
+              const parsedBathrooms = parseFloat(String(bathroomValue));
+              if (!isNaN(parsedBathrooms) && parsedBathrooms >= 0) {
+                bathrooms = parsedBathrooms;
+              } else {
+                warnings.push(`Invalid bathroom value "${bathroomValue}" for property "${name}", using default: 1.0`);
+              }
+            }
+
+            // Create property object with normalized values
             const property: InsertGuestyProperty = {
               propertyId: propertyId,
-              name: name,
-              address: row.ADDRESS || row.Address || row.address || '',
-              bedrooms: parseInt(row.BEDROOMS || row.Bedrooms || row.bedrooms || '1', 10), 
-              bathrooms: parseFloat(row.BATHROOMS || row.Bathrooms || row.bathrooms || '1.0'),
+              name: name.substring(0, 255), // Ensure within field limits
+              address: String(row.ADDRESS || row.Address || row.address || '').substring(0, 500),
+              bedrooms: bedrooms,
+              bathrooms: bathrooms,
               amenities: amenities,
-              listingUrl: listingUrl,
-              icalUrl: icalUrl
+              listingUrl: String(listingUrl || '').substring(0, 500),
+              icalUrl: icalUrl ? String(icalUrl).substring(0, 500) : null
             };
 
             properties.push(property);
+            console.log(`Added property: ${property.name} (${property.propertyId})`);
           } catch (error) {
             console.error('Error parsing CSV row:', error);
             errors.push(`Error parsing row: ${JSON.stringify(row).substring(0, 150)}... - ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -223,7 +255,7 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
         .on('end', async () => {
           try {
             console.log(`Parsed ${properties.length} properties from CSV`);
-            
+
             // Skip empty files
             if (properties.length === 0) {
               resolve({
@@ -259,7 +291,7 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
                   listingUrl: String(property.listingUrl || '').substring(0, 500),
                   icalUrl: property.icalUrl ? String(property.icalUrl).substring(0, 500) : null,
                 };
-                
+
                 if (existingProperties.length > 0) {
                   // Update existing property
                   await db

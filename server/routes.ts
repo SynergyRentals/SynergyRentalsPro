@@ -2839,7 +2839,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // CSV File Upload Import route for properties
+  // CSV File Upload route for properties
+// This endpoint allows uploading a CSV file directly via multipart/form-data
+app.post("/csv_direct_upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+  // Force the response content type to always be JSON
+  res.setHeader('Content-Type', 'application/json');
+  let tempFilePath = '';
+  
+  try {
+    console.log("CSV upload request received");
+    
+    // Debug request information
+    console.log("Request files:", req.files ? Object.keys(req.files) : "No files");
+    console.log("Headers:", req.headers['content-type']);
+    
+    // Check if the request includes a file
+    if (!req.files || !req.files.file) {
+      console.log("No file found in request");
+      return res.status(400).json({
+        success: false,
+        message: "No file was uploaded. Please ensure you're sending a file with field name 'file'."
+      });
+    }
+    
+    const uploadedFile = req.files.file as fileUpload.UploadedFile;
+    console.log("File received:", uploadedFile.name, "Size:", uploadedFile.size, "MIME:", uploadedFile.mimetype);
+    
+    // Ensure it's a CSV file
+    if (!uploadedFile.name.endsWith('.csv') && uploadedFile.mimetype !== 'text/csv') {
+      return res.status(400).json({
+        success: false,
+        message: `Uploaded file must be a CSV file. Received: ${uploadedFile.mimetype}`
+      });
+    }
+    
+    // Create temporary file to process
+    tempFilePath = `./tmp/tmp-${Date.now()}.csv`;
+    
+    // Ensure tmp directory exists
+    if (!fs.existsSync('./tmp')) {
+      fs.mkdirSync('./tmp', { recursive: true });
+    }
+    
+    console.log("Moving file to:", tempFilePath);
+    
+    // Move the uploaded file to the temp location
+    await uploadedFile.mv(tempFilePath);
+    
+    // Check the file was moved successfully
+    if (!fs.existsSync(tempFilePath)) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to save uploaded file"
+      });
+    }
+    
+    console.log("File saved, checking file size:", fs.statSync(tempFilePath).size);
+    
+    // Import the CSV importer function
+    const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
+    
+    // Process the CSV file with error handling
+    console.log("Starting CSV import process");
+    try {
+      const result = await importGuestyPropertiesFromCSV(tempFilePath);
+      console.log("CSV import complete:", result);
+      
+      // Add detailed status information to response
+      // Track errors and warnings
+      if (result.errors && result.errors.length > 0) {
+        console.log("CSV import had some errors:", result.errors);
+        result.hadErrors = true;
+        result.errorCount = result.errors.length;
+        // Limit error output to prevent huge responses
+        if (result.errors.length > 5) {
+          result.errors = result.errors.slice(0, 5);
+          result.message += ` (Showing 5 of ${result.errorCount} errors)`;
+        }
+      }
+      
+      // Add warning information
+      if (result.warnings && result.warnings.length > 0) {
+        console.log("CSV import had some warnings:", result.warnings);
+        result.hadWarnings = true;
+        result.warningCount = result.warnings.length;
+        // Limit warning output
+        if (result.warnings.length > 5) {
+          result.warnings = result.warnings.slice(0, 5);
+          result.message += ` (Showing 5 of ${result.warningCount} warnings)`;
+        }
+      }
+      
+      // Log the action
+      try {
+        await storage.createLog({
+          action: "GUESTY_CSV_IMPORT",
+          userId: req.user?.id,
+          targetTable: "guesty_properties",
+          notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV (${uploadedFile.name})`,
+          ipAddress: req.ip
+        });
+      } catch (logError) {
+        console.error("Failed to log CSV import action:", logError);
+        // Continue even if logging fails
+      }
+      
+      // Return the import result
+      res.json(result);
+    } catch (importError) {
+      console.error("Error in CSV import process:", importError);
+      res.status(500).json({
+        success: false,
+        message: `Error processing CSV: ${importError instanceof Error ? importError.message : "Unknown error"}`
+      });
+    } finally {
+      // Cleanup - try to delete the temp file but don't fail if it doesn't work
+      try {
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+          console.log("Cleaned up temporary file:", tempFilePath);
+        }
+      } catch (cleanupError) {
+        console.error("Failed to clean up temporary file:", cleanupError);
+      }
+    }
+  } catch (error) {
+    console.error("Error handling CSV upload:", error);
+    
+    // Return a JSON error response
+    res.status(500).json({
+      success: false,
+      message: `Error handling CSV upload: ${error instanceof Error ? error.message : "Unknown error"}`
+    });
+    
+    // Cleanup in case of error
+    try {
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    } catch (cleanupError) {
+      console.error("Failed to clean up temporary file after error:", cleanupError);
+    }
+  }
+});load Import route for properties
   // This endpoint allows uploading a CSV file directly via multipart/form-data
   app.post("/api/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     // Force the response content type to always be JSON
