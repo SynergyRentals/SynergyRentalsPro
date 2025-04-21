@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSV Import Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    button { padding: 8px 12px; margin: 5px; }
+    #result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; min-height: 100px; }
+    input { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Test CSV Import</h1>
+  
+  <div>
+    <h2>1. Login</h2>
+    <button id="login">Login as Admin</button>
+    <div id="loginStatus"></div>
+  </div>
+  
+  <div>
+    <h2>2. Upload CSV</h2>
+    <input type="file" id="csvFile" accept=".csv" />
+    <button id="upload" disabled>Upload CSV</button>
+  </div>
+  
+  <div>
+    <h2>Results:</h2>
+    <pre id="result">Results will appear here</pre>
+  </div>
+  
+  <script>
+    let token = null;
+    
+    document.getElementById('login').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'admin' })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          token = data.token;
+          document.getElementById('loginStatus').textContent = 'Login successful!';
+          document.getElementById('upload').removeAttribute('disabled');
+        } else {
+          document.getElementById('loginStatus').textContent = `Login failed: ${data.message || 'Unknown error'}`;
+        }
+      } catch (error) {
+        document.getElementById('loginStatus').textContent = `Error: ${error.message}`;
+      }
+    });
+    
+    document.getElementById('upload').addEventListener('click', async () => {
+      const fileInput = document.getElementById('csvFile');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        document.getElementById('result').textContent = 'Please select a CSV file first.';
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      if (!file.name.endsWith('.csv')) {
+        document.getElementById('result').textContent = 'File must be a CSV file.';
+        return;
+      }
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        document.getElementById('result').textContent = 'Uploading...';
+        
+        const response = await fetch('/api/guesty/import-csv-upload', {
+          method: 'POST',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById('result').textContent = `Error: ${error.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

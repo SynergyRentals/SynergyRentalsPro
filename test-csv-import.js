@@ -1,7 +1,7 @@
 // Test CSV import with authentication
-import fetch from 'node-fetch';
-import FormData from 'form-data';
-import fs from 'fs';
+const fetch = require('node-fetch');
+const FormData = require('form-data');
+const fs = require('fs');
 
 async function login() {
   try {

@@ -2912,37 +2912,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
             result.message += ` (Showing 5 of ${result.errorCount} errors)`;
           }
         }
-        return res.json(result);
+        
+        // Log the successful import
+        try {
+          await storage.createLog({
+            action: "GUESTY_CSV_UPLOAD_IMPORT",
+            userId: req.user?.id,
+            targetTable: "guesty_properties",
+            notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV`,
+            ipAddress: req.ip
+          });
+        } catch (logError) {
+          console.error("Error logging CSV import:", logError);
+        }
+        
+        // Return success response
+        const response = res.json(result);
+        
+        // Clean up the temp file (after sending the response)
+        try {
+          fs.unlinkSync(tempFilePath);
+          tempFilePath = '';
+          console.log("Temporary file cleaned up successfully");
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp file:", cleanupError);
+        }
+        
+        return response;
       } catch (importError) {
         console.error("CSV import failed with error:", importError);
+        
+        // Clean up the temp file even when there's an error
+        try {
+          if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+            tempFilePath = '';
+            console.log("Temporary file cleaned up after error");
+          }
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp file after import error:", cleanupError);
+        }
+        
         return res.status(500).json({
           success: false,
           message: `CSV import failed: ${importError instanceof Error ? importError.message : "Unknown error"}`,
         });
-      }
-      
-      // If we reached here, it means the CSV import was successful and we already sent a response above
-      // No need to send another response here
-      
-      // Clean up the temp file
-      try {
-        fs.unlinkSync(tempFilePath);
-        tempFilePath = '';
-      } catch (cleanupError) {
-        console.error("Error cleaning up temp file:", cleanupError);
-      }
-      
-      // Log the action
-      try {
-        await storage.createLog({
-          action: "GUESTY_CSV_UPLOAD_IMPORT",
-          userId: req.user?.id,
-          targetTable: "guesty_properties",
-          notes: `Imported Guesty properties from uploaded CSV`,
-          ipAddress: req.ip
-        });
-      } catch (logError) {
-        console.error("Error logging CSV import:", logError);
       }
     } catch (error) {
       console.error("Error processing uploaded CSV:", error);
