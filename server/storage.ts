@@ -16,6 +16,9 @@ import { pool } from "./db";
 
 // Interface for storage operations
 export interface IStorage {
+  // Session store for authentication
+  sessionStore: session.Store;
+  
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -118,6 +121,18 @@ export interface IStorage {
 
 // Database Storage implementation
 export class DatabaseStorage implements IStorage {
+  // Initialize session store with PostgreSQL
+  sessionStore: session.Store;
+
+  constructor() {
+    const PostgresStore = connectPg(session);
+    this.sessionStore = new PostgresStore({
+      pool, // use existing pg pool
+      tableName: 'session', // use custom table name (default: "session")
+      createTableIfMissing: true
+    });
+    console.log("[Storage] PostgreSQL session store initialized");
+  }
   // Users
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
