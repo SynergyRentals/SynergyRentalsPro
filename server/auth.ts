@@ -66,7 +66,8 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       secure: false, // Set to false for development
-      sameSite: 'none', // More permissive for development
+      sameSite: 'lax', // Using lax for development
+      httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     }
   };
