@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSV Import Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="file"] {
+      display: block;
+      margin-bottom: 10px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .warning {
+      color: #856404;
+      background-color: #fff3cd;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    .sample {
+      font-family: monospace;
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CSV Property Import Tester</h1>
+    
+    <div class="card">
+      <h2>Login</h2>
+      <div class="form-group">
+        <label for="username">Username:</label>
+        <input type="text" id="username" value="admin">
+      </div>
+      <div class="form-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" value="admin">
+      </div>
+      <button id="login-btn">Login</button>
+      <div id="login-result" class="result"></div>
+    </div>
+    
+    <div class="card">
+      <h2>CSV Import</h2>
+      <div class="warning">
+        <strong>Note:</strong> Before uploading, please ensure the CSV file has the correct format.
+      </div>
+      
+      <div class="form-group">
+        <label for="csv-file">Select CSV File:</label>
+        <input type="file" id="csv-file" accept=".csv">
+      </div>
+      
+      <button id="upload-btn" disabled>Upload CSV</button>
+      
+      <h3>Sample CSV Format:</h3>
+      <div class="sample">
+        NAME,ADDRESS,BEDROOMS,BATHROOMS,AMENITIES,LISTING_URL,ICAL_URL<br>
+        Beach House,123 Ocean Dr,3,2.5,"WiFi,Pool,Beach Access",https://example.com/listing,https://example.com/ical<br>
+        Mountain Cabin,456 Pine Rd,2,1,"Fireplace,Hiking",https://example.com/listing2,<br>
+      </div>
+      
+      <div id="upload-result" class="result"></div>
+    </div>
+  </div>
+  
+  <script>
+    // Login functionality
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const loginResult = document.getElementById('login-result');
+      
+      loginResult.textContent = 'Logging in...';
+      
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          loginResult.innerHTML = `<strong>Login successful!</strong>`;
+          document.getElementById('upload-btn').removeAttribute('disabled');
+          localStorage.setItem('token', data.token);
+        } else {
+          loginResult.innerHTML = `<strong>Login failed:</strong> ${data.message || 'Unknown error'}`;
+        }
+      } catch (error) {
+        loginResult.innerHTML = `<strong>Error:</strong> ${error.message}`;
+      }
+    });
+    
+    // CSV Upload functionality
+    document.getElementById('upload-btn').addEventListener('click', async () => {
+      const fileInput = document.getElementById('csv-file');
+      const uploadResult = document.getElementById('upload-result');
+      const token = localStorage.getItem('token');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        uploadResult.innerHTML = '<strong>Error:</strong> Please select a CSV file.';
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      if (!file.name.endsWith('.csv')) {
+        uploadResult.innerHTML = '<strong>Error:</strong> File must be a CSV file.';
+        return;
+      }
+      
+      uploadResult.textContent = 'Uploading...';
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/guesty/import-csv-upload', {
+          method: 'POST',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          body: formData
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          uploadResult.innerHTML = `<strong>Server Error (${response.status}):</strong> ${errorText}`;
+          return;
+        }
+        
+        const data = await response.json();
+        
+        // Format the response nicely
+        let resultHtml = `<h3>Import Result:</h3>`;
+        resultHtml += `<p><strong>Success:</strong> ${data.success}</p>`;
+        resultHtml += `<p><strong>Message:</strong> ${data.message}</p>`;
+        resultHtml += `<p><strong>Properties Count:</strong> ${data.propertiesCount}</p>`;
+        
+        if (data.hadErrors) {
+          resultHtml += `<h4>Errors (${data.errorCount}):</h4><ul>`;
+          data.errors.forEach(error => {
+            resultHtml += `<li>${error}</li>`;
+          });
+          resultHtml += `</ul>`;
+        }
+        
+        if (data.hadWarnings) {
+          resultHtml += `<h4>Warnings (${data.warningCount}):</h4><ul>`;
+          data.warnings.forEach(warning => {
+            resultHtml += `<li>${warning}</li>`;
+          });
+          resultHtml += `</ul>`;
+        }
+        
+        uploadResult.innerHTML = resultHtml;
+      } catch (error) {
+        uploadResult.innerHTML = `<strong>Error:</strong> ${error.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

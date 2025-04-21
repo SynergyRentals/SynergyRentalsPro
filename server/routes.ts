@@ -2902,6 +2902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("CSV import complete:", result);
         
         // Add detailed status information to response
+        // Track errors and warnings
         if (result.errors && result.errors.length > 0) {
           console.log("CSV import had some errors:", result.errors);
           result.hadErrors = true;
@@ -2910,6 +2911,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (result.errors.length > 5) {
             result.errors = result.errors.slice(0, 5);
             result.message += ` (Showing 5 of ${result.errorCount} errors)`;
+          }
+        }
+        
+        // Add warning information
+        if (result.warnings && result.warnings.length > 0) {
+          console.log("CSV import had some warnings:", result.warnings);
+          result.hadWarnings = true;
+          result.warningCount = result.warnings.length;
+          // Limit warning output to prevent huge responses
+          if (result.warnings.length > 5) {
+            result.warnings = result.warnings.slice(0, 5);
+            result.message += ` (Showing 5 of ${result.warningCount} warnings)`;
           }
         }
         
