@@ -15,7 +15,7 @@ localPort = 5000
 externalPort = 80
 
 [workflows]
-runButton = "Custom Dev Server"
+runButton = "Restart App"
 
 [[workflows.workflow]]
 name = "Project"
@@ -51,7 +51,7 @@ task = "shell.exec"
 args = "npm run dev"
 
 [[workflows.workflow]]
-name = "Custom Dev Server"
+name = "Restart App"
 author = 41304928
 mode = "sequential"
 
