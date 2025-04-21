@@ -107,6 +107,12 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
   // Check if property exists and has icalUrl
   const hasIcalUrl = property && typeof property === 'object' && 'icalUrl' in property && !!property.icalUrl;
   
+  // Handle null or undefined values for bedrooms and bathrooms with proper defaults
+  const bedrooms = property?.bedrooms || 1;
+  const bathrooms = property?.bathrooms || 1;
+  // Set default amenities as empty array if undefined or null
+  const amenities = Array.isArray(property?.amenities) ? property.amenities : [];
+  
   // Fetch calendar events if property has icalUrl
   const { data: calendarEvents, isLoading: isLoadingCalendar, refetch: refetchCalendar } = useQuery({
     queryKey: [`/api/properties/${id}/calendar`],
@@ -269,14 +275,14 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
         <div className="flex items-center">
           <BedDouble className="h-5 w-5 mr-2 text-muted-foreground" />
           <span>
-            {property.bedrooms} {property.bedrooms === 1 ? "Bedroom" : "Bedrooms"}
+            {bedrooms} {bedrooms === 1 ? "Bedroom" : "Bedrooms"}
           </span>
         </div>
         
         <div className="flex items-center">
           <Bath className="h-5 w-5 mr-2 text-muted-foreground" />
           <span>
-            {property.bathrooms} {property.bathrooms === 1 ? "Bathroom" : "Bathrooms"}
+            {bathrooms} {bathrooms === 1 ? "Bathroom" : "Bathrooms"}
           </span>
         </div>
         
@@ -315,9 +321,9 @@ export default function PropertyDetail({ id, onEdit }: PropertyDetailProps) {
                 <CardTitle>Amenities</CardTitle>
               </CardHeader>
               <CardContent>
-                {property.amenities && property.amenities.length > 0 ? (
+                {amenities.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {property.amenities.map((amenity: string) => (
+                    {amenities.map((amenity: string) => (
                       <Badge key={amenity} variant="secondary">
                         {amenity}
                       </Badge>
