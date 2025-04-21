@@ -1,0 +1,3 @@
+NAME,ADDRESS,BEDROOMS,BATHROOMS,AMENITIES,LISTING_URL
+Test Property 1,123 Main St,2,2.5,"Pool,WiFi,Parking",https://example.com/property1
+Test Property 2,456 Oak Ave,3,2.0,"WiFi,Gym,Pet Friendly",https://example.com/property2
