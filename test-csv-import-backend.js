@@ -7,7 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { importGuestyPropertiesFromCSV } from './server/lib/csvImporter.ts';
+import { importGuestyPropertiesFromCSV } from './server/lib/csvImporter';
 
 // Get the directory name using ESM
 const __filename = fileURLToPath(import.meta.url);
