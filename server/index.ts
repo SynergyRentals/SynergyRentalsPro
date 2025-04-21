@@ -60,6 +60,23 @@ app.use((req, res, next) => {
   setupRoutes(app);
   setupAdminDataRoutes(app);
   setupGuestySyncRoutes(app);
+  
+  // Apply API error middleware to ensure consistent JSON responses
+  app.use('/api', (err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error("API error middleware caught:", err);
+    
+    // Always set JSON content type
+    res.setHeader('Content-Type', 'application/json');
+    
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    
+    res.status(status).json({ 
+      success: false,
+      message,
+      error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error("Global error handler caught:", err);

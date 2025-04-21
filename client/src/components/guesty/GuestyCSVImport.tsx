@@ -64,14 +64,29 @@ export function GuestyCSVImport() {
       const response = await fetch("/api/guesty/import-csv-upload", {
         method: "POST",
         body: formData,
-        credentials: "same-origin"
+        credentials: "same-origin",
+        headers: {
+          // Don't set Content-Type header for FormData - browser will set it with boundary
+          "Accept": "application/json"
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      // Get the response text first
+      const text = await response.text();
+      
+      // Try to parse as JSON
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Failed to parse server response as JSON:", parseError);
+        console.log("Response was:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        throw new Error(`Invalid JSON response from server: ${text.substring(0, 100)}...`);
       }
       
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${result.message || response.statusText}`);
+      }
       
       // Add additional validation of the response
       if (!result) {

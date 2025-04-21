@@ -2808,6 +2808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSV Import route for properties (using fixed file path)
   // This endpoint imports properties data from a CSV file when API is rate limited
   app.post("/api/guesty/import-csv", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    // Force the response content type to always be JSON
+    res.setHeader('Content-Type', 'application/json');
     try {
       // Use the CSV file in attached_assets directory
       const filePath = './attached_assets/461800_2025-04-15_00_27_58.csv';
@@ -2840,6 +2842,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSV File Upload Import route for properties
   // This endpoint allows uploading a CSV file directly via multipart/form-data
   app.post("/api/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    // Force the response content type to always be JSON
+    res.setHeader('Content-Type', 'application/json');
     let tempFilePath = '';
     
     try {
