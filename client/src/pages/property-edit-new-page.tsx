@@ -1,17 +1,21 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PropertyForm from "../components/properties/PropertyForm";
 import { apiRequest } from "../lib/queryClient";
 
 export default function PropertyEditNewPage() {
-  const { id } = useParams();
+  // Use useRoute instead of useParams to match wouter's API
+  const [match, params] = useRoute("/properties/:id/edit");
   const [, navigate] = useLocation();
   
+  // Log routing info for debugging
+  console.log("Property edit page match:", match, "params:", params);
+  
   // Get property ID as number
-  const propertyId = id ? parseInt(id, 10) : undefined;
+  const propertyId = params?.id ? parseInt(params.id, 10) : undefined;
   
   // Fetch property data
   const { data: property, isLoading, error } = useQuery({
@@ -30,7 +34,11 @@ export default function PropertyEditNewPage() {
   
   // Handle navigation back to property detail
   const handleBack = () => {
-    navigate(`/properties/${id}`);
+    if (params?.id) {
+      navigate(`/properties/${params.id}`);
+    } else {
+      navigate("/properties");
+    }
   };
   
   // Handle success after property update
