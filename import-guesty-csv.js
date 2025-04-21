@@ -2,7 +2,7 @@
 import fetch from 'node-fetch';
 
 async function login() {
-  const response = await fetch('http://localhost:5000/api/auth/login', {
+  const response = await fetch('http://localhost:5000/api/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -21,15 +21,21 @@ async function login() {
   }
   
   console.log('Login successful');
-  return data.token;
+  
+  // Get the cookie from the response headers
+  const setCookieHeader = response.headers.get('set-cookie');
+  return { 
+    user: data,
+    cookie: setCookieHeader 
+  };
 }
 
-async function importCSV(token) {
+async function importCSV(sessionData) {
   const response = await fetch('http://localhost:5000/api/guesty/import-csv', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Cookie': sessionData.cookie
     }
   });
   
