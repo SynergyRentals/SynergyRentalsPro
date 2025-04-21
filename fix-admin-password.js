@@ -1,6 +1,8 @@
-const { Pool } = require('pg');
-const crypto = require('crypto');
-const { promisify } = require('util');
+import pg from 'pg';
+import crypto from 'crypto';
+import { promisify } from 'util';
+
+const { Pool } = pg;
 
 // Create a new pool directly
 const pool = new Pool({
