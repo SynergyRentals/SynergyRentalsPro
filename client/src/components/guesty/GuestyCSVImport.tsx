@@ -80,8 +80,8 @@ export function GuestyCSVImport() {
         });
       }, 150);
       
-      // Use the direct upload endpoint
-      const response = await fetch("/csv_direct_upload", {
+      // Use the direct upload endpoint on port 5001
+      const response = await fetch("http://localhost:5001/direct_csv_upload", {
         method: "POST",
         body: formData,
         credentials: "same-origin",

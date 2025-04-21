@@ -53,6 +53,84 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Create a separate standalone Express app for direct CSV upload
+  // This completely bypasses the middleware chain
+  const directUploadApp = express();
+  
+  // Only add minimal required middleware
+  directUploadApp.use(express.json());
+  
+  // Add CORS middleware to allow requests from the main app
+  directUploadApp.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    next();
+  });
+  
+  directUploadApp.use(fileUpload({
+    createParentPath: true,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    abortOnLimit: true,
+    useTempFiles: true,
+    tempFileDir: './tmp/',
+  }));
+  
+  // Add direct CSV upload endpoint
+  directUploadApp.post('/direct_csv_upload', async (req, res) => {
+    // Always force JSON response
+    res.setHeader('Content-Type', 'application/json');
+    console.log("[Direct Upload] CSV upload request received");
+    
+    try {
+      // Check if the request includes a file
+      if (!req.files || !req.files.file) {
+        console.log("[Direct Upload] No file found in request");
+        return res.status(400).json({
+          success: false,
+          message: "No file was uploaded. Please ensure you're sending a file with field name 'file'."
+        });
+      }
+      
+      const uploadedFile = req.files.file as fileUpload.UploadedFile;
+      console.log("[Direct Upload] File received:", uploadedFile.name, "Size:", uploadedFile.size, "MIME:", uploadedFile.mimetype);
+      
+      // Ensure it's a CSV file
+      if (!uploadedFile.name.endsWith('.csv') && uploadedFile.mimetype !== 'text/csv') {
+        return res.status(400).json({
+          success: false,
+          message: `Uploaded file must be a CSV file. Received: ${uploadedFile.mimetype}`
+        });
+      }
+      
+      // Process the CSV file
+      console.log("[Direct Upload] Processing CSV file");
+      
+      // Import the CSV importer dynamically to avoid circular references
+      const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
+      const result = await importGuestyPropertiesFromCSV(uploadedFile.tempFilePath);
+      
+      // Send the JSON response
+      console.log("[Direct Upload] CSV import complete, returning result");
+      return res.json(result);
+    } catch (error) {
+      console.error("[Direct Upload] Error:", error);
+      return res.status(500).json({
+        success: false,
+        message: `CSV import failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      });
+    }
+  });
+  
+  // Start direct upload server on a different port
+  directUploadApp.listen(5001, '0.0.0.0', () => {
+    console.log("[Direct Upload] Direct upload server running on port 5001");
+  });
+  
+  // Set up the main app
   const server = createServer(app);
   setupAuth(app);
   app.use('/api', apiResponseMiddleware);
