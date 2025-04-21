@@ -198,11 +198,10 @@ export async function importGuestyPropertiesFromCSV(filePath: string): Promise<{
             const listingUrl = row.LISTING_URL || row.ListingUrl || row.listingUrl || row.listing_url || '';
             const icalUrl = row.ICAL_URL || row.IcalUrl || row.icalUrl || row.ical_url || null;
 
-            try {
             // Additional validation for required fields
             if (!name || name.trim() === '') {
               warnings.push(`Row skipped: Missing name/title field: ${JSON.stringify(row).substring(0, 100)}...`);
-              continue;
+              return; // Skip this row
             }
 
             // Normalize and validate bedrooms

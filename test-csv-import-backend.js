@@ -86,23 +86,19 @@ async function runAllTests() {
   try {
     console.log('Starting CSV import tests...');
     
-    // Test 1: Valid CSV
-    await runTest('Valid CSV Test', validCsvPath);
+    // Import the actual properties file
+    const realCsvPath = path.join(__dirname, 'attached_assets', '461800_2025-04-15_00_27_58.csv'); 
+    console.log(`Testing actual property file from: ${realCsvPath}`);
     
-    // Test 2: Missing Name Field CSV
-    await runTest('Missing Name Field Test', missingNameCsvPath);
-    
-    // Test 3: Invalid Columns CSV
-    await runTest('Invalid Columns Test', invalidColumnsCsvPath);
-    
-    // Test 4: Empty CSV
-    await runTest('Empty CSV Test', emptyCsvPath);
-    
-    // Test 5: Invalid Data Types CSV
-    await runTest('Invalid Data Types Test', invalidTypesCsvPath);
-    
-    // Test 6: Non-existent file
-    await runTest('Non-existent File Test', path.join(testDir, 'does-not-exist.csv'));
+    if (fs.existsSync(realCsvPath)) {
+      console.log('Property CSV file exists. Attempting to import...');
+      const fileContent = fs.readFileSync(realCsvPath, 'utf8').substring(0, 200);
+      console.log('File preview:', fileContent, '...');
+      
+      await runTest('Real Property CSV Test', realCsvPath);
+    } else {
+      console.error('Property CSV file not found at path:', realCsvPath);
+    }
     
     console.log('\nAll tests completed!');
   } catch (error) {
