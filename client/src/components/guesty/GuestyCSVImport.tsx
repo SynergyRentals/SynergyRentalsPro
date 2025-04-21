@@ -80,11 +80,11 @@ export function GuestyCSVImport() {
         });
       }, 150);
       
-      // Use the CSV direct upload endpoint that was created specifically to avoid middleware issues
-      const response = await fetch("/csv_direct_upload", {
+      // Use the dedicated direct upload server running on port 5001
+      const response = await fetch("http://localhost:5001/direct_csv_upload", {
         method: "POST",
         body: formData,
-        credentials: "same-origin",
+        credentials: "omit", // Don't send cookies to different origin
         headers: {
           // Don't set Content-Type header for FormData - browser will set it with boundary
           "Accept": "application/json"

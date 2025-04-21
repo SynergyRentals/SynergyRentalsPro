@@ -79,7 +79,7 @@ app.use((req, res, next) => {
     tempFileDir: './tmp/',
   }));
   
-  // Add direct CSV upload endpoint
+  // Add direct CSV upload endpoint - make sure name matches what client is using
   directUploadApp.post('/direct_csv_upload', async (req, res) => {
     // Always force JSON response
     res.setHeader('Content-Type', 'application/json');
