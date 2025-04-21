@@ -15,6 +15,8 @@ export async function apiRequest(url: string, method: string = 'GET', data?: any
   const requestOptions: RequestInit = {
     method,
     ...options,
+    // This is crucial for session cookies!
+    credentials: 'include',
     headers: {
       ...(options.headers || {}),
       // Add default headers for JSON except when using FormData
@@ -61,6 +63,7 @@ export function getQueryFn(options: QueryFnOptions = {}) {
   return async ({ queryKey }: { queryKey: (string | object)[] }) => {
     try {
       const url = queryKey[0] as string;
+      // The apiRequest function will now include credentials
       const data = await apiRequest(url, 'GET');
       return data;
     } catch (error: any) {
