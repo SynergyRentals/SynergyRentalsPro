@@ -2994,8 +2994,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Added a "_json" endpoint that won't be transformed by middleware
-  app.post("/api_json/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+  // Added a non-API endpoint that won't be transformed by any middleware
+  app.post("/csv_direct_upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     // Force the response content type to always be JSON
     res.setHeader('Content-Type', 'application/json');
     let tempFilePath = '';

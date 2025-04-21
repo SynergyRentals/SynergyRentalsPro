@@ -60,8 +60,8 @@ export function GuestyCSVImport() {
         setUploadProgress(prev => Math.min(prev + 5, 90));
       }, 100);
       
-      // Use our new API endpoint that bypasses the Vite HTML conversion
-      const response = await fetch("/api_json/guesty/import-csv-upload", {
+      // Use a non-API route to completely bypass all middleware
+      const response = await fetch("/csv_direct_upload", {
         method: "POST",
         body: formData,
         credentials: "same-origin",
