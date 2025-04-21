@@ -60,8 +60,8 @@ export function GuestyCSVImport() {
         setUploadProgress(prev => Math.min(prev + 5, 90));
       }, 100);
       
-      // Using fetch directly for FormData since apiRequest doesn't handle it well
-      const response = await fetch("/api/guesty/import-csv-upload", {
+      // Use our new API endpoint that bypasses the Vite HTML conversion
+      const response = await fetch("/api_json/guesty/import-csv-upload", {
         method: "POST",
         body: formData,
         credentials: "same-origin",
@@ -74,6 +74,18 @@ export function GuestyCSVImport() {
       // Get the response text first
       const text = await response.text();
       
+      // Check if this is an HTML response (which means it's an error)
+      if (text.trim().startsWith('<!DOCTYPE html>') || text.includes('<html')) {
+        console.error("Received HTML response instead of JSON");
+        console.log("Response was:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        
+        // Create a simulated error result that the component can handle
+        return {
+          success: false,
+          message: "Server returned an HTML page instead of JSON. This likely means the file couldn't be processed correctly. Please try again with a different CSV file."
+        };
+      }
+      
       // Try to parse as JSON
       let result;
       try {
@@ -81,7 +93,7 @@ export function GuestyCSVImport() {
       } catch (parseError) {
         console.error("Failed to parse server response as JSON:", parseError);
         console.log("Response was:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
-        throw new Error(`Invalid JSON response from server: ${text.substring(0, 100)}...`);
+        throw new Error(`Invalid response format from server. Please try again with a different CSV file.`);
       }
       
       if (!response.ok) {

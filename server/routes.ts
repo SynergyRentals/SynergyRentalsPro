@@ -2994,6 +2994,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Added a "_json" endpoint that won't be transformed by middleware
+  app.post("/api_json/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
+    // Force the response content type to always be JSON
+    res.setHeader('Content-Type', 'application/json');
+    let tempFilePath = '';
+    
+    try {
+      console.log("CSV upload request received (JSON endpoint)");
+      
+      // Debug request information
+      console.log("Request files:", req.files ? Object.keys(req.files) : "No files");
+      console.log("Headers:", req.headers['content-type']);
+      
+      // Check if the request includes a file
+      if (!req.files || !req.files.file) {
+        console.log("No file found in request");
+        return res.status(400).json({
+          success: false,
+          message: "No file was uploaded. Please ensure you're sending a file with field name 'file'."
+        });
+      }
+      
+      const uploadedFile = req.files.file as fileUpload.UploadedFile;
+      console.log("File received:", uploadedFile.name, "Size:", uploadedFile.size, "MIME:", uploadedFile.mimetype);
+      
+      // Ensure it's a CSV file
+      if (!uploadedFile.name.endsWith('.csv') && uploadedFile.mimetype !== 'text/csv') {
+        return res.status(400).json({
+          success: false,
+          message: `Uploaded file must be a CSV file. Received: ${uploadedFile.mimetype}`
+        });
+      }
+      
+      // Create temporary file to process
+      tempFilePath = `./tmp/upload_${Date.now()}.csv`;
+      
+      // Ensure tmp directory exists
+      if (!fs.existsSync('./tmp')) {
+        fs.mkdirSync('./tmp', { recursive: true });
+      }
+      
+      console.log("Moving file to:", tempFilePath);
+      
+      // Move the uploaded file to the temp location
+      await uploadedFile.mv(tempFilePath);
+      
+      // Check the file was moved successfully
+      if (!fs.existsSync(tempFilePath)) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to save uploaded file"
+        });
+      }
+      
+      console.log("File saved, checking file size:", fs.statSync(tempFilePath).size);
+      
+      // Import the CSV importer function
+      const { importGuestyPropertiesFromCSV } = await import('./lib/csvImporter');
+      
+      // Process the CSV file with error handling
+      console.log("Starting CSV import process");
+      try {
+        const result = await importGuestyPropertiesFromCSV(tempFilePath);
+        console.log("CSV import complete:", result);
+        
+        // Add detailed status information to response
+        // Track errors and warnings
+        if (result.errors && result.errors.length > 0) {
+          console.log("CSV import had some errors:", result.errors);
+          result.hadErrors = true;
+          result.errorCount = result.errors.length;
+          // Limit error output to prevent huge responses
+          if (result.errors.length > 5) {
+            result.errors = result.errors.slice(0, 5);
+            result.message += ` (Showing 5 of ${result.errorCount} errors)`;
+          }
+        }
+        
+        // Add warning information
+        if (result.warnings && result.warnings.length > 0) {
+          console.log("CSV import had some warnings:", result.warnings);
+          result.hadWarnings = true;
+          result.warningCount = result.warnings.length;
+          // Limit warning output to prevent huge responses
+          if (result.warnings.length > 5) {
+            result.warnings = result.warnings.slice(0, 5);
+            result.message += ` (Showing 5 of ${result.warningCount} warnings)`;
+          }
+        }
+        
+        // Log the successful import
+        try {
+          await storage.createLog({
+            action: "GUESTY_CSV_UPLOAD_IMPORT",
+            userId: req.user?.id,
+            targetTable: "guesty_properties",
+            notes: `Imported ${result.propertiesCount} Guesty properties from uploaded CSV`,
+            ipAddress: req.ip
+          });
+        } catch (logError) {
+          console.error("Error logging CSV import:", logError);
+        }
+        
+        // Return success response
+        const response = res.json(result);
+        
+        // Clean up the temp file (after sending the response)
+        try {
+          fs.unlinkSync(tempFilePath);
+          tempFilePath = '';
+          console.log("Temporary file cleaned up successfully");
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp file:", cleanupError);
+        }
+        
+        return response;
+      } catch (importError) {
+        console.error("CSV import failed with error:", importError);
+        
+        // Clean up the temp file even when there's an error
+        try {
+          if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+            tempFilePath = '';
+            console.log("Temporary file cleaned up after error");
+          }
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp file after import error:", cleanupError);
+        }
+        
+        return res.status(500).json({
+          success: false,
+          message: `CSV import failed: ${importError instanceof Error ? importError.message : "Unknown error"}`,
+        });
+      }
+    } catch (error) {
+      console.error("Error processing uploaded CSV:", error);
+      
+      // Clean up temp file if it exists
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp file after error:", cleanupError);
+        }
+      }
+      
+      res.status(500).json({ 
+        success: false,
+        message: `Error processing uploaded CSV: ${error instanceof Error ? error.message : "Unknown error"}`
+      });
+    }
+  });
+
   // Full sync route (properties and reservations)
   // TODO: This will be migrated to use guestyClient for all sync operations in a future update
   // Current implementation is preserved for now to ensure backward compatibility
