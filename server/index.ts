@@ -62,11 +62,21 @@ app.use((req, res, next) => {
   setupGuestySyncRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("Global error handler caught:", err);
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    
+    // Always set JSON content type to fix HTML response bug
     res.setHeader('Content-Type', 'application/json');
-    res.status(status).json({ message });
-    throw err;
+    
+    // Return a properly formatted JSON error response
+    res.status(status).json({ 
+      success: false,
+      message,
+      error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+    
+    // Don't rethrow the error - this was causing HTML responses
   });
 
   if (app.get("env") === "development") {
