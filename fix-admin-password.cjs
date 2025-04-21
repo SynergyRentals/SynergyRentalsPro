@@ -24,7 +24,7 @@ async function hashPassword(password) {
 async function main() {
   try {
     // Hash the default password
-    const password = 'password123';
+    const password = 'admin';
     const hashedPassword = await hashPassword(password);
     console.log(`Hashed password: ${hashedPassword}`);
     
@@ -37,7 +37,7 @@ async function main() {
     
     console.log(`Updated ${result.rowCount} rows`);
     
-    console.log('Admin password reset successfully to "password123"');
+    console.log('Admin password reset successfully to "admin"');
   } catch (error) {
     console.error('Error resetting admin password:', error);
   } finally {
