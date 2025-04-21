@@ -75,14 +75,31 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = Number(process.env.PORT) || 3000; // Using 3000 as the default port to avoid conflict
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    const address = server.address();
-    const actualPort = typeof address === 'object' && address ? address.port : port;
-    log(`serving on port ${actualPort}`);
-  });
+  // Try different ports if the primary one is unavailable
+  let port = Number(process.env.PORT) || 5000;
+  const fallbackPorts = [3000, 8080, 8000];
+  let serverStarted = false;
+  
+  const startServer = (portToUse: number) => {
+    server.listen({
+      port: portToUse,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      serverStarted = true;
+      const address = server.address();
+      const actualPort = typeof address === 'object' && address ? address.port : portToUse;
+      log(`serving on port ${actualPort}`);
+    }).on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE' && fallbackPorts.length > 0) {
+        const nextPort = fallbackPorts.shift();
+        log(`Port ${portToUse} is in use, trying port ${nextPort}`);
+        startServer(nextPort!);
+      } else {
+        log(`Failed to start server: ${err.message}`);
+      }
+    });
+  };
+  
+  startServer(port);
 })();
