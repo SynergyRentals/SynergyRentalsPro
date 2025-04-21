@@ -1,16 +1,20 @@
 import React, { useState } from "react";
-import { useParams, useLocation } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PropertyDetail from "../components/properties/PropertyDetail";
 
 export default function PropertyDetailNewPage() {
-  const { id } = useParams();
+  // Use useRoute instead of useParams to match wouter's API
+  const [match, params] = useRoute("/properties/:id");
   const [, navigate] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   
+  // Log match and params for debugging
+  console.log("Property detail page match:", match, "params:", params);
+  
   // Get property ID as number
-  const propertyId = id ? parseInt(id, 10) : undefined;
+  const propertyId = params?.id ? parseInt(params.id, 10) : undefined;
   
   // Handle navigation back to properties list
   const handleBack = () => {
@@ -19,7 +23,9 @@ export default function PropertyDetailNewPage() {
   
   // Toggle edit mode
   const handleEdit = () => {
-    navigate(`/properties/${id}/edit`);
+    if (params?.id) {
+      navigate(`/properties/${params.id}/edit`);
+    }
   };
   
   // If no valid property ID, return error state
