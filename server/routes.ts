@@ -29,6 +29,7 @@ import {
 import { guestyClient } from "./lib/guestyApiClient";
 import { getCalendarEvents, getCachedCalendarEvents, clearIcalCache, getCheckoutDate, normalizeToUTCMidnight, createFallbackDates } from "./services/icalService";
 import { syncAllGuestyListings, syncAllGuestyReservations, syncAllGuestyData } from "./services/guestySyncService";
+import { importGuestyPropertiesFromCSV } from "./lib/csvImporter";
 import { verifyGuestyWebhookMiddleware } from "./lib/webhookVerifier";
 import { extractWebhookDetails, logWebhookEvent, processWebhookEvent } from "./lib/webhookProcessor";
 import { processHostAiWebhook } from "./lib/hostAiWebhookHandler";
