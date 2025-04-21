@@ -75,7 +75,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = Number(process.env.PORT) || 3000; // Changed from 5000 to 3000 to avoid port conflict
+  const port = Number(process.env.PORT) || 3000; // Using 3000 as the default port to avoid conflict
   server.listen({
     port,
     host: "0.0.0.0",
