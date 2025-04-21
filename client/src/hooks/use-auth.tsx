@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
+      // Adding withCredentials to ensure cookies are sent with the request
       return await apiRequest("/api/login", "POST", credentials);
     },
     onSuccess: (user: SelectUser) => {
