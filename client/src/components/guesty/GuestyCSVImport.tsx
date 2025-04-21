@@ -80,8 +80,8 @@ export function GuestyCSVImport() {
         });
       }, 150);
       
-      // Revert to using a standard endpoint to avoid CORS issues in deployment environments
-      const response = await fetch("/api/guesty/import-csv-upload", {
+      // Use the CSV direct upload endpoint that was created specifically to avoid middleware issues
+      const response = await fetch("/csv_direct_upload", {
         method: "POST",
         body: formData,
         credentials: "same-origin",
@@ -235,7 +235,7 @@ export function GuestyCSVImport() {
             )}
             
             {importResult && importResult.success && (
-              <Alert variant="success" className="mt-2 bg-green-50 border-green-200">
+              <Alert className="mt-2 bg-green-50 border-green-200">
                 <AlertTitle>Import Successful</AlertTitle>
                 <AlertDescription className="text-xs">
                   Successfully imported {importResult.propertiesCount || 0} properties.

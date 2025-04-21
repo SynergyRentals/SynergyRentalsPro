@@ -2982,8 +2982,10 @@ app.post("/csv_direct_upload", checkRole(["admin", "ops"]), async (req: Request,
       console.error("Failed to clean up temporary file after error:", cleanupError);
     }
   }
-});load Import route for properties
-  // This endpoint allows uploading a CSV file directly via multipart/form-data
+});
+
+// CSV Import route for properties
+// This endpoint allows uploading a CSV file directly via multipart/form-data
   app.post("/api/guesty/import-csv-upload", checkRole(["admin", "ops"]), async (req: Request, res: Response) => {
     // Force the response content type to always be JSON
     res.setHeader('Content-Type', 'application/json');
